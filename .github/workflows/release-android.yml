@@ -11,7 +11,7 @@ on:
         default: false
       tag_name:
         description: Android release tag
-        default: android-v0.1.1-beta.1
+        default: android-v0.1.2-beta.1
         required: true
 
 permissions:

@@ -7,7 +7,7 @@ import pytest
 from scripts import desktop_release
 
 
-@pytest.mark.parametrize('version', ['0.1.0', '0.1.1'])
+@pytest.mark.parametrize('version', ['0.1.0', '0.1.1', '0.1.2'])
 def test_publication_rejects_missing_platform_and_checksums_exact_files(tmp_path, monkeypatch, version):
     monkeypatch.setattr(desktop_release, '__version__', version)
     names = ['Windows-x64.zip', 'Linux-x64.tar.gz', 'macOS-arm64-UNTESTED.zip', 'macOS-x64-UNTESTED.zip']

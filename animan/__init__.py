@@ -1,7 +1,7 @@
 """AnimeLab - Anime Downloader in Python (FastAPI)."""
 import os
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 def _sanitize_proxy_env():
     """Normalise automatiquement les URLs de proxy SOCKS de socks:// vers socks5://

@@ -20,8 +20,8 @@ android {
         applicationId = "com.animan.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 215
-        versionName = "0.1.1"
+        versionCode = 216
+        versionName = "0.1.2"
         manifestPlaceholders["appLabel"] = "@string/app_name"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

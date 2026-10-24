@@ -1,6 +1,6 @@
 [project]
 name = "animelab"
-version = "0.1.1"
+version = "0.1.2"
 description = "AnimeLab Python engine and web application"
 requires-python = ">=3.12,<3.14"
 license = "GPL-3.0-only"
