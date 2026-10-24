@@ -16,12 +16,6 @@ PKG = 'eu.kanade.tachiyomi.animeextension.fr.frenchanime'
 BASE = 'https://french-anime.com'
 
 
-@pytest.fixture(autouse=True)
-def fixture_dns(monkeypatch):
-    import socket
-    monkeypatch.setattr(socket, 'getaddrinfo', lambda *args, **kwargs: [(socket.AF_INET, socket.SOCK_STREAM, 6, '', ('93.184.216.34', 443))])
-
-
 @pytest.mark.parametrize('pkg,host,expected', [
     (PKG, BASE, 'frenchanime'),
     ('eu.kanade.tachiyomi.animeextension.fr.franime', 'https://franime.fr', 'franime'),

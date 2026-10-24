@@ -13,6 +13,7 @@ logging.basicConfig(
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
@@ -239,6 +240,8 @@ install_error_handlers(app)
 from animan.api_contracts import install_contract_schema
 install_contract_schema(app)
 app.add_middleware(ErrorContractMiddleware)
+# Validate Host before CSRF checks, CORS preflights and route handling.
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS, www_redirect=False)
 
 app.include_router(network_router)
 app.include_router(anime_router)

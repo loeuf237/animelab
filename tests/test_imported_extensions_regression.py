@@ -8,13 +8,6 @@ from animan.services.aniyomi_container import AniyomiContainerSource
 from animan.services.aniyomi_dex_parser import SourceRecipe, AniyomiDexParser
 from animan.services.source_http import VerificationRequired
 
-@pytest.fixture(autouse=True)
-def public_fixture_dns(monkeypatch):
-    import socket
-    monkeypatch.setattr(socket, 'getaddrinfo', lambda *args, **kwargs: [(socket.AF_INET, socket.SOCK_STREAM, 6, '', ('93.184.216.34', 443))])
-
-
-
 def container(name, **kwargs):
     recipe = SourceRecipe(pkg=f'eu.kanade.tachiyomi.animeextension.fr.{name}', base_url=f'https://{name}.example', **kwargs)
     if name not in ('jetanime', 'vostfree', 'anisama'):

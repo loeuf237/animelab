@@ -31,11 +31,28 @@ else:
     DEFAULT_DB_PATH = str(DEFAULT_DB_DIR / "animan.sqlite3")
     DEFAULT_CACHE_DIR = HOME_DIR / ".animan" / "cache"
 
+def parse_allowed_hosts(value: str | None) -> list[str]:
+    """Parse incoming HTTP hosts independently of the server's bind address."""
+    if value is None:
+        return ["127.0.0.1", "localhost"]
+    hosts = list(dict.fromkeys(host.strip().lower() for host in value.split(",") if host.strip()))
+    if not hosts:
+        raise ValueError("ANIMAN_ALLOWED_HOSTS must contain at least one host")
+    for host in hosts:
+        name = host[2:] if host.startswith("*.") else host
+        if host != "*" and (
+            not name or "*" in name or any(char.isspace() or char in ":/\\?#@" for char in name)
+        ):
+            raise ValueError("ANIMAN_ALLOWED_HOSTS expects hosts without schemes, ports or paths")
+    return hosts
+
+
 class Settings:
     MAX_MEDIA_WORKERS: int = max(1, int(os.getenv("ANIMAN_MEDIA_WORKERS", "1")))
     MAX_EXPORT_WORKERS: int = max(1, int(os.getenv("ANIMAN_EXPORT_WORKERS", "1")))
     PORT: int = int(os.getenv("ANIMAN_PORT", "8080"))
     HOST: str = os.getenv("ANIMAN_HOST", "127.0.0.1")
+    ALLOWED_HOSTS: list[str] = parse_allowed_hosts(os.getenv("ANIMAN_ALLOWED_HOSTS"))
     SSL_VERIFY: bool = os.getenv("ANIMAN_SSL_VERIFY", "true").lower() in ("1", "true", "yes")
 
     # Sources anime

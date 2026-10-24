@@ -1,7 +1,6 @@
 import json
 import asyncio
 import shutil
-import socket
 import struct
 import subprocess
 from pathlib import Path
@@ -26,8 +25,6 @@ def isolated(monkeypatch):
     monkeypatch.setattr(library_service, "mark_as_downloaded", lambda *args: None)
     monkeypatch.setattr(manager, "broadcast_update", lambda task: None)
     monkeypatch.setattr(manager, "plex_organization", False)
-    monkeypatch.setattr(socket, "getaddrinfo", lambda *args: [
-        (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))])
 
 
 @pytest.fixture

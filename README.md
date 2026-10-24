@@ -87,9 +87,12 @@ Settings controls language, downloads, sources and proxies. For a source checkou
 | Variable | Purpose | Default |
 | --- | --- | --- |
 | `ANIMAN_HOST` | Server bind address | `127.0.0.1` |
+| `ANIMAN_ALLOWED_HOSTS` | Accepted HTTP hosts, comma-separated, without schemes or ports | `127.0.0.1,localhost` |
 | `ANIMAN_PORT` | HTTP port | `8080` |
 | `ANIMAN_RELOAD` | Reload the development server after code changes | `true` |
 | `ANIMAN_DOWNLOAD_DIR` | Download destination | `~/Downloads/Animan` on desktop |
+
+Only local HTTP hosts are accepted by default; other hosts receive HTTP 400. For LAN access or a reverse proxy, explicitly list the IP addresses or domain names used to reach AnimeLab, for example `ANIMAN_ALLOWED_HOSTS=127.0.0.1,localhost,192.168.1.50,anime.example.org`. This also works with Docker Compose. Setting `ANIMAN_HOST=0.0.0.0` alone does not authorize other hosts. Subdomains can be allowed with `*.example.org`; `*` disables host validation and should be avoided. These are incoming application hosts, not anime source domains.
 
 For local-only use without automatic reload, on Linux/macOS:
 
@@ -136,6 +139,8 @@ uv run --locked python scripts/check.py all
 ```
 
 The runner executes linting, typing, unit tests, the interface build, Python tests and browser tests. Python tests use a temporary home, database, cache and download directory. To run only the backend suite, after building the interface, use **`uv run --locked python scripts/check.py python`**; CI uses the same command with a JUnit report option.
+
+Tests share an offline DNS fixture in `tests/conftest.py`; numeric addresses and loopback connections remain usable, and DNS security cases can override it. Direct `python -m pytest tests` runs skip the SPA serving test if `frontend/dist/index.html` is absent. The isolated runner and CI still require the frontend build, so a missing build fails validation.
 
 Python dependencies, including development tools, are pinned in `uv.lock`; `requirements.txt` is a generated runtime-only export for pip and Docker. Frontend dependencies are pinned in `frontend/package-lock.json`. See the [development guide](docs/development.md) for system prerequisites, individual checks, dependency updates and the current typing/linting scope.
 

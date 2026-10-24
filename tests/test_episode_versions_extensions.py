@@ -1,5 +1,4 @@
 import json
-import socket
 from unittest.mock import AsyncMock, MagicMock
 import pytest
 from animan.models.download_task import DownloadTask, DownloadStatus
@@ -19,7 +18,6 @@ def isolated(monkeypatch, tmp_path):
     monkeypatch.setattr(manager, 'broadcast_update', lambda task: None)
     monkeypatch.setattr(library_service, 'save_task', lambda task: None)
     monkeypatch.setattr(library_service, 'save_tasks_batch', lambda tasks: None)
-    monkeypatch.setattr(socket, 'getaddrinfo', lambda *args: [(socket.AF_INET, socket.SOCK_STREAM, 6, '', ('93.184.216.34', 443))])
 
 
 @pytest.mark.parametrize('plex', [False, True])

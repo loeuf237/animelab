@@ -36,6 +36,7 @@ def test_environment(directory: Path) -> dict[str, str]:
         "ANIMAN_CACHE_DIR": str(directory / "cache"),
         "ANIMAN_STARTUP_REFRESH": "false",
         "ANIMAN_HOST": "127.0.0.1",
+        "ANIMAN_ALLOWED_HOSTS": "localhost,127.0.0.1,testserver,test",
         "ANIMAN_RELOAD": "false",
         "TMDB_API_KEY": "",
     })

@@ -2,8 +2,45 @@ import pytest
 import io
 import struct
 import zipfile
+import ipaddress
+import os
+import socket
 
+# App middleware is configured during collection, before fixtures run. These
+# names are test-only; production defaults accept localhost and 127.0.0.1.
+os.environ.setdefault("ANIMAN_ALLOWED_HOSTS", "localhost,127.0.0.1,testserver,test")
 from animan.config import settings
+
+_system_getaddrinfo = socket.getaddrinfo
+
+
+@pytest.fixture(autouse=True)
+def offline_dns(monkeypatch):
+    """Resolve fixture domains offline while preserving numeric/loopback sockets.
+
+    HTTP responses remain mocked by each test. Security tests can override DNS
+    to exercise failed resolution or private addresses; SSRF checks stay active.
+    """
+    from animan import security
+
+    def resolve(host, port, family=0, type=0, proto=0, flags=0):
+        if host is not None:
+            hostname = host.decode("ascii") if isinstance(host, bytes) else host
+            try:
+                ipaddress.ip_address(hostname)
+            except ValueError:
+                if hostname.lower().rstrip(".") == "localhost" or hostname.lower().rstrip(".").endswith(".localhost"):
+                    host = "::1" if family == socket.AF_INET6 else "127.0.0.1"
+                elif flags & socket.AI_NUMERICHOST:
+                    raise socket.gaierror(socket.EAI_NONAME, "Expected a numeric host")
+                else:
+                    host = "2606:4700:4700::1111" if family == socket.AF_INET6 else "93.184.216.34"
+        return _system_getaddrinfo(host, port, family, type, proto, flags)
+
+    # A fresh cache prevents DNS results from one test masking the next one's
+    # mocked failure or private address. monkeypatch restores it on teardown.
+    monkeypatch.setattr(security, "_DNS_CACHE", {})
+    monkeypatch.setattr(socket, "getaddrinfo", resolve)
 
 
 @pytest.fixture

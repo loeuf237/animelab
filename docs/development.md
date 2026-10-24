@@ -61,6 +61,17 @@ CI uses the last command on Python 3.12 and 3.13. The underlying test command is
 `python -m pytest tests -q`; the wrapper sets isolated storage before any engine
 imports. Do not use the underlying command with a personal library environment.
 
+`tests/conftest.py` mocks DNS centrally for offline fixture domains and isolates
+the DNS cache between tests. Numeric addresses and loopback sockets remain
+usable for local HTTP server tests. Override `socket.getaddrinfo` in a security
+test to simulate a private address or a failed lookup; URL safety checks remain
+enabled. The test environment permits `testserver` and `test` as HTTP hosts;
+production defaults permit only `localhost` and `127.0.0.1`.
+
+With the underlying pytest command, the SPA serving test uses `skipif` when
+`frontend/dist/index.html` is absent. The wrapper and CI still require this
+build and fail if it is missing; the skip only supports backend-only test runs.
+
 To apply frontend formatting or ESLint's safe automatic fixes:
 
 ```bash

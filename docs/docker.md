@@ -119,11 +119,21 @@ Compose reads these optional values from `.env`:
 | --- | --- | --- |
 | `ANIMELAB_PORT` | `8080` | Host port |
 | `ANIMELAB_BIND_ADDRESS` | `127.0.0.1` | Host address on which the port is published |
+| `ANIMAN_ALLOWED_HOSTS` | `127.0.0.1,localhost` | Accepted incoming HTTP hosts, comma-separated, without schemes or ports |
 | `ANIMELAB_LANGUAGE` | `fr` | Default application language; browser language detection still applies |
 | `ANIMELAB_STARTUP_REFRESH` | `true` | Refresh source feeds and the proxy list on startup |
 
-Use `ANIMELAB_BIND_ADDRESS=0.0.0.0` only when you want access from a trusted LAN,
-then open `http://SERVER_IP:8080/app/`. The server has no multi-user login system;
+For access from a trusted LAN, set both the bind address and the accepted hosts
+in `.env` (replace the example IP with the server's actual address):
+
+```dotenv
+ANIMELAB_BIND_ADDRESS=0.0.0.0
+ANIMAN_ALLOWED_HOSTS=127.0.0.1,localhost,192.168.1.50
+```
+
+Then open `http://SERVER_IP:8080/app/`. Unlisted HTTP hosts receive HTTP 400;
+binding to all interfaces does not authorize all hostnames. Include the public
+hostname when using a reverse proxy. The server has no multi-user login system;
 do not publish it directly to the Internet. Port binding defaults to this computer.
 Additional backend `ANIMAN_*` variables can be set in the service's `environment`
 through a Compose override. Paths inside the container differ from host paths.

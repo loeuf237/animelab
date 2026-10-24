@@ -4,12 +4,6 @@ import pytest
 from animan.services.aniyomi_container import AniyomiContainerSource
 from animan.services.aniyomi_dex_parser import SourceRecipe
 
-@pytest.fixture(autouse=True)
-def public_fixture_dns(monkeypatch):
-    import socket
-    monkeypatch.setattr(socket, 'getaddrinfo', lambda *args, **kwargs: [(socket.AF_INET, socket.SOCK_STREAM, 6, '', ('93.184.216.34', 443))])
-
-
 @pytest.mark.asyncio
 async def test_json_recipe_search_detail_sources():
     recipe = SourceRecipe(

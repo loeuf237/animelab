@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from fastapi.testclient import TestClient
+from pathlib import Path
 
 from run import app
 from animan.models.anime import AnimeDetail, Episode, AnimeResult
@@ -143,6 +144,10 @@ async def test_api_source_feed(client):
         assert len(data["releases"]) == 1
         assert data["releases"][0]["title"] == "Bleach TYBW"
 
+@pytest.mark.skipif(
+    not (Path(__file__).resolve().parents[1] / "frontend/dist/index.html").is_file(),
+    reason="SPA not built: cd frontend && npm ci && npm run build",
+)
 def test_spa_serving(client):
     """Vérifie que la SPA Vue 3 est servie par FastAPI sous /spa et /app."""
     resp = client.get("/spa")
