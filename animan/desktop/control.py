@@ -62,6 +62,8 @@ class ControlServer:
                     self.reply(200, owner.controller.status())
                 elif self.path == '/api/diagnostics':
                     self.reply(200, owner.controller.diagnose())
+                elif self.path == '/api/launcher-config':
+                    self.reply(200, owner.controller.config)
                 else:
                     self.reply(404, {'error': 'Not found'})
 
@@ -71,13 +73,16 @@ class ControlServer:
                     return
                 try:
                     length = int(self.headers.get('Content-Length', '0'))
-                    if not 0 < length <= 2048:
+                    if not 0 < length <= 8192:
                         raise ValueError('Invalid request size')
                     if self.headers.get_content_type() != 'application/json':
                         raise ValueError('Expected JSON')
                     data = json.loads(self.rfile.read(length))
                     if self.path == '/api/config':
                         owner.controller.save_config(data)
+                        self.reply(200, owner.controller.status())
+                    elif self.path == '/api/launcher-config':
+                        owner.controller.save_launcher_config(data)
                         self.reply(200, owner.controller.status())
                     elif self.path == '/api/action' and isinstance(data, dict) and data.get('action') in ('restart', 'stop'):
                         owner.controller.command(data['action'])

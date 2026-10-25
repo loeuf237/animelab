@@ -88,7 +88,7 @@ function render(value) {
   $('state').textContent = t(value.busy ? 'waiting' : value.ready ? 'ready' : value.running ? 'waiting' : 'offline');
   $('address').textContent = value.url || '—';
   $('open-app').hidden = !value.ready || value.busy;
-  if (value.ready && /^http:\/\/127\.0\.0\.1:\d+\/spa\/$/.test(value.url)) $('open-app').href = value.url;
+  if (value.ready && /^http:\/\/127\.0\.0\.1:\d+\/spa\/(?:downloads|library|sources|extensions|settings)?$/.test(value.url)) $('open-app').href = value.url;
   $('warning').textContent = [value.portFallback && t('fallback'), value.pendingRestart && t('pending'), value.nativeError && t('native'), value.error && t('failed')].filter(Boolean).join(' ');
   $('restart').disabled = value.busy;
   if (!initialized) {

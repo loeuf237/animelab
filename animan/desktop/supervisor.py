@@ -1,5 +1,6 @@
 """Own exactly one child engine; serialize restarts and never kill by port/PID file."""
 import json
+import os
 import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -20,6 +21,7 @@ from animan import __version__
 from animan.diagnostics import redact_text
 from .control import ControlServer
 from .state import valid_port, write_json
+from .options import engine_environment, normalize_config, preferences, ui_path
 
 logger = logging.getLogger('animan.desktop')
 
@@ -54,17 +56,20 @@ class Supervisor:
         self.error = None
         self.native_error = None
         self.busy = False
-        self.mode = 'browser' if headless or admin or config['browser'] else 'native'
+        self.mode = self.interface_mode()
         self.launch_config = dict(config)
         self.port_fallback = False
         self.control = ControlServer(self)
+
+    def interface_mode(self):
+        return 'browser' if self.headless or self.admin or self.config['browser'] or not preferences(self.config)['openUi'] else 'native'
 
     def status(self):
         with self.lock:
             return {'application': 'AnimeLab', 'version': __version__, 'instanceId': self.control.token[:16],
                     'running': bool(self.process and self.process.poll() is None),
                     'ready': self.ready, 'busy': self.busy, 'port': self.port,
-                    'url': f'http://127.0.0.1:{self.port}/spa/' if self.ready else None,
+                    'url': f'http://127.0.0.1:{self.port}' + ui_path(self.config) if self.ready else None,
                     'configuredPort': self.config['port'], 'browser': self.config['browser'],
                     'portFallback': self.port_fallback,
                     'pendingRestart': self.config != self.launch_config,
@@ -75,6 +80,13 @@ class Supervisor:
         if not isinstance(data, dict) or set(data) != {'port', 'browser'} or type(data['browser']) is not bool:
             raise ValueError('Expected port and browser settings')
         config = {'port': valid_port(data['port']), 'browser': data['browser']}
+        with self.lock:
+            config = {**self.config, **config}
+            write_json(self.directory / 'config.json', config)
+            self.config = config
+
+    def save_launcher_config(self, data):
+        config = normalize_config(data)
         with self.lock:
             write_json(self.directory / 'config.json', config)
             self.config = config
@@ -162,7 +174,8 @@ class Supervisor:
             if self.mode == 'browser':
                 args += ['--headless']
             self.process = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                                            stderr=subprocess.STDOUT, bufsize=0)
+                                            stderr=subprocess.STDOUT, bufsize=0,
+                                            env={**os.environ, **engine_environment(self.config)})
             self.console_thread = threading.Thread(target=self.capture_console, args=(self.process.stdout,), daemon=True)
             self.console_thread.start()
         deadline = time.monotonic() + 35
@@ -230,7 +243,7 @@ class Supervisor:
             except Exception:
                 logger.exception('Engine startup failed')
                 self.error, self.busy = 'Engine startup failed. Run diagnostics.', False
-            if not self.headless and (self.admin or self.mode == 'browser' or not self.ready):
+            if not self.headless and preferences(self.config)['openUi'] and (self.admin or self.mode == 'browser' or not self.ready):
                 webbrowser.open(self.control.url if self.admin or not self.ready else self.status()['url'])
             gui_deadline = time.monotonic() + 30
             while True:
@@ -242,13 +255,15 @@ class Supervisor:
                     break
                 if command == 'restart':
                     self.stop_engine()
-                    self.mode = 'browser' if self.headless or self.admin or self.config['browser'] else 'native'
+                    self.mode = self.interface_mode()
                     try:
                         self.start_engine()
                     except Exception:
                         logger.exception('Engine restart failed')
                         self.error, self.busy = 'Engine restart failed. Run diagnostics.', False
                     gui_deadline = time.monotonic() + 30
+                    if self.ready and not self.headless and self.mode == 'browser' and preferences(self.config)['openUi']:
+                        webbrowser.open(self.status()['url'])
                 if self.process is None:
                     continue  # The admin console remains available after a failed start.
                 code = self.process.poll()

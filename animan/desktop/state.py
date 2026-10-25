@@ -43,7 +43,11 @@ def load_config(directory):
         return {'port': 8080, 'browser': False}
     if not isinstance(data, dict) or not isinstance(data.get('browser', False), bool):
         raise ValueError('Invalid desktop configuration')
-    return {'port': valid_port(data.get('port')), 'browser': data.get('browser', False)}
+    base = {'port': valid_port(data.get('port')), 'browser': data.get('browser', False)}
+    if 'launcher' in data:
+        from .options import normalize_config
+        return normalize_config({**base, 'launcher': data['launcher']})
+    return base
 
 
 class InstanceLock:

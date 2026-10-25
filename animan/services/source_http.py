@@ -437,6 +437,9 @@ class SourceHTTPService:
     def timeout(value):
         if isinstance(value, httpx.Timeout):
             return (value.connect or 15.0, value.read or 300.0)
+        if os.getenv('ANIMAN_DESKTOP_PREFERENCES') and isinstance(value, (int, float)):
+            from animan.config import settings
+            return (settings.CONNECTION_TIMEOUT, value)
         return value
 
     @staticmethod

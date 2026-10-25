@@ -62,7 +62,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg libgirepository1.0-dev libcairo2-dev pkg-config gir1.2-gtk-3.0 gir1.2-webkit2-4.1
+          sudo apt-get install -y ffmpeg xvfb xauth libxcb-cursor0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libgirepository1.0-dev libcairo2-dev pkg-config gir1.2-gtk-3.0 gir1.2-webkit2-4.1
       - name: macOS media tools
         if: runner.os == 'macOS'
         run: brew install ffmpeg
@@ -87,6 +87,12 @@ jobs:
       - name: Render and close the actual packaged Windows native window
         if: runner.os == 'Windows'
         run: python scripts/desktop_release.py gui-check
+      - name: Render all tabs of the packaged Windows launcher
+        if: runner.os == 'Windows'
+        run: python scripts/desktop_release.py launcher-check
+      - name: Render all tabs of the packaged Linux launcher
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum python scripts/desktop_release.py launcher-check
       - name: Preserve packaged check failure details
         if: failure()
         uses: actions/upload-artifact@v4
@@ -95,6 +101,7 @@ jobs:
           path: |
             build/packaged-self-test.log
             build/native-window-check.log
+            build/native-launcher-check.log
           if-no-files-found: ignore
           retention-days: 7
       - name: Archive checked platform package

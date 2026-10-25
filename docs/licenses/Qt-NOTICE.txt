@@ -1,0 +1,13 @@
+AnimeLab Desktop uses dynamically linked Qt Widgets and PySide6-Essentials.
+Qt and PySide are copyright The Qt Company Ltd. and other contributors.
+These components are distributed under their LGPLv3/GPLv3 licensing options;
+the Qt GPL exception applies where indicated in upstream files.
+AnimeLab itself is GPL-3.0-only. No Qt WebEngine, QML or Qt Quick is bundled.
+
+Source and corresponding version: 6.12.0 (see build-info.json for each package).
+Qt source: https://download.qt.io/archive/qt/6.12/6.12.0/submodules/
+PySide source: https://code.qt.io/cgit/pyside/pyside-setup.git/?h=v6.12.0
+Build/install instructions: https://doc.qt.io/qtforpython-6/building_from_source/index.html
+Qt licenses: https://doc.qt.io/qt-6/licensing.html
+The bundled shared libraries can be replaced by compatible versions.
+License texts are distributed alongside this notice.
