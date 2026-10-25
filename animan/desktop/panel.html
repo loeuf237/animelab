@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AnimeLab · Administration</title>
+  <link rel="stylesheet" href="/panel.css">
+  <script src="/panel.js" defer></script>
+</head>
+<body>
+  <main>
+    <header><div><p class="eyebrow">AnimeLab · Desktop</p><h1 data-i18n="title">Administration</h1></div>
+      <select id="language" aria-label="Language"><option value="fr">Français</option><option value="en">English</option></select>
+    </header>
+    <p data-i18n="intro">Manage this computer’s local application.</p>
+    <p id="notice" role="status" aria-live="polite"></p>
+    <section aria-labelledby="state-title">
+      <div class="heading"><h2 id="state-title" data-i18n="state">Local server</h2><span id="state" class="badge">…</span></div>
+      <p id="address">…</p><p id="warning" class="warning"></p>
+      <a id="open-app" class="button primary" target="_blank" rel="noopener noreferrer" hidden data-i18n="open">Open AnimeLab</a>
+      <p class="muted" data-i18n="local">Accessible only on this computer. Closing this tab leaves the server running.</p>
+    </section>
+    <section aria-labelledby="config-title">
+      <h2 id="config-title" data-i18n="config">Startup settings</h2>
+      <form id="config-form">
+        <label for="port" data-i18n="port">Application port</label>
+        <input id="port" type="number" min="1" max="65535" step="1" required inputmode="numeric">
+        <label class="checkbox"><input id="browser" type="checkbox"><span data-i18n="browser">Open in my browser instead of a native window</span></label>
+        <p class="muted" data-i18n="applyHint">Save, then restart to apply. Active downloads are paused and kept for resuming.</p>
+        <button type="submit" data-i18n="save">Save settings</button>
+      </form>
+    </section>
+    <section aria-labelledby="tools-title">
+      <h2 id="tools-title" data-i18n="tools">Maintenance</h2>
+      <div class="actions">
+        <button id="diagnose" data-i18n="diagnose">Run quick diagnosis</button>
+        <button id="restart" data-i18n="restart">Restart the server</button>
+        <button id="stop" class="danger" data-i18n="stop">Quit AnimeLab</button>
+      </div>
+      <p class="muted" data-i18n="checks">Checks the interface, SQLite, write access, media tools and the local server. No source websites are contacted.</p>
+      <ul id="results" aria-live="polite"></ul>
+      <button id="export" hidden data-i18n="export">Download diagnostic report</button>
+      <p class="muted" data-i18n="logs">Local logs: ~/.animan/desktop/desktop.log and engine.log (your user folder on Windows). Reports omit raw logs, cookies and proxy credentials.</p>
+    </section>
+    <footer data-i18n="recovery">If startup fails, reopen Administration from the extracted application folder. No administrator privileges are required.</footer>
+  </main>
+</body>
+</html>

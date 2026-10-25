@@ -84,6 +84,19 @@ jobs:
         run: python -m PyInstaller --clean --noconfirm animan.spec
       - name: Test packaged backend, SPA, curl transport and media tools
         run: python scripts/desktop_release.py check
+      - name: Render and close the actual packaged Windows native window
+        if: runner.os == 'Windows'
+        run: python scripts/desktop_release.py gui-check
+      - name: Preserve packaged check failure details
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: launcher-checks-${{ matrix.label }}
+          path: |
+            build/packaged-self-test.log
+            build/native-window-check.log
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Archive checked platform package
         run: python scripts/desktop_release.py archive
       - uses: actions/upload-artifact@v4

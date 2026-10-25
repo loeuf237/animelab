@@ -22,6 +22,8 @@ Choose a build from [GitHub Releases](https://github.com/loeuf237/animelab/relea
 
 Desktop packages include Python, the compiled interface, FFmpeg and ffprobe. Windows uses WebView2; Linux uses GTK/WebKit, with an installed-browser fallback when a native window is unavailable.
 
+Desktop administration provides port settings, local diagnostics, restart and graceful shutdown. Open **AnimeLab → Administration** or the `Administration` shortcut beside the executable. See [desktop tools and recovery](docs/desktop-distribution.md). These changes require a newly built desktop package.
+
 Android remains a **prerelease**. The [0.1.2 beta release notes](docs/releases/android-v0.1.2-beta.1.md) explain its emulator coverage and pending physical-device validation. Release assets include checksums and build information.
 
 In supporting browsers, install the web interface as a PWA using the browser's install or **Add to Home Screen** option. The AnimeLab server must remain available.

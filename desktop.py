@@ -3,6 +3,7 @@ import argparse
 import gc
 import json
 import logging
+from logging.handlers import RotatingFileHandler
 import os
 from pathlib import Path
 import shutil
@@ -56,16 +57,18 @@ def wait_for_server(port, max_retries=80, delay=.25):
 
 
 def start_server(port):
-    os.environ.update(ANIMAN_PORT=str(port), ANIMAN_HOST="127.0.0.1", ANIMAN_RELOAD="false")
+    os.environ.update(ANIMAN_PORT=str(port), ANIMAN_HOST="127.0.0.1", ANIMAN_RELOAD="false",
+                      ANIMAN_ALLOWED_HOSTS='127.0.0.1,localhost')
     from animan.config import settings
     settings.PORT, settings.HOST = port, "127.0.0.1"
+    settings.ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
     from run import app
     import uvicorn
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port,
         log_level="warning", log_config=None, access_log=False, timeout_graceful_shutdown=10))
     worker = threading.Thread(target=server.run, daemon=True, name="AnimeLabServer")
     worker.start()
-    if not wait_for_server(port):
+    if not wait_for_server(port) or not worker.is_alive() or not server.started:
         server.should_exit = True
         worker.join(timeout=15)
         raise RuntimeError("AnimeLab server did not become ready")
@@ -124,49 +127,158 @@ def self_test():
             gc.collect()  # Release SQLite handles before Windows removes temporary storage.
 
 
+def configure_file_logging(path):
+    from animan.diagnostics import install_logging
+    install_logging()
+    logging.getLogger().addHandler(RotatingFileHandler(path, maxBytes=2_000_000, backupCount=2, encoding='utf-8'))
+
+
+def engine_worker(args, directory):
+    """An owned child. A native crash can never take the administration console down."""
+    configure_file_logging(directory / 'engine.log')
+    # WinForms can raise on its GUI thread, outside main()'s try/except.
+    def thread_failure(arguments):
+        logger.error('Uncaught desktop engine thread error',
+                     exc_info=(arguments.exc_type, arguments.exc_value, arguments.exc_traceback))
+    threading.excepthook = thread_failure
+    if args.control_url:
+        from animan.diagnostics import remember_secret
+        remember_secret(args.control_url.partition('#')[2])
+    workdir = Path(args.worker)
+    from animan.desktop.lifetime import acquire_engine_lock, parent_watch
+    done, monitor = parent_watch(args.control_url, workdir)
+    lock = None
+    try:
+        lock = acquire_engine_lock(directory, workdir)
+        run_engine(args, workdir)
+    finally:
+        done.set()
+        monitor.join(timeout=4)
+        if lock:
+            lock.release()
+
+
+def run_engine(args, workdir):
+    server, worker = start_server(args.port)
+    (workdir / 'ready').touch()
+    try:
+        if args.headless:
+            while worker.is_alive() and not (workdir / 'stop').exists():
+                time.sleep(.2)
+        else:
+            from animan.desktop.window import open_window
+            open_window(f'http://127.0.0.1:{args.port}/spa/', args.control_url, workdir)
+    finally:
+        # Lifespan shutdown pauses/persists transfers on the server event loop.
+        server.should_exit = True
+        worker.join(timeout=20)
+        if worker.is_alive():
+            raise RuntimeError('Engine did not shut down within 20 seconds')
+        from animan.database import engine
+        engine.dispose()
+
+
 def main():
     parser = argparse.ArgumentParser(description="AnimeLab desktop")
     parser.add_argument("--version", action="version", version=__version__)
     parser.add_argument("--self-test", action="store_true", help="Offline packaged backend/frontend/media checks")
     parser.add_argument("--headless", action="store_true", help="Run without opening a window")
+    parser.add_argument('--admin', action='store_true', help='Open desktop administration in the browser')
+    parser.add_argument('--browser', action='store_true', help='Use the installed browser instead of a native window')
+    parser.add_argument('--port', type=int, help='Local server port (1-65535); saved for future launches')
+    commands = parser.add_mutually_exclusive_group()
+    commands.add_argument('--stop', action='store_true', help='Stop the active desktop instance gracefully')
+    commands.add_argument('--status', action='store_true', help='Report the active desktop instance status')
+    commands.add_argument('--diagnose', action='store_true', help='Export quick desktop diagnostics as JSON')
+    parser.add_argument('--report-file', type=Path, help='Destination JSON for --status or --diagnose')
+    parser.add_argument('--gui-self-test', action='store_true', help='Create, render and close a real native window')
+    parser.add_argument('--worker', help=argparse.SUPPRESS)
+    parser.add_argument('--control-url', help=argparse.SUPPRESS)
     args = parser.parse_args()
     configure_bundled_tools()
     if args.self_test:
         self_test()
         return
-    server, worker = start_server(find_available_port(int(os.getenv("ANIMAN_PORT", "8080"))))
-    url = f"http://127.0.0.1:{server.config.port}/spa/"
-    logger.info("AnimeLab %s ready at %s", __version__, url)
-    try:
-        if args.headless:
-            while worker.is_alive(): time.sleep(.5)
-            return
-        try:
-            import webview
-            from animan.config import settings
-            from animan.services.browser_verification import browser_verification
-            from animan.services.source_http import USER_AGENT
-            webview.create_window("AnimeLab", url, width=1280, height=820, min_size=(800, 600))
-            browser_verification.webview_opener = lambda target: webview.create_window(
-                "AnimeLab — Site verification", target, width=900, height=700)
+    if args.gui_self_test:
+        from animan.desktop.window import open_window
+        with tempfile.TemporaryDirectory(prefix='animelab-gui-check-') as temporary:
+            open_window(workdir=Path(temporary), probe=True)
+        return
+    from animan.desktop.state import InstanceLock, load_config, state_directory, valid_port, write_json
+    from animan.desktop.control import remote_call, running_record
+    from animan.desktop.supervisor import Supervisor
+    directory = state_directory()
+    if args.worker:
+        if args.port is None:
+            parser.error('A worker requires --port')
+        valid_port(args.port)
+        engine_worker(args, directory)
+        return
+    configure_file_logging(directory / 'desktop.log')
+    record = running_record(directory)
+    if args.stop or args.status or args.diagnose:
+        if args.stop:
+            remote_call(record, '/api/action', {'action': 'stop'})
+            deadline = time.monotonic() + 45
+            while time.monotonic() < deadline:
+                try:
+                    remote_call(record)
+                except (OSError, ValueError):
+                    return
+                time.sleep(.2)
+            raise RuntimeError('AnimeLab did not finish shutting down within 45 seconds')
+        if args.diagnose:
             try:
-                webview.start(user_agent=USER_AGENT, icon=str(settings.STATIC_DIR / "img/icon-512.png"))
-            finally:
-                browser_verification.webview_opener = None
-        except Exception as error:
-            logger.warning("Native window unavailable (%s); using the installed browser", error)
-            webbrowser.open(url)
-            while worker.is_alive(): time.sleep(.5)
-    except KeyboardInterrupt:
-        pass
+                result = remote_call(record, '/api/diagnostics')
+            except (OSError, ValueError):
+                supervisor = Supervisor(directory, load_config(directory), headless=True)
+                try:
+                    result = supervisor.diagnose()
+                finally:
+                    supervisor.control.close()
+            write_json(args.report_file or directory / 'diagnostics.json', result)
+        else:
+            result = remote_call(record)
+            if args.report_file:
+                write_json(args.report_file, result)
+        print(json.dumps(result, indent=2))
+        return
+    lock = InstanceLock(directory)
+    if not lock.acquire():
+        # Wait briefly if another launcher is still creating its control plane.
+        for _ in range(50):
+            try:
+                record = running_record(directory)
+                status = remote_call(record)
+                if args.port is not None or args.browser:
+                    remote_call(record, '/api/config', {
+                        'port': valid_port(args.port) if args.port is not None else status['configuredPort'],
+                        'browser': args.browser or status['browser'],
+                    })
+                if not args.headless:
+                    target = f"http://127.0.0.1:{record['port']}/#{record['token']}"
+                    webbrowser.open(target if args.admin or not status['ready'] else status['url'])
+                return
+            except (OSError, ValueError):
+                time.sleep(.1)
+        raise RuntimeError('Another desktop instance owns the lock but is not responding')
+    try:
+        try:
+            config = load_config(directory)
+        except ValueError:
+            if args.port is None:
+                raise
+            config = {'port': valid_port(args.port), 'browser': False}
+        if args.port is not None:
+            config['port'] = valid_port(args.port)
+            write_json(directory / 'config.json', config)
+        elif os.getenv('ANIMAN_PORT'):
+            config['port'] = valid_port(int(os.environ['ANIMAN_PORT']))
+        if args.browser:
+            config['browser'] = True
+        Supervisor(directory, config, headless=args.headless, admin=args.admin).run()
     finally:
-        from animan.services.download_manager import download_manager
-        download_manager.pause_all_downloads()
-        server.should_exit = True
-        worker.join(timeout=20)
-        if not worker.is_alive():
-            from animan.database import engine
-            engine.dispose()
+        lock.release()
 
 
 if __name__ == "__main__":
@@ -174,4 +286,10 @@ if __name__ == "__main__":
         main()
     except Exception:
         logger.exception("AnimeLab failed to start or complete its package checks")
+        if sys.platform == 'win32' and not any(flag in sys.argv for flag in ('--worker', '--self-test', '--gui-self-test')):
+            import ctypes
+            ctypes.windll.user32.MessageBoxW(None,
+                'AnimeLab could not start. Check ~/.animan/desktop/desktop.log in your user folder.\n'
+                'Open Administration from the extracted application folder, or use --admin --port 8080.',
+                'AnimeLab — Startup error', 0x10)
         raise SystemExit(1)

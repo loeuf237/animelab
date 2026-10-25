@@ -45,3 +45,22 @@ with open(sys.argv[1], 'w') as handle:
     subprocess.run([sys.executable, '-c', code, str(result)],
                    cwd=Path(__file__).resolve().parents[1], check=True, timeout=20)
     assert json.loads(result.read_text()) == {'stdin':True,'stdout':True,'stderr':True}
+
+
+@pytest.mark.parametrize('windows,mac,binary,extension', [
+    (True, False, 'AnimeLab.exe', '.cmd'),
+    (False, False, 'AnimeLab', '.sh'),
+    (False, True, 'AnimeLab.app/Contents/MacOS/AnimeLab', '.command'),
+])
+def test_archives_ship_quoted_administration_shortcuts(tmp_path, windows, mac, binary, extension):
+    folder = tmp_path / 'Application with spaces'
+    folder.mkdir()
+    desktop_release.shortcuts(folder, binary, windows=windows, mac=mac)
+    assert (folder / 'DESKTOP-TOOLS.md').is_file()
+    for name, flag in [('Administration', '--admin'), ('Browser', '--browser'), ('Stop', '--stop')]:
+        shortcut = folder / (name + extension)
+        text = shortcut.read_text()
+        assert flag in text and binary in text
+        assert ('"%~dp0' + binary + '"') in text if windows else ('"./' + binary + '"') in text
+        if not windows:
+            assert shortcut.stat().st_mode & 0o111
