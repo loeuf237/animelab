@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock, patch, MagicMock
 from fastapi.testclient import TestClient
 
 from run import app
-from animan.services.extension_service import extension_service
-from animan.services.download_manager import download_manager
-from animan.models.download_task import DownloadStatus
+from animelab.services.extension_service import extension_service
+from animelab.services.download_manager import download_manager
+from animelab.models.download_task import DownloadStatus
 
 @pytest.fixture
 def client():

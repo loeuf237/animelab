@@ -397,13 +397,13 @@ symboles référencés, pas la couverture de tous les comportements du scénario
 
 | Domaine | Points d’entrée examinés |
 | --- | --- |
-| Modèles | [anime.py](../../animan/models/anime.py), [download_task.py](../../animan/models/download_task.py), [favorite.py](../../animan/models/favorite.py), [auto_download.py](../../animan/models/auto_download.py), [watch_progress.py](../../animan/models/watch_progress.py) |
-| API et UI | [run.py](../../run.py), [routeurs](../../animan/routers), [client TS](../../frontend/src/api/client.ts), [store downloads](../../frontend/src/stores/downloads.ts) |
-| Téléchargements | [DownloadManagerService](../../animan/services/download_manager.py), [reprise](../../animan/services/download_resume.py), [intégrité](../../animan/services/verification_service.py), [sous-titres](../../animan/services/subtitle_service.py) |
-| Sources/extensions | [catalogue](../../animan/services/source_catalogue.py), [extensions](../../animan/services/extension_service.py), [parseur DEX](../../animan/services/aniyomi_dex_parser.py), [conteneur](../../animan/services/aniyomi_container.py) |
-| Réseau | [transport](../../animan/services/source_http.py), [vérification](../../animan/services/browser_verification.py), [proxies publics](../../animan/services/proxy_pool.py), [routes réseau](../../animan/routers/network.py) |
-| Bibliothèque et automatisation | [LibraryService](../../animan/services/library_service.py), [WatchdogService](../../animan/services/watchdog_service.py) |
-| Bureau et Android | [desktop.py](../../desktop.py), [android_runtime.py](../../android_runtime.py), [Kotlin](../../android/app/src/main/java/com/animan/app), [sécurité Android](../../animan/android_security.py), [façade média](../../animan/media_tools.py) |
+| Modèles | [anime.py](../../animelab/models/anime.py), [download_task.py](../../animelab/models/download_task.py), [favorite.py](../../animelab/models/favorite.py), [auto_download.py](../../animelab/models/auto_download.py), [watch_progress.py](../../animelab/models/watch_progress.py) |
+| API et UI | [run.py](../../run.py), [routeurs](../../animelab/routers), [client TS](../../frontend/src/api/client.ts), [store downloads](../../frontend/src/stores/downloads.ts) |
+| Téléchargements | [DownloadManagerService](../../animelab/services/download_manager.py), [reprise](../../animelab/services/download_resume.py), [intégrité](../../animelab/services/verification_service.py), [sous-titres](../../animelab/services/subtitle_service.py) |
+| Sources/extensions | [catalogue](../../animelab/services/source_catalogue.py), [extensions](../../animelab/services/extension_service.py), [parseur DEX](../../animelab/services/aniyomi_dex_parser.py), [conteneur](../../animelab/services/aniyomi_container.py) |
+| Réseau | [transport](../../animelab/services/source_http.py), [vérification](../../animelab/services/browser_verification.py), [proxies publics](../../animelab/services/proxy_pool.py), [routes réseau](../../animelab/routers/network.py) |
+| Bibliothèque et automatisation | [LibraryService](../../animelab/services/library_service.py), [WatchdogService](../../animelab/services/watchdog_service.py) |
+| Bureau et Android | [desktop.py](../../desktop.py), [android_runtime.py](../../android_runtime.py), [Kotlin](../../android/app/src/main/java/com/animan/app), [sécurité Android](../../animelab/android_security.py), [façade média](../../animelab/media_tools.py) |
 
 ## 7. Régénérer et contrôler le dossier
 

@@ -18,7 +18,7 @@ def apk_fixture(tmp_path, *, mapped_end, alignment=16384, relro_size=0x1000):
         struct.pack_into('<IIQQQQQQ', elf, 64 + index * 56, kind, 0, 0, address, 0, size, size, align)
     apk = tmp_path / 'candidate.apk'
     with zipfile.ZipFile(apk, 'w') as archive:
-        for marker in ['frontend/dist/index.html', 'android_runtime.py', 'animan/services/download_manager.py',
+        for marker in ['frontend/dist/index.html', 'android_runtime.py', 'animelab/services/download_manager.py',
                        'curl_cffi/_wrapper.py', 'pydantic_core/_pydantic_core.py']:
             archive.writestr(marker, '')
         archive.writestr('lib/arm64-v8a/libffmpegkit.so', elf)

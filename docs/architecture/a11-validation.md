@@ -9,7 +9,7 @@
   adresses, tailles, drapeaux et alignements des segments sont comparés avant
   publication. Les originaux et leurs empreintes sont conservés hors APK.
 - Six copies publiques identiques retirées des entrées Android ; les fichiers
-  canoniques servis depuis `animan/static` et les assets Vue restent présents.
+  canoniques servis depuis `animelab/static` et les assets Vue restent présents.
 - lxml, libxml2 et libxslt retirés des dépendances Android : les adaptateurs
   utilisent BeautifulSoup avec `html.parser`. Les dépendances bureau restent
   inchangées. Tous les extracteurs yt-dlp et les outils FFmpeg restent inclus.

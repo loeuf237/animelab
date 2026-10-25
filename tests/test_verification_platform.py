@@ -5,9 +5,9 @@ import httpx
 import pytest
 from fastapi import FastAPI
 
-from animan.api_errors import APIProblem
-from animan.services.browser_verification import BrowserVerificationService
-from animan.services.source_http import SourceHTTPService
+from animelab.api_errors import APIProblem
+from animelab.services.browser_verification import BrowserVerificationService
+from animelab.services.source_http import SourceHTTPService
 
 
 @pytest.fixture
@@ -51,7 +51,7 @@ async def test_unsupported_mode_does_not_open_window(service, monkeypatch):
     state.proxy = 'http://proxy.example:8080'
     opener = AsyncMock()
     monkeypatch.setattr(browser.mechanisms['webview'], 'open', opener)
-    monkeypatch.setattr('animan.services.browser_verification.is_safe_url', lambda url: True)
+    monkeypatch.setattr('animelab.services.browser_verification.is_safe_url', lambda url: True)
     with pytest.raises(APIProblem):
         await browser.start('source.example', mode='webview')
     opener.assert_not_called()
@@ -60,7 +60,7 @@ async def test_unsupported_mode_does_not_open_window(service, monkeypatch):
 @pytest.mark.asyncio
 async def test_route_change_never_imports_cookies_or_clears_challenge(service, monkeypatch):
     browser, state = service
-    monkeypatch.setattr('animan.services.browser_verification.is_safe_url', lambda url: True)
+    monkeypatch.setattr('animelab.services.browser_verification.is_safe_url', lambda url: True)
     job = await browser.start('source.example', mode='webview')
     state.generation += 1  # An automatic rotation/reconfiguration happened.
     importer = AsyncMock()
@@ -76,7 +76,7 @@ async def test_route_change_never_imports_cookies_or_clears_challenge(service, m
 @pytest.mark.asyncio
 async def test_webview_captures_then_rechecks_and_duplicate_complete_is_rejected(service, monkeypatch):
     browser, state = service
-    monkeypatch.setattr('animan.services.browser_verification.is_safe_url', lambda url: True)
+    monkeypatch.setattr('animelab.services.browser_verification.is_safe_url', lambda url: True)
     monkeypatch.setattr(browser.transport, 'request', lambda method, url, **kwargs: httpx.Response(200, request=httpx.Request(method, url)))
     job = await browser.start('source.example', mode='webview')
     assert (await browser.complete(job['id']))['success']
@@ -88,9 +88,9 @@ async def test_webview_captures_then_rechecks_and_duplicate_complete_is_rejected
 
 @pytest.mark.asyncio
 async def test_remote_client_options_do_not_offer_server_windows(service, monkeypatch):
-    from animan.routers.network import router
+    from animelab.routers.network import router
     browser, _ = service
-    monkeypatch.setattr('animan.routers.network.browser_verification', browser)
+    monkeypatch.setattr('animelab.routers.network.browser_verification', browser)
     app = FastAPI(); app.include_router(router)
     transport = httpx.ASGITransport(app, client=('192.0.2.1', 54321))
     async with httpx.AsyncClient(transport=transport, base_url='http://server') as client:

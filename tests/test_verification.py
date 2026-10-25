@@ -4,9 +4,9 @@ import subprocess
 import pytest
 from fastapi.testclient import TestClient
 
-from animan.services.verification_service import verification_service, format_duration
-from animan.services.download_manager import download_manager
-from animan.models.download_task import DownloadTask, DownloadStatus
+from animelab.services.verification_service import verification_service, format_duration
+from animelab.services.download_manager import download_manager
+from animelab.models.download_task import DownloadTask, DownloadStatus
 from run import app
 
 client = TestClient(app)
@@ -123,7 +123,7 @@ def test_api_verify_endpoints(sample_valid_mp4):
 
     # Verify all
     from unittest.mock import patch
-    with patch("animan.services.download_manager.library_service.get_history", return_value=[]):
+    with patch("animelab.services.download_manager.library_service.get_history", return_value=[]):
         resp_all = client.post("/api/download/verify-all")
         assert resp_all.status_code == 200
         all_data = resp_all.json()
@@ -159,7 +159,7 @@ def test_api_redownload_task(sample_corrupted_file):
 def test_decode_diagnostics_are_classified(sample_valid_mp4, monkeypatch, diagnostic, code, valid):
     import json
     monkeypatch.setattr(verification_service, "_ffprobe_path", "/usr/bin/ffprobe")
-    monkeypatch.setattr("animan.services.verification_service.shutil.which", lambda name: "/usr/bin/" + name)
+    monkeypatch.setattr("animelab.services.verification_service.shutil.which", lambda name: "/usr/bin/" + name)
     calls = []
     def run(cmd, **kwargs):
         calls.append(cmd)
@@ -167,7 +167,7 @@ def test_decode_diagnostics_are_classified(sample_valid_mp4, monkeypatch, diagno
             return subprocess.CompletedProcess(cmd, 0, json.dumps({"format": {"duration": "1200"},
                 "streams": [{"codec_type": "video"}, {"codec_type": "audio"}]}), "")
         return subprocess.CompletedProcess(cmd, code, "", diagnostic)
-    monkeypatch.setattr("animan.services.verification_service.subprocess.run", run)
+    monkeypatch.setattr("animelab.services.verification_service.subprocess.run", run)
     result = verification_service.verify_file(sample_valid_mp4)
     assert result.valid == valid
     assert "-sn" in calls[1] and "-fps_mode" in calls[1]
@@ -177,6 +177,6 @@ def test_probe_exception_does_not_validate_magic_header(sample_valid_mp4, monkey
     monkeypatch.setattr(verification_service, "_ffprobe_path", "/usr/bin/ffprobe")
     def run(*args, **kwargs):
         raise subprocess.TimeoutExpired("ffprobe", 30)
-    monkeypatch.setattr("animan.services.verification_service.subprocess.run", run)
+    monkeypatch.setattr("animelab.services.verification_service.subprocess.run", run)
     result = verification_service.verify_file(sample_valid_mp4)
     assert not result.valid and result.status == "ERROR"

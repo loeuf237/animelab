@@ -2,7 +2,7 @@
 !include theme.iuml
 ' @source desktop.py:start_server
 ' @source run.py:lifespan
-' @source animan/services/tmdb_service.py:TmdbService.enrich_anime_detail
+' @source animelab/services/tmdb_service.py:TmdbService.enrich_anime_detail
 title AnimeLab — déploiements actuels bureau et navigateur / PWA
 left to right direction
 node "Poste utilisateur — Windows / Linux / macOS" as Desktop {

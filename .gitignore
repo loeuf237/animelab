@@ -30,7 +30,7 @@ MANIFEST
 # PyInstaller
 *.manifest
 *.spec
-!animan.spec
+!animelab.spec
 
 # Installer logs
 pip-log.txt
@@ -71,7 +71,7 @@ venv.bak/
 
 # Local artifacts and temporary media resources
 artefacts/
-animan/ressources/
+animelab/ressources/
 CONVERSATION_HISTORY.md
 *CONVERSATION*.md
 *.deb

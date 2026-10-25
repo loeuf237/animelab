@@ -6,10 +6,10 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from run import app
-from animan.database import init_db
-from animan.models.download_task import DownloadTask, DownloadStatus
-from animan.services.download_manager import download_manager
-from animan.services.library_service import library_service
+from animelab.database import init_db
+from animelab.models.download_task import DownloadTask, DownloadStatus
+from animelab.services.download_manager import download_manager
+from animelab.services.library_service import library_service
 
 @pytest.fixture(scope="module")
 def stream_fixture(tmp_path_factory):
@@ -113,7 +113,7 @@ def test_resolve_stream_remote_playback(stream_fixture):
         "selectedQuality": "1080p",
     }
 
-    with patch("animan.services.voiranime_service.voiranime_service.extract_download_info", return_value=mock_info):
+    with patch("animelab.services.voiranime_service.voiranime_service.extract_download_info", return_value=mock_info):
         resp = c.get(
             "/api/media/stream/resolve",
             params={
@@ -147,7 +147,7 @@ def test_subtitle_proxy(stream_fixture):
     mock_resp.status_code = 200
     mock_resp.text = "WEBVTT\n\n1\n00:00:01.000 --> 00:00:03.000\nSous-titre test"
 
-    with patch("animan.services.source_http.AsyncSourceClient.get", new_callable=AsyncMock, return_value=mock_resp):
+    with patch("animelab.services.source_http.AsyncSourceClient.get", new_callable=AsyncMock, return_value=mock_resp):
         resp = c.get("/api/media/subtitle-proxy", params={"url": "https://vidzy.org/srtproxy/sample.vtt"})
         assert resp.status_code == 200
         assert resp.headers.get("access-control-allow-origin") == "*"

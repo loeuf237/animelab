@@ -1,8 +1,8 @@
 import json
 from unittest.mock import AsyncMock, patch
 import pytest
-from animan.services.aniyomi_container import AniyomiContainerSource
-from animan.services.aniyomi_dex_parser import SourceRecipe
+from animelab.services.aniyomi_container import AniyomiContainerSource
+from animelab.services.aniyomi_dex_parser import SourceRecipe
 
 @pytest.mark.asyncio
 async def test_json_recipe_search_detail_sources():

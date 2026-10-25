@@ -6,13 +6,13 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from animan.models.download_task import DownloadTask, DownloadStatus
-from animan.services.download_manager import DownloadManagerService
-from animan.services.download_stages.budget import StageBudget
-from animan.services.download_stages.state import transition
-from animan.services.library_service import library_service
-from animan.services.verification_service import verification_service, VerificationResult
-from animan import platform_events
+from animelab.models.download_task import DownloadTask, DownloadStatus
+from animelab.services.download_manager import DownloadManagerService
+from animelab.services.download_stages.budget import StageBudget
+from animelab.services.download_stages.state import transition
+from animelab.services.library_service import library_service
+from animelab.services.verification_service import verification_service, VerificationResult
+from animelab import platform_events
 
 
 @pytest.mark.asyncio
@@ -132,13 +132,13 @@ async def test_waiting_media_job_is_protected_from_removal_and_resume(monkeypatc
 @pytest.mark.asyncio
 async def test_shutdown_persists_pause_and_restart_keeps_the_transfer_retryable(tmp_path,monkeypatch):
     import importlib
-    from animan.database import create_database_engine
-    from animan.migrations import migrate
+    from animelab.database import create_database_engine
+    from animelab.migrations import migrate
     from sqlalchemy.orm import sessionmaker
     engine=create_database_engine('sqlite:///'+str(tmp_path/'restart.sqlite'))
     migrate(engine)
     sessions=sessionmaker(bind=engine)
-    monkeypatch.setattr(importlib.import_module('animan.services.library_service'),'SessionLocal',sessions)
+    monkeypatch.setattr(importlib.import_module('animelab.services.library_service'),'SessionLocal',sessions)
     manager=DownloadManagerService()
     monkeypatch.setattr(manager,'broadcast_update',lambda task:None)
     task=DownloadTask(savePath=str(tmp_path/'video.mp4'),fileUrl='https://cdn.example/video.mp4')

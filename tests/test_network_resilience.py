@@ -8,9 +8,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from animan.models.download_task import DownloadTask, DownloadStatus
-from animan.services.download_manager import download_manager, DownloadManagerService
-from animan.services.download_resume import prepare_hls_cache, write_metadata, segment_digest
+from animelab.models.download_task import DownloadTask, DownloadStatus
+from animelab.services.download_manager import download_manager, DownloadManagerService
+from animelab.services.download_resume import prepare_hls_cache, write_metadata, segment_digest
 
 
 @pytest.mark.asyncio

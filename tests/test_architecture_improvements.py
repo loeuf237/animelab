@@ -3,11 +3,11 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from animan.config import Settings
-from animan.models.download_task import DownloadTask, DownloadTaskEntity, ensure_utc
-from animan.services.background import spawn, _background_tasks
-from animan.services.proxy_service import ProxyService
-from animan.routers.media import (
+from animelab.config import Settings
+from animelab.models.download_task import DownloadTask, DownloadTaskEntity, ensure_utc
+from animelab.services.background import spawn, _background_tasks
+from animelab.services.proxy_service import ProxyService
+from animelab.routers.media import (
     _put_memory_cached_image,
     _get_memory_cached_image,
     _save_disk_cached_image,
@@ -107,7 +107,7 @@ async def test_spawn_keeps_reference_and_logs_failures(caplog):
     async def boom():
         raise RuntimeError("kaboom")
 
-    with caplog.at_level("ERROR", logger="animan.background"):
+    with caplog.at_level("ERROR", logger="animelab.background"):
         t2 = spawn(boom(), name="boom")
         await asyncio.gather(t2, return_exceptions=True)
         await asyncio.sleep(0)
@@ -120,8 +120,8 @@ async def test_verify_task_async_does_not_block_event_loop(monkeypatch, tmp_path
     import threading
     import time as _time
     import importlib
-    dm_mod = importlib.import_module("animan.services.download_manager")
-    from animan.services.verification_service import VerificationResult
+    dm_mod = importlib.import_module("animelab.services.download_manager")
+    from animelab.services.verification_service import VerificationResult
 
     f = tmp_path / "v.mp4"
     f.write_bytes(b"x" * 10)

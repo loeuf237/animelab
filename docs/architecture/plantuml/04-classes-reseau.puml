@@ -1,17 +1,17 @@
 @startuml
 !include theme.iuml
 title AnimeLab — sessions HTTP, protection des sites et proxies
-' @source animan/services/source_http.py:SourceHTTPService
-' @source animan/services/source_http.py:DomainSession
-' @source animan/services/source_http.py:SourceClient
-' @source animan/services/source_http.py:AsyncSourceClient
-' @source animan/services/source_http.py:SourceStreamResponse
-' @source animan/services/source_http.py:VerificationRequired
-' @source animan/services/source_http.py:RateLimited
-' @source animan/services/source_http.py:SourceNetworkError
-' @source animan/services/proxy_pool.py:ProxyPool
-' @source animan/services/proxy_service.py:ProxyService
-' @source animan/services/browser_verification.py:BrowserVerificationService
+' @source animelab/services/source_http.py:SourceHTTPService
+' @source animelab/services/source_http.py:DomainSession
+' @source animelab/services/source_http.py:SourceClient
+' @source animelab/services/source_http.py:AsyncSourceClient
+' @source animelab/services/source_http.py:SourceStreamResponse
+' @source animelab/services/source_http.py:VerificationRequired
+' @source animelab/services/source_http.py:RateLimited
+' @source animelab/services/source_http.py:SourceNetworkError
+' @source animelab/services/proxy_pool.py:ProxyPool
+' @source animelab/services/proxy_service.py:ProxyService
+' @source animelab/services/browser_verification.py:BrowserVerificationService
 class SourceHTTPService {
   _domains: dict
   _cache: dict

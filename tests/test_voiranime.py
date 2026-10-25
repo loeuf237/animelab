@@ -1,6 +1,6 @@
 import pytest
 from bs4 import BeautifulSoup
-from animan.services.voiranime_service import voiranime_service
+from animelab.services.voiranime_service import voiranime_service
 
 SAMPLE_MADARA_CARD_HTML = """
 <div class="page-item-detail video">

@@ -7,10 +7,10 @@ from unittest.mock import AsyncMock
 import httpx
 import pytest
 
-from animan.models.download_task import DownloadTask, DownloadStatus, ExportStatus
-from animan.services.download_manager import DownloadManagerService
-from animan.services.download_resume import write_metadata, media_resource
-from animan.services.library_service import library_service
+from animelab.models.download_task import DownloadTask, DownloadStatus, ExportStatus
+from animelab.services.download_manager import DownloadManagerService
+from animelab.services.download_resume import write_metadata, media_resource
+from animelab.services.library_service import library_service
 from test_auto_export_migrations import exports
 
 
@@ -137,7 +137,7 @@ async def test_cancellation_during_mux_retains_worker_and_prevents_parallel_publ
 
 @pytest.mark.asyncio
 async def test_repeated_finalization_does_not_duplicate_native_export(exports, monkeypatch):
-    from animan import platform_events
+    from animelab import platform_events
     manager, task, _ = exports
     calls = []
     monkeypatch.setattr(platform_events, 'completed_handler', lambda task: calls.append(task.id) or {'uris': ['content://downloads/1']})

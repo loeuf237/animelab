@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from pathlib import Path
 
 from run import app
-from animan.models.anime import AnimeDetail, Episode, AnimeResult
+from animelab.models.anime import AnimeDetail, Episode, AnimeResult
 
 @pytest.fixture
 def client():
@@ -51,8 +51,8 @@ async def test_api_anime_detail_success(client):
         ],
     )
 
-    with patch("animan.services.extension_service.extension_service.get_container_source_by_id", return_value=None):
-        with patch("animan.services.scraping_service.scraping_service.get_anime_detail", new_callable=AsyncMock) as mock_get:
+    with patch("animelab.services.extension_service.extension_service.get_container_source_by_id", return_value=None):
+        with patch("animelab.services.scraping_service.scraping_service.get_anime_detail", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = mock_detail
 
             resp = client.get(
@@ -78,7 +78,7 @@ async def test_api_anime_detail_success(client):
 
 @pytest.mark.asyncio
 async def test_api_anime_detail_not_found(client):
-    with patch("animan.services.scraping_service.scraping_service.get_anime_detail", new_callable=AsyncMock) as mock_get:
+    with patch("animelab.services.scraping_service.scraping_service.get_anime_detail", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = None
 
         resp = client.get(
@@ -104,9 +104,9 @@ async def test_api_home_feed(client):
         )
     ]
 
-    with patch("animan.services.scraping_service.scraping_service.get_latest_releases", new_callable=AsyncMock) as m_fm:
-        with patch("animan.services.voiranime_service.voiranime_service.get_latest_releases", new_callable=AsyncMock) as m_va:
-            with patch("animan.services.animepahe_service.animepahe_service.get_latest_releases", new_callable=AsyncMock) as m_ap:
+    with patch("animelab.services.scraping_service.scraping_service.get_latest_releases", new_callable=AsyncMock) as m_fm:
+        with patch("animelab.services.voiranime_service.voiranime_service.get_latest_releases", new_callable=AsyncMock) as m_va:
+            with patch("animelab.services.animepahe_service.animepahe_service.get_latest_releases", new_callable=AsyncMock) as m_ap:
                 m_fm.return_value = mock_releases
                 m_va.return_value = []
                 m_ap.return_value = []
@@ -133,7 +133,7 @@ async def test_api_source_feed(client):
         )
     ]
 
-    with patch("animan.services.voiranime_service.voiranime_service.get_latest_releases", new_callable=AsyncMock) as mock_va:
+    with patch("animelab.services.voiranime_service.voiranime_service.get_latest_releases", new_callable=AsyncMock) as mock_va:
         mock_va.return_value = mock_releases
 
         resp = client.get("/api/sources/voir-anime/feed")

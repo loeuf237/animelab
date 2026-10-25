@@ -6,8 +6,8 @@
 !run.py
 !LICENSE
 !NOTICE
-!animan/
-!animan/**
+!animelab/
+!animelab/**
 !frontend/
 !frontend/package.json
 !frontend/package-lock.json
@@ -26,4 +26,4 @@
 **/.env*
 **/http_sessions/
 **/verification_profiles/
-animan/ressources/
+animelab/ressources/

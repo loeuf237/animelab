@@ -6,7 +6,7 @@ const token = 'desktop-test-capability-never-a-real-secret'
 const assets = Object.fromEntries(
   ['html', 'js', 'css'].map((extension) => [
     extension,
-    readFileSync(new URL(`../../../animan/desktop/panel.${extension}`, import.meta.url)),
+    readFileSync(new URL(`../../../animelab/desktop/panel.${extension}`, import.meta.url)),
   ]),
 )
 

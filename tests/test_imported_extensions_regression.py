@@ -4,9 +4,9 @@ import json
 from unittest.mock import AsyncMock
 
 import pytest
-from animan.services.aniyomi_container import AniyomiContainerSource
-from animan.services.aniyomi_dex_parser import SourceRecipe, AniyomiDexParser
-from animan.services.source_http import VerificationRequired
+from animelab.services.aniyomi_container import AniyomiContainerSource
+from animelab.services.aniyomi_dex_parser import SourceRecipe, AniyomiDexParser
+from animelab.services.source_http import VerificationRequired
 
 def container(name, **kwargs):
     recipe = SourceRecipe(pkg=f'eu.kanade.tachiyomi.animeextension.fr.{name}', base_url=f'https://{name}.example', **kwargs)
@@ -100,7 +100,7 @@ async def test_aniworld_season_pages_and_redirected_players(monkeypatch):
     assert len(detail.episodes) == 1
     assert detail.episodes[0].title == 'Début'
     import httpx
-    from animan.services.source_http import AsyncSourceClient
+    from animelab.services.source_http import AsyncSourceClient
     response = httpx.Response(200, request=httpx.Request('GET', 'https://voe.sx/example'))
     monkeypatch.setattr(AsyncSourceClient, 'get', AsyncMock(return_value=response))
     streams = await source.get_episode_sources(detail.episodes[0].playerUrl)

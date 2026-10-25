@@ -7,10 +7,10 @@ plugins {
 }
 
 // Disable only for a controlled size comparison using the same application code.
-val optimizeApk = providers.gradleProperty("animan.optimizeApk").orNull != "false"
+val optimizeApk = providers.gradleProperty("animelab.optimizeApk").orNull != "false"
 val packagingPython = System.getenv("ANIMAN_BUILD_PYTHON") ?: "python3"
 val optimizer = rootProject.file("../scripts/android_optimize.py")
-val isolatedValidation = providers.gradleProperty("animan.isolatedValidation").orNull == "true"
+val isolatedValidation = providers.gradleProperty("animelab.isolatedValidation").orNull == "true"
 
 android {
     namespace = "com.animan.app"
@@ -109,7 +109,7 @@ chaquopy {
     defaultConfig {
         version = "3.13"
         System.getenv("ANIMAN_BUILD_PYTHON")?.let { buildPython(it) }
-        extractPackages("animan")
+        extractPackages("animelab")
         pip {
             options("--timeout", "120", "--find-links", "${rootProject.projectDir}/wheels")
             install("-r", System.getenv("ANIMAN_ANDROID_REQUIREMENTS")
@@ -122,15 +122,15 @@ val syncPythonSource by tasks.registering(Sync::class) {
     inputs.property("optimizeApk", optimizeApk)
     inputs.file(optimizer)
     from("${rootProject.projectDir}/..") {
-        include("animan/**")
+        include("animelab/**")
         include("run.py")
         include("android_runtime.py")
         include("frontend/dist/**")
         exclude("**/__pycache__/**")
         exclude("**/.pytest_cache/**")
         exclude("**/*.pyc")
-        exclude("animan/Artefacts/**")
-        exclude("animan/ressources/**")
+        exclude("animelab/Artefacts/**")
+        exclude("animelab/ressources/**")
     }
     into("${projectDir}/src/main/python")
     if (optimizeApk) {

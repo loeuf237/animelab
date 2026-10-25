@@ -59,7 +59,7 @@ checked before stripping. Original binaries and hashes are retained under
 `android/app/build/reports/native-optimization/`, and R8 maps under
 `android/app/build/outputs/mapping/`. CI uploads these diagnostic artifacts.
 The source synchronization removes only byte-identical public copies served
-from `animan/static`; it retains SPA assets, templates and all extractors.
+from `animelab/static`; it retains SPA assets, templates and all extractors.
 Native libraries remain uncompressed for direct loading.
 
 The A11 source build passed the complete direct/HLS/subtitle/export probe on a

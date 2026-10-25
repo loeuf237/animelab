@@ -1,8 +1,8 @@
 @startuml
 !include theme.iuml
-' @source animan/services/extension_service.py:ExtensionService.import_repository
-' @source animan/services/extension_service.py:ExtensionService.toggle_extension
-' @source animan/services/aniyomi_dex_parser.py:AniyomiDexParser.parse_apk
+' @source animelab/services/extension_service.py:ExtensionService.import_repository
+' @source animelab/services/extension_service.py:ExtensionService.toggle_extension
+' @source animelab/services/aniyomi_dex_parser.py:AniyomiDexParser.parse_apk
 title AnimeLab — import d'un dépôt et activation d'une source
 autonumber
 actor Utilisateur as U
@@ -63,5 +63,5 @@ opt observation, historique et restauration
   API -> Ext : restore_recipe(id, revision)
   Ext -> DB : nouvelle révision, historique préservé
 end
-' @source animan/services/extension_service.py:ExtensionService.restore_recipe
+' @source animelab/services/extension_service.py:ExtensionService.restore_recipe
 @enduml

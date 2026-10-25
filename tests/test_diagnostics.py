@@ -4,8 +4,8 @@ import logging
 from types import SimpleNamespace
 import httpx
 import pytest
-from animan.diagnostics import Telemetry,install_logging,remember_secret,redact_text
-from animan.models.download_task import DownloadStatus
+from animelab.diagnostics import Telemetry,install_logging,remember_secret,redact_text
+from animelab.models.download_task import DownloadStatus
 
 
 def test_structured_events_are_bounded_and_fields_are_allowlisted():
@@ -23,7 +23,7 @@ def test_phase_durations_only_on_transition(monkeypatch):
     recorder=Telemetry()
     task=SimpleNamespace(id='task',source='source',phase='transfer',status=DownloadStatus.DOWNLOADING,
                          verificationUrl=None,directDownloadUrl='https://host.example/video?key=secret',fileUrl='')
-    import animan.diagnostics as module
+    import animelab.diagnostics as module
     ticks=iter([10,12,15]);monkeypatch.setattr(module.time,'monotonic',lambda:next(ticks))
     recorder.task_phase(task);recorder.task_phase(task)
     task.phase='mux';recorder.task_phase(task)
@@ -57,8 +57,8 @@ def test_logs_mask_headers_proxy_credentials_loopback_and_tracebacks():
 async def test_export_is_local_only_and_excludes_raw_download_data(monkeypatch):
     import importlib
     from fastapi import FastAPI
-    from animan.routers.diagnostics import router
-    module=importlib.import_module('animan.services.download_manager')
+    from animelab.routers.diagnostics import router
+    module=importlib.import_module('animelab.services.download_manager')
     monkeypatch.setattr(module.download_manager,'tasks',{'secret':SimpleNamespace(status=DownloadStatus.COMPLETED,error='Cookie: private',fileUrl='https://private.example')})
     app=FastAPI();app.include_router(router)
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app,client=('127.0.0.1',123)),base_url='http://local') as client:

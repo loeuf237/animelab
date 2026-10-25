@@ -2,8 +2,8 @@ import pytest
 import os
 import tempfile
 from pathlib import Path
-from animan.models.download_task import DownloadTask, DownloadStatus
-from animan.services.download_manager import download_manager
+from animelab.models.download_task import DownloadTask, DownloadStatus
+from animelab.services.download_manager import download_manager
 
 @pytest.mark.asyncio
 async def test_html_response_rejection(tmp_path, monkeypatch):
@@ -88,7 +88,7 @@ def test_redownload_purges_corrupted_html(tmp_path):
 
 def test_speed_tracker_smoothing_and_decay():
     """Vérifie que SpeedTracker lisse les arrivées par paquets HLS et ne chute pas à 0 B/s."""
-    from animan.models.download_task import SpeedTracker
+    from animelab.models.download_task import SpeedTracker
 
     tracker = SpeedTracker(window_seconds=3.0)
     t0 = 1000.0

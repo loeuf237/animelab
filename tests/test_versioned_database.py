@@ -5,19 +5,19 @@ from pathlib import Path
 import pytest
 from sqlalchemy.orm import sessionmaker
 
-from animan import database
-from animan.database import create_database_engine, sqlite_connection, transaction, Base
-from animan.migrations import MIGRATIONS, Migration, migrate
-from animan.models.download_task import DownloadTask, DownloadStatus, DownloadTaskEntity, ExportStatus
-from animan.models.watch_progress import WatchProgress
-from animan.services.library_service import library_service
-from animan.services.proxy_service import ProxyService
-from animan.services.source_settings_service import SourceSettingsService
-from animan.services.extension_service import ExtensionService
+from animelab import database
+from animelab.database import create_database_engine, sqlite_connection, transaction, Base
+from animelab.migrations import MIGRATIONS, Migration, migrate
+from animelab.models.download_task import DownloadTask, DownloadStatus, DownloadTaskEntity, ExportStatus
+from animelab.models.watch_progress import WatchProgress
+from animelab.services.library_service import library_service
+from animelab.services.proxy_service import ProxyService
+from animelab.services.source_settings_service import SourceSettingsService
+from animelab.services.extension_service import ExtensionService
 
 
 def test_upgrade_backup_is_repeatable_and_keeps_all_existing_rows(tmp_path):
-    from animan.models.favorite import FavoriteAnime
+    from animelab.models.favorite import FavoriteAnime
     # The old-schema fixture intentionally omits A01/A02 fields.
     from sqlalchemy import MetaData, Table
     legacy = tmp_path / 'old.sqlite'
@@ -94,8 +94,8 @@ def test_settings_connections_share_policy_rollback_and_close(tmp_path):
 
 def test_completion_progress_export_and_tracking_commit_or_roll_back_as_one(tmp_path, monkeypatch):
     import importlib
-    library = importlib.import_module('animan.services.library_service')
-    from animan.models.auto_download import AutoDownloadEpisode
+    library = importlib.import_module('animelab.services.library_service')
+    from animelab.models.auto_download import AutoDownloadEpisode
     engine = create_database_engine('sqlite:///' + str(tmp_path / 'atomic.sqlite'))
     migrate(engine)
     sessions = sessionmaker(bind=engine)

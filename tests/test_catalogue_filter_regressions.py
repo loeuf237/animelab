@@ -5,10 +5,10 @@ from urllib.parse import parse_qs, urlparse
 from fastapi.testclient import TestClient
 import pytest
 
-from animan.services.aniyomi_container import AniyomiContainerSource
-from animan.services.aniyomi_dex_parser import SourceRecipe, AniyomiDexParser
-from animan.services.source_catalogue import SourceCatalogueService, CatalogueError
-from animan.services.source_registry import SourceRegistry
+from animelab.services.aniyomi_container import AniyomiContainerSource
+from animelab.services.aniyomi_dex_parser import SourceRecipe, AniyomiDexParser
+from animelab.services.source_catalogue import SourceCatalogueService, CatalogueError
+from animelab.services.source_registry import SourceRegistry
 
 
 def catalogue(name):
@@ -145,7 +145,7 @@ async def test_single_groups_are_exposed_and_conflicting_values_rejected(monkeyp
     with pytest.raises(CatalogueError, match='une seule option'):
         await cat.browse(source.pkg, 'catalogue', tags=languages)
     from run import app
-    monkeypatch.setattr('animan.routers.sources.source_catalogue', cat)
+    monkeypatch.setattr('animelab.routers.sources.source_catalogue', cat)
     client = TestClient(app)
     response = client.get(f'/api/sources/{source.pkg}/filters')
     assert response.status_code == 200

@@ -6,9 +6,9 @@ import pytest
 from fastapi import FastAPI
 from pydantic import ValidationError
 
-from animan.api_contracts import ContractRoute, DownloadTaskResponse, install_contract_schema
-from animan.api_errors import ErrorContractMiddleware, install_error_handlers, APIProblem
-from animan.services.source_http import VerificationRequired, SourceNetworkError, RateLimited
+from animelab.api_contracts import ContractRoute, DownloadTaskResponse, install_contract_schema
+from animelab.api_errors import ErrorContractMiddleware, install_error_handlers, APIProblem
+from animelab.services.source_http import VerificationRequired, SourceNetworkError, RateLimited
 
 
 def api_app():
@@ -66,8 +66,8 @@ async def test_rate_limit_keeps_retry_after_and_binary_response_streams():
 
 @pytest.mark.asyncio
 async def test_invalid_download_is_rejected_before_queueing_and_does_not_echo_secrets(monkeypatch):
-    from animan.routers.download import router
-    from animan.services.download_manager import download_manager
+    from animelab.routers.download import router
+    from animelab.services.download_manager import download_manager
     start = AsyncMock()
     monkeypatch.setattr(download_manager, 'start_download', start)
     app = api_app(); app.include_router(router)
@@ -85,7 +85,7 @@ async def test_invalid_download_is_rejected_before_queueing_and_does_not_echo_se
 
 
 def test_schema_download_response_detects_contract_drift():
-    from animan.models.download_task import DownloadTask
+    from animelab.models.download_task import DownloadTask
     wire = DownloadTask().to_dict()
     assert DownloadTaskResponse.model_validate(wire).exportUris == []
     with pytest.raises(ValidationError):
@@ -122,8 +122,8 @@ async def test_legacy_metadata_failure_keeps_http_status_and_adds_media_advice()
 
 @pytest.mark.asyncio
 async def test_active_media_worker_cannot_be_cancelled_or_deleted(monkeypatch):
-    from animan.routers.download import router
-    from animan.services.download_manager import download_manager
+    from animelab.routers.download import router
+    from animelab.services.download_manager import download_manager
     monkeypatch.setattr(download_manager, '_export_in_progress', lambda task_id: True)
     app = api_app(); app.include_router(router)
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url='http://test') as client:

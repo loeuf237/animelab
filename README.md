@@ -118,6 +118,9 @@ Stop it with `docker compose down`. See the [Docker guide](docs/docker.md) for v
 
 ## Development and contributions
 
+The Python engine lives in `animelab/`; desktop packaging uses `animelab.spec`.
+See the [package namespace and compatibility notes](docs/package-namespace.md).
+
 Bug reports, translations, source adapters, UI improvements and device testing are welcome. [Open an issue](https://github.com/loeuf237/animelab/issues) with reproduction steps, platform and application version; discuss substantial changes before submitting a pull request. Remove cookies, credentials and private URLs from diagnostic material.
 
 For frontend development, keep the Python server running and launch Vite in another terminal:

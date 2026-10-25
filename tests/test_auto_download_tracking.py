@@ -6,18 +6,18 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from animan import platform_events
-from animan.database import Base
-from animan.models.anime import AnimeDetail, Episode
-from animan.models.auto_download import AutoDownloadEpisode
-from animan.models.download_task import DownloadStatus
-from animan.services.download_manager import DownloadManagerService
-from animan.services.library_service import library_service
-from animan.services.source_catalogue import source_catalogue
-from animan.services.watchdog_service import WatchdogService
+from animelab import platform_events
+from animelab.database import Base
+from animelab.models.anime import AnimeDetail, Episode
+from animelab.models.auto_download import AutoDownloadEpisode
+from animelab.models.download_task import DownloadStatus
+from animelab.services.download_manager import DownloadManagerService
+from animelab.services.library_service import library_service
+from animelab.services.source_catalogue import source_catalogue
+from animelab.services.watchdog_service import WatchdogService
 
-library_module = importlib.import_module("animan.services.library_service")
-watchdog_module = importlib.import_module("animan.services.watchdog_service")
+library_module = importlib.import_module("animelab.services.library_service")
+watchdog_module = importlib.import_module("animelab.services.watchdog_service")
 
 
 @pytest.fixture

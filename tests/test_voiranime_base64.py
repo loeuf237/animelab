@@ -1,6 +1,6 @@
 import base64
 import pytest
-from animan.services.voiranime_service import voiranime_service
+from animelab.services.voiranime_service import voiranime_service
 
 def test_decode_base64_mirror_iframe():
     raw_iframe = '<iframe src="https://vidmoly.to/embed-xyz123.html" width="100%" height="100%" frameborder="0"></iframe>'

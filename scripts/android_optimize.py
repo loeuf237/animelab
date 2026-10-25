@@ -115,8 +115,8 @@ def optimize_requirements(root, output, strip_tool):
 
 
 def deduplicate_sources(root):
-    """Only remove public copies whose URLs run.py serves from animan/static."""
-    static = root / "animan/static"
+    """Only remove public copies whose URLs run.py serves from animelab/static."""
+    static = root / "animelab/static"
     frontend = root / "frontend/dist"
     candidates = list((frontend / "img").rglob("*")) + [frontend / "manifest.json"]
     removed = []

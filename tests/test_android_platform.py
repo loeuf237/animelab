@@ -5,8 +5,8 @@ import subprocess
 import httpx
 import pytest
 
-from animan import media_tools
-from animan.android_security import AndroidSessionMiddleware
+from animelab import media_tools
+from animelab.android_security import AndroidSessionMiddleware
 
 
 @pytest.fixture
@@ -40,8 +40,8 @@ def test_native_media_rejects_global_working_directory(native):
 
 
 def test_android_hls_assembly_uses_absolute_paths_without_process_cwd(tmp_path, monkeypatch):
-    from animan.models.download_task import DownloadTask
-    from animan.services.download_manager import DownloadManagerService
+    from animelab.models.download_task import DownloadTask
+    from animelab.services.download_manager import DownloadManagerService
     from pathlib import Path
 
     folder = tmp_path / "episode's segments"
@@ -118,11 +118,11 @@ async def test_android_rejects_unauthenticated_websocket():
 
 @pytest.mark.asyncio
 async def test_paused_native_export_keeps_the_private_video_completed(monkeypatch, tmp_path):
-    from animan import platform_events
-    from animan.models.download_task import DownloadTask, DownloadStatus
-    from animan.services.download_manager import DownloadManagerService
-    from animan.services.library_service import library_service
-    from animan.services.verification_service import verification_service, VerificationResult
+    from animelab import platform_events
+    from animelab.models.download_task import DownloadTask, DownloadStatus
+    from animelab.services.download_manager import DownloadManagerService
+    from animelab.services.library_service import library_service
+    from animelab.services.verification_service import verification_service, VerificationResult
     manager = DownloadManagerService()
     task = DownloadTask(status=DownloadStatus.DOWNLOADING, savePath=str(tmp_path / "episode.mp4"))
     monkeypatch.setattr(verification_service, "verify_file", lambda **kwargs: VerificationResult(valid=True, status="VALID"))
@@ -141,9 +141,9 @@ async def test_paused_native_export_keeps_the_private_video_completed(monkeypatc
 
 
 def test_interrupted_mux_is_restored_as_paused(monkeypatch, tmp_path):
-    from animan.models.download_task import DownloadTask, DownloadStatus
-    from animan.services.download_manager import DownloadManagerService
-    from animan.services.library_service import library_service
+    from animelab.models.download_task import DownloadTask, DownloadStatus
+    from animelab.services.download_manager import DownloadManagerService
+    from animelab.services.library_service import library_service
     manager = DownloadManagerService()
     task = DownloadTask(status=DownloadStatus.MUXING, savePath=str(tmp_path / "missing.mp4"))
     class Entity:
@@ -163,12 +163,12 @@ def test_interrupted_mux_is_restored_as_paused(monkeypatch, tmp_path):
 @pytest.mark.asyncio
 async def test_storage_controls_validate_actions_and_retry_export(monkeypatch, tmp_path):
     from fastapi import FastAPI
-    from animan import platform_events
-    from animan.routers.library import router
-    from animan.routers.download import router as downloads_router
-    from animan.services.download_manager import download_manager
-    from animan.services.library_service import library_service
-    from animan.models.download_task import DownloadTask, DownloadStatus
+    from animelab import platform_events
+    from animelab.routers.library import router
+    from animelab.routers.download import router as downloads_router
+    from animelab.services.download_manager import download_manager
+    from animelab.services.library_service import library_service
+    from animelab.models.download_task import DownloadTask, DownloadStatus
     app = FastAPI()
     app.include_router(router)
     app.include_router(downloads_router)
@@ -205,9 +205,9 @@ async def test_storage_controls_validate_actions_and_retry_export(monkeypatch, t
 
 @pytest.mark.asyncio
 async def test_storage_failure_never_invents_available_capacity(monkeypatch, tmp_path):
-    from animan.routers.library import get_system_storage
-    from animan.config import settings
-    from animan import platform_events
+    from animelab.routers.library import get_system_storage
+    from animelab.config import settings
+    from animelab import platform_events
     import shutil
     monkeypatch.setattr(settings, 'DOWNLOAD_DIR', str(tmp_path))
     monkeypatch.setattr(platform_events, 'storage_status_handler', None)

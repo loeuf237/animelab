@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
-from animan.services.unpacking import unpack, try_unpack
-from animan.services.scraping_service import scraping_service
+from animelab.services.unpacking import unpack, try_unpack
+from animelab.services.scraping_service import scraping_service
 
 def test_dean_edwards_unpacker():
     # Simple packed string test

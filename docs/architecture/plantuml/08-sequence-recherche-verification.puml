@@ -1,8 +1,8 @@
 @startuml
 !include theme.iuml
-' @source animan/routers/anime.py:search_api
-' @source animan/services/browser_verification.py:BrowserVerificationService.complete
-' @source animan/routers/network.py:complete
+' @source animelab/routers/anime.py:search_api
+' @source animelab/services/browser_verification.py:BrowserVerificationService.complete
+' @source animelab/routers/network.py:complete
 title AnimeLab — recherche multisource et vérification assistée
 autonumber
 actor Utilisateur as U

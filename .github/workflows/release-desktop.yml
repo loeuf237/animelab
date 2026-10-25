@@ -81,7 +81,7 @@ jobs:
       - name: Record versions and tool licenses
         run: python scripts/desktop_release.py prepare
       - name: Build Python app including Vue and media tools
-        run: python -m PyInstaller --clean --noconfirm animan.spec
+        run: python -m PyInstaller --clean --noconfirm animelab.spec
       - name: Test packaged backend, SPA, curl transport and media tools
         run: python scripts/desktop_release.py check
       - name: Render and close the actual packaged Windows native window

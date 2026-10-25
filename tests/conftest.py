@@ -9,7 +9,7 @@ import socket
 # App middleware is configured during collection, before fixtures run. These
 # names are test-only; production defaults accept localhost and 127.0.0.1.
 os.environ.setdefault("ANIMAN_ALLOWED_HOSTS", "localhost,127.0.0.1,testserver,test")
-from animan.config import settings
+from animelab.config import settings
 
 _system_getaddrinfo = socket.getaddrinfo
 
@@ -21,7 +21,7 @@ def offline_dns(monkeypatch):
     HTTP responses remain mocked by each test. Security tests can override DNS
     to exercise failed resolution or private addresses; SSRF checks stay active.
     """
-    from animan import security
+    from animelab import security
 
     def resolve(host, port, family=0, type=0, proto=0, flags=0):
         if host is not None:

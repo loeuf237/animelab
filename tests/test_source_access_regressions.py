@@ -7,14 +7,14 @@ import httpx
 import pytest
 from bs4 import BeautifulSoup
 
-from animan.models.anime import AnimeResult
-from animan.routers import anime as router
-from animan.services.source_http import VerificationRequired
-from animan.services.voiranime_service import voiranime_service
-from animan.services.animepahe_service import animepahe_service
-from animan.services.scraping_service import scraping_service
-from animan.services.aniyomi_container import AniyomiContainerSource
-from animan.services.aniyomi_dex_parser import SourceRecipe
+from animelab.models.anime import AnimeResult
+from animelab.routers import anime as router
+from animelab.services.source_http import VerificationRequired
+from animelab.services.voiranime_service import voiranime_service
+from animelab.services.animepahe_service import animepahe_service
+from animelab.services.scraping_service import scraping_service
+from animelab.services.aniyomi_container import AniyomiContainerSource
+from animelab.services.aniyomi_dex_parser import SourceRecipe
 
 
 @pytest.mark.asyncio
@@ -63,7 +63,7 @@ async def test_animepahe_search_does_not_swallow_request_failure(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_extension_request_failure_is_not_an_empty_catalogue(monkeypatch):
-    from animan.services import aniyomi_container
+    from animelab.services import aniyomi_container
     source = AniyomiContainerSource(SourceRecipe(pkg='test', base_url='https://source.example'))
     client = SimpleNamespace(request=AsyncMock(side_effect=httpx.ConnectError('offline')))
     class Context:
@@ -101,7 +101,7 @@ def test_manual_retry_keeps_blocked_state_until_transport_accepts(monkeypatch):
     import threading
     from fastapi.testclient import TestClient
     from run import app
-    from animan.services import source_http as transport_module
+    from animelab.services import source_http as transport_module
     url = 'https://source.example/search?q=one'
     state = SimpleNamespace(condition=threading.RLock(), blocked_url=url, generation=0, last_error='challenge')
     get = AsyncMock(side_effect=VerificationRequired(url))
@@ -135,7 +135,7 @@ async def test_imported_voiranime_old_recipe_reads_current_cards(monkeypatch):
 @pytest.mark.parametrize('original', [voiranime_service, animepahe_service, scraping_service])
 async def test_known_protection_is_reported_even_with_a_fresh_cache(original, monkeypatch):
     import time
-    from animan.services.source_http import source_http
+    from animelab.services.source_http import source_http
     service = object.__new__(type(original))
     service.base_url = 'https://source.example'
     service.latest_cache = [AnimeResult(id='old',title='Cached anime',url='https://source.example/old')]

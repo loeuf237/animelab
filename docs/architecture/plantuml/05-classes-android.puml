@@ -11,7 +11,7 @@ title AnimeLab — classes et objets de l'hôte Android
 ' @source android/app/src/main/java/com/animan/app/VerificationBridge.kt:VerificationBridge
 ' @source android/app/src/main/java/com/animan/app/VerificationActivity.kt:VerificationActivity
 ' @source android_runtime.py:start
-' @source animan/android_security.py:AndroidSessionMiddleware
+' @source animelab/android_security.py:AndroidSessionMiddleware
 package "Kotlin / cycle de vie" {
   class MainActivity {
     +onCreate(savedInstanceState)

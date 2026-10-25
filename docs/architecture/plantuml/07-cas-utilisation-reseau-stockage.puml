@@ -1,8 +1,8 @@
 @startuml
 !include theme.iuml
-' @source animan/routers/network.py:rotate_proxy
-' @source animan/routers/network.py:complete
-' @source animan/routers/library.py:android_storage_action
+' @source animelab/routers/network.py:rotate_proxy
+' @source animelab/routers/network.py:complete
+' @source animelab/routers/library.py:android_storage_action
 title AnimeLab — cas d'utilisation réseau et stockage Android
 left to right direction
 actor Utilisateur as U

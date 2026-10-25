@@ -37,7 +37,7 @@ required-version = "==0.13.1"
 
 [tool.ruff]
 target-version = "py312"
-include = ["animan/**/*.py", "scripts/**/*.py", "tests/**/*.py", "run.py", "desktop.py", "android_runtime.py"]
+include = ["animelab/**/*.py", "scripts/**/*.py", "tests/**/*.py", "run.py", "desktop.py", "android_runtime.py"]
 
 [tool.ruff.lint]
 # Start with correctness checks across the engine, tests and build tools.
@@ -54,11 +54,11 @@ ignore = ["F401", "F841"]
 [tool.mypy]
 python_version = "3.12"
 files = [
-    "animan/models/anime.py",
-    "animan/android_security.py",
-    "animan/services/download_resume.py",
-    "animan/services/subtitle_service.py",
-    "animan/services/download_errors.py",
+    "animelab/models/anime.py",
+    "animelab/android_security.py",
+    "animelab/services/download_resume.py",
+    "animelab/services/subtitle_service.py",
+    "animelab/services/download_errors.py",
     "scripts/check.py",
 ]
 check_untyped_defs = true

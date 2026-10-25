@@ -3,12 +3,12 @@ import math
 import pytest
 from sqlalchemy.orm import sessionmaker
 from pydantic import ValidationError
-from animan import database
-from animan.database import create_database_engine,transaction
-from animan.migrations import migrate
-from animan.models.download_task import DownloadTaskEntity
-from animan.models.playback import PlaybackProgress
-from animan.services.playback_service import PlaybackOpen,PlaybackSave,PlaybackSelection,PlaybackService
+from animelab import database
+from animelab.database import create_database_engine,transaction
+from animelab.migrations import migrate
+from animelab.models.download_task import DownloadTaskEntity
+from animelab.models.playback import PlaybackProgress
+from animelab.services.playback_service import PlaybackOpen,PlaybackSave,PlaybackSelection,PlaybackService
 
 
 @pytest.fixture
@@ -80,8 +80,8 @@ def test_invalid_clocks_are_rejected(value):
 async def test_playback_api_contract_and_missing_identity(playback):
     import httpx
     from fastapi import FastAPI
-    from animan.routers.playback import router
-    from animan.api_errors import install_error_handlers,ErrorContractMiddleware
+    from animelab.routers.playback import router
+    from animelab.api_errors import install_error_handlers,ErrorContractMiddleware
     app=FastAPI();app.include_router(router);install_error_handlers(app);app.add_middleware(ErrorContractMiddleware)
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test') as client:
         result=await client.post('/api/playback/session',json={'source':'source','animeUrl':'https://example.org/series','episodeNumber':3,'version':'VF'})

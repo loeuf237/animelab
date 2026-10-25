@@ -58,9 +58,9 @@ def main():
         fixture = command('exec', '-T', 'animelab', 'python', '-c', '''
 import json, os, subprocess
 from pathlib import Path
-from animan.config import settings
-from animan.models.download_task import DownloadTask, DownloadStatus
-from animan.services.library_service import library_service
+from animelab.config import settings
+from animelab.models.download_task import DownloadTask, DownloadStatus
+from animelab.services.library_service import library_service
 assert os.getuid() == 1000 and os.getgid() == 1000
 assert Path.home() == Path('/data')
 assert not Path('/app/android').exists() and not Path('/app/.git').exists()
@@ -103,7 +103,7 @@ print(json.dumps({'prefix':p.read_bytes()[:64].hex(), 'size':p.stat().st_size}))
             raise RuntimeError('Settings did not survive container replacement')
         command('exec', '-T', 'animelab', 'python', '-c', '''
 from pathlib import Path
-from animan.config import settings
+from animelab.config import settings
 for parent in [Path.home()/'.animan/extensions', settings.CACHE_DIR/'http_sessions']:
     assert (parent/'.docker-smoke-marker').read_text() == 'persistent'
 ''')

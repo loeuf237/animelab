@@ -1,20 +1,20 @@
 @startuml
 !include theme.iuml
 title AnimeLab — sources, recettes importées et extracteurs
-' @source animan/services/source_catalogue.py:SourceCatalogueService
-' @source animan/services/scraping_service.py:ScrapingService
-' @source animan/services/voiranime_service.py:VoirAnimeScrapingService
-' @source animan/services/animepahe_service.py:AnimepaheService
-' @source animan/services/extension_service.py:ExtensionService
-' @source animan/services/aniyomi_dex_parser.py:SourceRecipe
-' @source animan/services/aniyomi_dex_parser.py:AniyomiDexParser
-' @source animan/services/aniyomi_container.py:AniyomiContainerSource
-' @source animan/services/recipe_runtime.py:RecipeRuntime
-' @source animan/services/recipe_plans.py:compile_operations
-' @source animan/services/extractors/base.py:BaseVideoExtractor
-' @source animan/services/extractors/base.py:ExtractorResult
-' @source animan/services/extractors/registry.py:ExtractorRegistry
-' @source animan/services/extractors/ytdlp_fallback.py:YtDlpFallbackExtractor
+' @source animelab/services/source_catalogue.py:SourceCatalogueService
+' @source animelab/services/scraping_service.py:ScrapingService
+' @source animelab/services/voiranime_service.py:VoirAnimeScrapingService
+' @source animelab/services/animepahe_service.py:AnimepaheService
+' @source animelab/services/extension_service.py:ExtensionService
+' @source animelab/services/aniyomi_dex_parser.py:SourceRecipe
+' @source animelab/services/aniyomi_dex_parser.py:AniyomiDexParser
+' @source animelab/services/aniyomi_container.py:AniyomiContainerSource
+' @source animelab/services/recipe_runtime.py:RecipeRuntime
+' @source animelab/services/recipe_plans.py:compile_operations
+' @source animelab/services/extractors/base.py:BaseVideoExtractor
+' @source animelab/services/extractors/base.py:ExtractorResult
+' @source animelab/services/extractors/registry.py:ExtractorRegistry
+' @source animelab/services/extractors/ytdlp_fallback.py:YtDlpFallbackExtractor
 package "Catalogue et sources natives" {
   class SourceCatalogueService {
     +provider(source_id)
@@ -147,10 +147,10 @@ SourceRegistry ..> RegisteredSource : sélection activée
 RegisteredSource --> SourceProvider : délègue
 RegisteredSource *-- SourceCapabilities
 SourceCatalogueService ..> SourceRegistry
-' @source animan/services/source_registry.py:SourceRegistry
-' @source animan/services/source_registry.py:RegisteredSource
-' @source animan/services/source_registry.py:SourceProvider
-' @source animan/services/source_registry.py:SourceCapabilities
+' @source animelab/services/source_registry.py:SourceRegistry
+' @source animelab/services/source_registry.py:RegisteredSource
+' @source animelab/services/source_registry.py:SourceProvider
+' @source animelab/services/source_registry.py:SourceCapabilities
 class ExtensionObservability {
   +record(pkg, operation, ...)
   +health(conn, ext_id)
@@ -165,5 +165,5 @@ note right of extension_recipe_versions
 Schéma de recette v1 et empreinte SHA-256.
 Restaurer crée une nouvelle révision.
 end note
-' @source animan/services/extension_observability.py:ExtensionObservability
+' @source animelab/services/extension_observability.py:ExtensionObservability
 @enduml

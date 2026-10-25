@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, patch
-from animan.models.anime import AnimeResult, AnimeDetail, Episode
-from animan.services.scraping_service import scraping_service
+from animelab.models.anime import AnimeResult, AnimeDetail, Episode
+from animelab.services.scraping_service import scraping_service
 
 def test_unify_animes_duplicates():
     # Deux cartes pour le même anime : une VF et une VOSTFR

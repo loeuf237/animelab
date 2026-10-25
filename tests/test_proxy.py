@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from fastapi.testclient import TestClient
-from animan.services.proxy_service import ProxyService, proxy_service
+from animelab.services.proxy_service import ProxyService, proxy_service
 from run import app
 
 
@@ -180,11 +180,11 @@ def test_one_click_proxy_enable_and_offline_i18n():
         assert settings["effective_url"] == "socks5://tg_user:******@127.0.0.1:1080"
         assert "tg_password" not in str(settings)
         # Le secret réel reste utilisé en interne
-        from animan.services.proxy_service import proxy_service as _ps
+        from animelab.services.proxy_service import proxy_service as _ps
         assert _ps.get_active_proxy() == "socks5://tg_user:tg_password@127.0.0.1:1080"
 
         # Vérification des traductions i18n du bandeau hors-ligne
-        from animan.services.i18n_service import i18n_service
+        from animelab.services.i18n_service import i18n_service
         for lang in ["fr", "en"]:
             catalog = i18n_service.get_catalog(lang)
             assert "offline_waiting" in catalog

@@ -2,20 +2,20 @@ import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from animan.services.extractors.base import BaseVideoExtractor, ExtractorResult
-from animan.services.extractors.registry import extractor_registry
-from animan.services.extractors.vidmoly import VidmolyExtractor
-from animan.services.extractors.sibnet import SibnetExtractor
-from animan.services.extractors.sendvid import SendvidExtractor
-from animan.services.extractors.streamtape import StreamtapeExtractor
-from animan.services.extractors.voe import VoeExtractor
-from animan.services.extractors.uqload import UqloadExtractor
-from animan.services.extractors.filemoon import FilemoonExtractor
-from animan.services.extractors.doodstream import DoodstreamExtractor
-from animan.services.extractors.mp4upload import Mp4uploadExtractor
-from animan.services.extractors.mailru import MailRuExtractor
-from animan.services.extractors.kwik import KwikExtractor
-from animan.services.extractors.ytdlp_fallback import YtDlpFallbackExtractor
+from animelab.services.extractors.base import BaseVideoExtractor, ExtractorResult
+from animelab.services.extractors.registry import extractor_registry
+from animelab.services.extractors.vidmoly import VidmolyExtractor
+from animelab.services.extractors.sibnet import SibnetExtractor
+from animelab.services.extractors.sendvid import SendvidExtractor
+from animelab.services.extractors.streamtape import StreamtapeExtractor
+from animelab.services.extractors.voe import VoeExtractor
+from animelab.services.extractors.uqload import UqloadExtractor
+from animelab.services.extractors.filemoon import FilemoonExtractor
+from animelab.services.extractors.doodstream import DoodstreamExtractor
+from animelab.services.extractors.mp4upload import Mp4uploadExtractor
+from animelab.services.extractors.mailru import MailRuExtractor
+from animelab.services.extractors.kwik import KwikExtractor
+from animelab.services.extractors.ytdlp_fallback import YtDlpFallbackExtractor
 
 def test_extractor_result_to_download_info():
     res = ExtractorResult(
@@ -268,7 +268,7 @@ async def test_kwik_extractor():
     extractor = KwikExtractor()
     assert extractor.matches("https://kwik.cx/e/stream_token") is True
 
-    with patch("animan.services.animepahe_service.animepahe_service.extract_kwik_stream", new_callable=AsyncMock) as mock_extract:
+    with patch("animelab.services.animepahe_service.animepahe_service.extract_kwik_stream", new_callable=AsyncMock) as mock_extract:
         mock_extract.return_value = "https://kwik.cx/direct/stream.mp4"
         res = await extractor.extract("https://kwik.cx/e/stream_token")
         assert res is not None

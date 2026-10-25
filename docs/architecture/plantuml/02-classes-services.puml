@@ -1,20 +1,20 @@
 @startuml
 !include theme.iuml
 title AnimeLab — orchestration des téléchargements et bibliothèque
-' @source animan/services/download_manager.py:DownloadManagerService
-' @source animan/services/download_manager.py:ResolvedVideoInfo
-' @source animan/services/library_service.py:LibraryService
-' @source animan/services/verification_service.py:DownloadVerificationService
-' @source animan/services/verification_service.py:VerificationResult
-' @source animan/services/watchdog_service.py:WatchdogService
-' @source animan/media_tools.py:run
-' @source animan/platform_events.py:completed
-' @source animan/services/download_stages/transfer.py:TransferWorker
-' @source animan/services/download_stages/media.py:MediaPipeline
-' @source animan/services/download_stages/export.py:ExportCoordinator
-' @source animan/services/download_stages/scheduler.py:DownloadScheduler
-' @source animan/services/download_stages/budget.py:StageBudget
-' @source animan/services/download_stages/state.py:transition
+' @source animelab/services/download_manager.py:DownloadManagerService
+' @source animelab/services/download_manager.py:ResolvedVideoInfo
+' @source animelab/services/library_service.py:LibraryService
+' @source animelab/services/verification_service.py:DownloadVerificationService
+' @source animelab/services/verification_service.py:VerificationResult
+' @source animelab/services/watchdog_service.py:WatchdogService
+' @source animelab/media_tools.py:run
+' @source animelab/platform_events.py:completed
+' @source animelab/services/download_stages/transfer.py:TransferWorker
+' @source animelab/services/download_stages/media.py:MediaPipeline
+' @source animelab/services/download_stages/export.py:ExportCoordinator
+' @source animelab/services/download_stages/scheduler.py:DownloadScheduler
+' @source animelab/services/download_stages/budget.py:StageBudget
+' @source animelab/services/download_stages/state.py:transition
 package "Services partagés Python" {
   class DownloadManagerService {
     tasks: Dict[str, DownloadTask]

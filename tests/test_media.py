@@ -3,9 +3,9 @@ import pytest
 from pathlib import Path
 from fastapi.testclient import TestClient
 from fastapi import FastAPI
-from animan.routers import media
-from animan.models.download_task import DownloadTask, DownloadStatus
-from animan.services.download_manager import download_manager
+from animelab.routers import media
+from animelab.models.download_task import DownloadTask, DownloadStatus
+from animelab.services.download_manager import download_manager
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
@@ -111,14 +111,14 @@ def test_completed_downloads_remain_playable_after_restart(monkeypatch, tmp_path
     import importlib
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
-    from animan.database import Base
-    from animan.models.download_task import ExportStatus
-    from animan.services.download_manager import DownloadManagerService
-    from animan.services.library_service import library_service
-    from animan.services.verification_service import verification_service
+    from animelab.database import Base
+    from animelab.models.download_task import ExportStatus
+    from animelab.services.download_manager import DownloadManagerService
+    from animelab.services.library_service import library_service
+    from animelab.services.verification_service import verification_service
     engine = create_engine(f'sqlite:///{tmp_path / "restore.sqlite"}')
     Base.metadata.create_all(engine)
-    monkeypatch.setattr(importlib.import_module('animan.services.library_service'), 'SessionLocal', sessionmaker(bind=engine))
+    monkeypatch.setattr(importlib.import_module('animelab.services.library_service'), 'SessionLocal', sessionmaker(bind=engine))
     video = tmp_path / 'completed.mp4'
     video.write_bytes(b'verified video' * 100000)
     completed = DownloadTask(id='completed', savePath=str(video), status=DownloadStatus.COMPLETED)

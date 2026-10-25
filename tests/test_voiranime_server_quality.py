@@ -1,7 +1,7 @@
 import json
 import pytest
 from unittest.mock import patch, MagicMock
-from animan.services.voiranime_service import VoirAnimeScrapingService
+from animelab.services.voiranime_service import VoirAnimeScrapingService
 
 SAMPLE_SOURCES_HTML = """
 <!DOCTYPE html>

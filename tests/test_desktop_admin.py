@@ -12,10 +12,10 @@ from urllib.request import ProxyHandler, Request, build_opener
 
 import pytest
 
-from animan.desktop.control import remote_call
-from animan.desktop.state import InstanceLock, load_config, read_json, write_json
-from animan.desktop.supervisor import Supervisor, choose_port
-from animan.desktop import window
+from animelab.desktop.control import remote_call
+from animelab.desktop.state import InstanceLock, load_config, read_json, write_json
+from animelab.desktop.supervisor import Supervisor, choose_port
+from animelab.desktop import window
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -100,7 +100,7 @@ def test_instance_lock_is_held_across_processes_and_released_on_crash(tmp_path):
     assert lock.acquire()
     script = '''
 from pathlib import Path
-from animan.desktop.state import InstanceLock
+from animelab.desktop.state import InstanceLock
 import sys
 lock = InstanceLock(Path(sys.argv[1]))
 print(lock.acquire())
@@ -126,7 +126,7 @@ def test_windows_uses_real_ico_and_rejects_png_disguised_as_ico(monkeypatch, tmp
     monkeypatch.setattr(sys, 'frozen', True, raising=False)
     monkeypatch.setattr(sys, '_MEIPASS', str(root), raising=False)
     assert Path(window.window_icon()) == icon
-    icon.write_bytes((ROOT / 'animan/static/img/icon-512.png').read_bytes())
+    icon.write_bytes((ROOT / 'animelab/static/img/icon-512.png').read_bytes())
     with pytest.raises(ValueError, match='ICO'):
         window.window_icon()
 
@@ -142,7 +142,7 @@ if '--headless' not in sys.argv:
 (path / 'ready').touch()
 while not (path / 'stop').exists(): time.sleep(.03)
 ''')
-    from animan.desktop import supervisor as module
+    from animelab.desktop import supervisor as module
     monkeypatch.setattr(module, 'launcher_command', lambda: [sys.executable, str(worker)])
     opened = []
     monkeypatch.setattr(module.webbrowser, 'open', opened.append)

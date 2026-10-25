@@ -1,8 +1,8 @@
 @startuml
 !include theme.iuml
-' @source animan/services/download_manager.py:DownloadManagerService._execute_download
-' @source animan/services/download_manager.py:DownloadManagerService._finalize_task
-' @source animan/services/download_manager.py:DownloadManagerService._publish_mux_file
+' @source animelab/services/download_manager.py:DownloadManagerService._execute_download
+' @source animelab/services/download_manager.py:DownloadManagerService._finalize_task
+' @source animelab/services/download_manager.py:DownloadManagerService._publish_mux_file
 title AnimeLab — téléchargement, HLS, sous-titres et finalisation
 autonumber
 actor Utilisateur as U

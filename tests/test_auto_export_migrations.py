@@ -9,15 +9,15 @@ from fastapi import FastAPI
 from sqlalchemy import MetaData, Table, create_engine
 from sqlalchemy.orm import sessionmaker
 
-from animan import database, platform_events
-from animan.database import Base
-from animan.models.download_task import DownloadTask, DownloadTaskEntity, DownloadStatus, ExportStatus
-from animan.models.favorite import FavoriteAnime
-from animan.services.library_service import library_service
-from animan.services.download_manager import DownloadManagerService
-from animan.services.verification_service import verification_service, VerificationResult
+from animelab import database, platform_events
+from animelab.database import Base
+from animelab.models.download_task import DownloadTask, DownloadTaskEntity, DownloadStatus, ExportStatus
+from animelab.models.favorite import FavoriteAnime
+from animelab.services.library_service import library_service
+from animelab.services.download_manager import DownloadManagerService
+from animelab.services.verification_service import verification_service, VerificationResult
 
-library_module = importlib.import_module("animan.services.library_service")
+library_module = importlib.import_module("animelab.services.library_service")
 
 
 @pytest.fixture
@@ -64,7 +64,7 @@ async def test_failed_export_is_independent_persistent_and_retryable_offline(exp
         return {"uris": ["content://downloads/7"], "destination": "Downloads/Animan"}
     monkeypatch.setattr(platform_events, "completed_handler", copy_local)
     # A retry operates only on the existing private file.
-    from animan.services.source_http import source_http
+    from animelab.services.source_http import source_http
     monkeypatch.setattr(source_http, "request", lambda *a, **k: pytest.fail("Export fetched network media"))
     await restored.export_task(again, manual=True)
     assert public.read_bytes() == b"verified private file"
@@ -202,7 +202,7 @@ def test_upgrade_preserves_legacy_favorites_and_splits_legacy_export_errors(tmp_
 
 @pytest.mark.asyncio
 async def test_tracking_preferences_api_validates_and_roundtrips(exports):
-    from animan.routers.library import router
+    from animelab.routers.library import router
     app = FastAPI()
     app.include_router(router)
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://127.0.0.1") as client:

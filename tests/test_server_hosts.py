@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.testclient import TestClient
 
-from animan.config import parse_allowed_hosts, settings
+from animelab.config import parse_allowed_hosts, settings
 from run import app
 
 

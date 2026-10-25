@@ -15,7 +15,7 @@ import threading
 import time
 from urllib.request import ProxyHandler, build_opener
 import webbrowser
-from animan import __version__
+from animelab import __version__
 
 # Windowed PyInstaller executables have no console streams on Windows.
 for _stream in ("stdin", "stdout", "stderr"):
@@ -23,7 +23,7 @@ for _stream in ("stdin", "stdout", "stderr"):
         setattr(sys, _stream, open(os.devnull, "r" if _stream == "stdin" else "w", encoding="utf-8"))
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
-logger = logging.getLogger("animan.desktop")
+logger = logging.getLogger("animelab.desktop")
 if os.getenv("ANIMAN_LOG_FILE"):
     logging.getLogger().addHandler(logging.FileHandler(os.environ["ANIMAN_LOG_FILE"], encoding="utf-8"))
 
@@ -59,13 +59,13 @@ def wait_for_server(port, max_retries=80, delay=.25):
 def start_server(port):
     os.environ.update(ANIMAN_PORT=str(port), ANIMAN_HOST="127.0.0.1", ANIMAN_RELOAD="false",
                       ANIMAN_ALLOWED_HOSTS='127.0.0.1,localhost')
-    from animan.config import settings
+    from animelab.config import settings
     settings.PORT, settings.HOST = port, "127.0.0.1"
     settings.ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
     from run import app
     if os.getenv('ANIMAN_DESKTOP_PREFERENCES'):
         from contextlib import asynccontextmanager
-        from animan.desktop.options import apply_download_preferences
+        from animelab.desktop.options import apply_download_preferences
         original_lifespan = app.router.lifespan_context
         @asynccontextmanager
         async def desktop_lifespan(application):
@@ -115,7 +115,7 @@ def self_test():
             from PySide6.QtCore import QLibraryInfo
             if not Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.PluginsPath)).is_dir():
                 raise RuntimeError('Bundled Qt platform plugins are missing')
-            from animan.services.extractors import extractor_registry
+            from animelab.services.extractors import extractor_registry
             import yt_dlp
             target = Path(directory) / "probe.mp4"
             for tool in ("ffmpeg", "ffprobe"):
@@ -126,7 +126,7 @@ def self_test():
             probe = subprocess.run(["ffprobe", "-v", "error", "-show_streams", "-of", "json", str(target)],
                                    stdin=subprocess.DEVNULL, check=True, capture_output=True, text=True, timeout=30)
             assert any(stream["codec_type"] == "video" for stream in json.loads(probe.stdout)["streams"])
-            from animan.services.verification_service import verification_service
+            from animelab.services.verification_service import verification_service
             result = verification_service.verify_file(str(target))
             if not result.valid: raise RuntimeError(f"Packaged media integrity check failed: {result.error}")
             print(json.dumps({"version":__version__, "frontend":True, "http":True,
@@ -135,13 +135,13 @@ def self_test():
             server.should_exit = True
             worker.join(timeout=20)
             if worker.is_alive(): raise RuntimeError("Packaged server failed to stop")
-            from animan.database import engine
+            from animelab.database import engine
             engine.dispose()
             gc.collect()  # Release SQLite handles before Windows removes temporary storage.
 
 
 def configure_file_logging(path):
-    from animan.diagnostics import install_logging
+    from animelab.diagnostics import install_logging
     install_logging()
     logging.getLogger().addHandler(RotatingFileHandler(path, maxBytes=2_000_000, backupCount=2, encoding='utf-8'))
 
@@ -155,10 +155,10 @@ def engine_worker(args, directory):
                      exc_info=(arguments.exc_type, arguments.exc_value, arguments.exc_traceback))
     threading.excepthook = thread_failure
     if args.control_url:
-        from animan.diagnostics import remember_secret
+        from animelab.diagnostics import remember_secret
         remember_secret(args.control_url.partition('#')[2])
     workdir = Path(args.worker)
-    from animan.desktop.lifetime import acquire_engine_lock, parent_watch
+    from animelab.desktop.lifetime import acquire_engine_lock, parent_watch
     done, monitor = parent_watch(args.control_url, workdir)
     lock = None
     try:
@@ -179,9 +179,9 @@ def run_engine(args, workdir):
             while worker.is_alive() and not (workdir / 'stop').exists():
                 time.sleep(.2)
         else:
-            from animan.desktop.window import open_window
-            from animan.desktop.state import load_config, state_directory
-            from animan.desktop.options import ui_path
+            from animelab.desktop.window import open_window
+            from animelab.desktop.state import load_config, state_directory
+            from animelab.desktop.options import ui_path
             open_window(f'http://127.0.0.1:{args.port}' + ui_path(load_config(state_directory())), args.control_url, workdir)
     finally:
         # Lifespan shutdown pauses/persists transfers on the server event loop.
@@ -189,7 +189,7 @@ def run_engine(args, workdir):
         worker.join(timeout=20)
         if worker.is_alive():
             raise RuntimeError('Engine did not shut down within 20 seconds')
-        from animan.database import engine
+        from animelab.database import engine
         engine.dispose()
 
 
@@ -218,12 +218,12 @@ def main():
         self_test()
         return
     if args.gui_self_test:
-        from animan.desktop.window import open_window
+        from animelab.desktop.window import open_window
         with tempfile.TemporaryDirectory(prefix='animelab-gui-check-') as temporary:
             open_window(workdir=Path(temporary), probe=True)
         return
     if args.launcher_self_test:
-        from animan.desktop.launcher import open_launcher
+        from animelab.desktop.launcher import open_launcher
         with tempfile.TemporaryDirectory(prefix='animelab-launcher-check-') as temporary:
             directory = Path(temporary) / 'desktop'
             directory.mkdir()
@@ -232,9 +232,9 @@ def main():
                               ANIMAN_DOWNLOAD_DIR=str(Path(temporary) / 'downloads'))
             open_launcher(directory, probe=True)
         return
-    from animan.desktop.state import InstanceLock, load_config, state_directory, valid_port, write_json
-    from animan.desktop.control import remote_call, running_record
-    from animan.desktop.supervisor import Supervisor
+    from animelab.desktop.state import InstanceLock, load_config, state_directory, valid_port, write_json
+    from animelab.desktop.control import remote_call, running_record
+    from animelab.desktop.supervisor import Supervisor
     directory = state_directory()
     if args.worker:
         if args.port is None:
@@ -273,7 +273,7 @@ def main():
         return
     if args.admin or not (args.launch or args.headless or args.browser or args.web_admin):
         if args.port is not None:
-            from animan.desktop.launcher_model import LauncherModel
+            from animelab.desktop.launcher_model import LauncherModel
             model = LauncherModel(directory)
             try:
                 config = model.config()
@@ -281,7 +281,7 @@ def main():
                 config = {'port': valid_port(args.port), 'browser': True}
             model.save({**config, 'port': valid_port(args.port)})
         try:
-            from animan.desktop.launcher import open_launcher
+            from animelab.desktop.launcher import open_launcher
             open_launcher(directory)
             return
         except Exception:

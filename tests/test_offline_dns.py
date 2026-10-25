@@ -4,7 +4,7 @@ import socket
 
 import pytest
 
-from animan import security
+from animelab import security
 
 
 def test_fixture_domains_resolve_offline_with_original_socket_parameters():

@@ -5,10 +5,10 @@ import httpx
 import pytest
 from curl_cffi.requests.exceptions import RequestException
 
-from animan.models.download_task import DownloadTask
-from animan.services.download_manager import DownloadManagerService
-from animan.services.download_resume import RESUME_OVERLAP, write_metadata
-from animan.services.source_http import SourceNetworkError
+from animelab.models.download_task import DownloadTask
+from animelab.services.download_manager import DownloadManagerService
+from animelab.services.download_resume import RESUME_OVERLAP, write_metadata
+from animelab.services.source_http import SourceNetworkError
 from test_proxy_pool import pool, entry
 from test_source_http import transport
 
