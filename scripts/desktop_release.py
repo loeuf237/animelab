@@ -19,9 +19,36 @@ sys.path.insert(0, str(ROOT))
 from animan import __version__
 
 
+def release_metadata():
+    tag = os.environ.get('RELEASE_TAG', 'v' + __version__)
+    if tag != 'v' + __version__:
+        raise ValueError('Tag does not match the application version')
+    notes = (ROOT / 'docs/releases' / (tag + '.md')).read_text(encoding='utf-8')
+    header, _, body = notes.partition('\n')
+    if not header.startswith('# ') or tag not in header.split():
+        raise ValueError('Release notes must start with a title containing the release tag')
+    sections = ('Major Changes', 'Added', 'Changed', 'Fixed', 'WebUI', 'Downloads', 'Contributors')
+    missing = [name for name in sections if not re.search(r'^## ' + re.escape(name) + r'\s*$', body, re.M)]
+    if missing:
+        raise ValueError('Release notes are missing sections: ' + ', '.join(missing))
+    return {'tag': tag, 'title': header[2:].strip(), 'body': body.lstrip()}
+
+
+def release_info():
+    info = release_metadata()
+    target = ROOT / 'build/release-notes.md'
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(info['body'], encoding='utf-8')
+    if os.getenv('GITHUB_OUTPUT'):
+        with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+            output.write('title=' + info['title'] + '\n')
+    print(json.dumps({'tag': info['tag'], 'title': info['title'], 'body_path': str(target)}))
+
+
 def prepare():
     tag = os.environ.get('RELEASE_TAG', 'v' + __version__)
     if tag != 'v' + __version__: raise ValueError('Tag does not match the application version')
+    release_metadata()  # Reject incomplete release notes before building platform binaries.
     target = ROOT / 'build' / 'release-metadata'
     target.mkdir(parents=True, exist_ok=True)
     packages = {item.metadata['Name']:item.version for item in metadata.distributions()}
@@ -206,5 +233,5 @@ def checksums():
 
 
 if __name__ == '__main__':
-    {'prepare':prepare,'check':check,'gui-check':gui_check,'launcher-check':launcher_check,
+    {'prepare':prepare,'release-info':release_info,'check':check,'gui-check':gui_check,'launcher-check':launcher_check,
      'archive':archive,'checksums':checksums}[sys.argv[1]]()

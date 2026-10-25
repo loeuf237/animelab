@@ -8,7 +8,7 @@ import pytest
 from scripts import desktop_release
 
 
-@pytest.mark.parametrize('version', ['0.1.0', '0.1.1', '0.1.2'])
+@pytest.mark.parametrize('version', ['0.1.0', '0.1.1', '0.1.2', '0.1.3'])
 def test_publication_rejects_missing_platform_and_checksums_exact_files(tmp_path, monkeypatch, version):
     monkeypatch.setattr(desktop_release, '__version__', version)
     names = ['Windows-x64.zip', 'Linux-x64.tar.gz', 'macOS-arm64-UNTESTED.zip', 'macOS-x64-UNTESTED.zip']
@@ -30,6 +30,42 @@ def test_preparation_rejects_mismatched_release_version(monkeypatch):
     monkeypatch.setenv('RELEASE_TAG','v2.1.0')
     with pytest.raises(ValueError, match='Tag'):
         desktop_release.prepare()
+
+
+def test_release_title_and_body_follow_structured_notes(tmp_path, monkeypatch):
+    monkeypatch.setenv('RELEASE_TAG', 'v0.1.3')
+    monkeypatch.setattr(desktop_release, '__version__', '0.1.3')
+    monkeypatch.setattr(desktop_release, 'ROOT', tmp_path)
+    notes = tmp_path / 'docs/releases/v0.1.3.md'
+    notes.parent.mkdir(parents=True)
+    body = '\n'.join('## ' + name + '\n\nDetails.\n' for name in
+        ('Major Changes', 'Added', 'Changed', 'Fixed', 'WebUI', 'Downloads', 'Contributors'))
+    notes.write_text('# AnimeLab v0.1.3 — Native launcher\n\n' + body, encoding='utf-8')
+    output = tmp_path / 'github-output'
+    monkeypatch.setenv('GITHUB_OUTPUT', str(output))
+    desktop_release.release_info()
+    assert output.read_text(encoding='utf-8') == 'title=AnimeLab v0.1.3 — Native launcher\n'
+    assert (tmp_path / 'build/release-notes.md').read_text(encoding='utf-8') == body
+    notes.write_text('# AnimeLab v0.1.3\n\n## Major Changes\n', encoding='utf-8')
+    with pytest.raises(ValueError, match='missing sections'):
+        desktop_release.release_metadata()
+    notes.write_text('# AnimeLab v0.1.2\n\n' + body, encoding='utf-8')
+    with pytest.raises(ValueError, match='title'):
+        desktop_release.release_metadata()
+
+
+def test_desktop_publisher_generates_notes_before_uploading_assets():
+    import yaml
+    workflow = yaml.safe_load((desktop_release.ROOT / '.github/workflows/release-desktop.yml').read_text())
+    publish = workflow['jobs']['publish']
+    assert publish['needs'] == 'build'
+    steps = publish['steps']
+    notes = next(i for i, step in enumerate(steps) if step.get('id') == 'release')
+    upload = next(i for i, step in enumerate(steps) if step.get('uses', '').startswith('softprops/action-gh-release@'))
+    assert notes < upload
+    assert 'release-info' in steps[notes]['run']
+    assert steps[upload]['with']['name'] == '${{ steps.release.outputs.title }}'
+    assert steps[upload]['with']['body_path'] == 'build/release-notes.md'
 
 
 def test_windowed_entry_point_can_configure_server_without_console(tmp_path):

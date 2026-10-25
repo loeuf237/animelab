@@ -22,7 +22,7 @@ Choose a build from [GitHub Releases](https://github.com/loeuf237/animelab/relea
 
 Desktop packages include Python, the compiled interface, FFmpeg and ffprobe. Windows uses WebView2; Linux uses GTK/WebKit, with an installed-browser fallback when a native window is unavailable.
 
-Desktop builds open a native tabbed launcher. Choose your interface, port, folders and download settings, then click **Launch**. It also provides diagnostics, proxy settings, backups and graceful shutdown. See [desktop tools and recovery](docs/desktop-distribution.md). These changes require a newly built desktop package.
+Desktop builds open a native tabbed launcher. Choose your interface, port, folders and download settings, then click **Launch**. It also provides diagnostics, proxy settings, backups and graceful shutdown. See the [0.1.3 desktop release notes](docs/releases/v0.1.3.md) and [desktop tools and recovery](docs/desktop-distribution.md).
 
 Android remains a **prerelease**. The [0.1.2 beta release notes](docs/releases/android-v0.1.2-beta.1.md) explain its emulator coverage and pending physical-device validation. Release assets include checksums and build information.
 
