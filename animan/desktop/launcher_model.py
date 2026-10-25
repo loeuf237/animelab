@@ -1,5 +1,6 @@
 """Native launcher's operations. No GUI imports, no engine imports before launch."""
 import json
+from contextlib import closing
 import os
 from pathlib import Path
 import shutil
@@ -29,7 +30,7 @@ class LauncherModel:
             path = Path(os.getenv('ANIMAN_DB_PATH', str(self.directory.parent / 'db/animan.sqlite3')))
             if path.is_file():
                 try:
-                    with sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True, timeout=1) as db:
+                    with closing(sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True, timeout=1)) as db:
                         row = db.execute('SELECT max_concurrent, global_limit, plex_org FROM download_preferences WHERE id=1').fetchone()
                     if row:
                         data['launcher'] = {'maxConcurrentDownloads': row[0], 'globalSpeedLimit': row[1],
@@ -194,8 +195,11 @@ class LauncherModel:
         temporary = Path(name)
         created = False
         try:
-            with sqlite3.connect(source.as_uri() + '?mode=ro', uri=True, timeout=5) as original:
-                with sqlite3.connect(temporary) as output:
+            # A Connection context manages transactions; it does not close the
+            # file. Explicitly close both handles before publishing or unlinking
+            # the snapshot, which Windows forbids while SQLite still owns it.
+            with closing(sqlite3.connect(source.as_uri() + '?mode=ro', uri=True, timeout=5)) as original:
+                with closing(sqlite3.connect(temporary)) as output:
                     deadline = time.monotonic() + 30
                     def progress(*_):
                         if time.monotonic() > deadline:

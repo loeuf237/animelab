@@ -1,5 +1,6 @@
 """Own exactly one child engine; serialize restarts and never kill by port/PID file."""
 import json
+from contextlib import closing
 import os
 import logging
 from logging.handlers import RotatingFileHandler
@@ -127,7 +128,7 @@ class Supervisor:
             path = Path(settings.DATABASE_PATH).resolve()
             if not path.is_file():
                 return 'Database not created yet'
-            with sqlite3.connect(path.as_uri() + '?mode=ro', uri=True, timeout=2) as db:
+            with closing(sqlite3.connect(path.as_uri() + '?mode=ro', uri=True, timeout=2)) as db:
                 if db.execute('PRAGMA quick_check').fetchone()[0] != 'ok':
                     raise RuntimeError('SQLite quick_check failed')
 

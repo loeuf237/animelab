@@ -1,5 +1,6 @@
 """Native launcher settings, engine integration, backup and real Qt controls."""
 import json
+from contextlib import closing
 import os
 from pathlib import Path
 import sqlite3
@@ -65,7 +66,7 @@ def test_native_environment_contains_only_supported_overrides():
 
 def test_first_native_launch_keeps_existing_download_preferences(model):
     database = model.paths()['database']
-    with sqlite3.connect(database) as db:
+    with closing(sqlite3.connect(database)) as db, db:
         db.execute('CREATE TABLE download_preferences (id INTEGER, max_concurrent INTEGER, global_limit INTEGER, plex_org INTEGER)')
         db.execute('INSERT INTO download_preferences VALUES (1, 7, 4096, 1)')
     values = model.config()['launcher']
@@ -83,7 +84,7 @@ def test_offline_proxy_edits_preserve_masked_credentials_and_stay_out_of_exports
     })
     assert result['password'] == '******' and 'another-private-secret' not in result['custom_url']
     model.engine_api('/api/proxy/settings', result)
-    with sqlite3.connect(model.paths()['database']) as db:
+    with closing(sqlite3.connect(model.paths()['database'])) as db:
         assert db.execute('SELECT password FROM network_proxy_settings').fetchone()[0] == 'private-proxy-password'
     assert 'private-proxy-password' not in json.dumps(model.config())
 
@@ -100,13 +101,13 @@ def test_sqlite_backup_includes_wal_data_and_does_not_overwrite(model, tmp_path,
     source = tmp_path / 'library.sqlite3'
     monkeypatch.setenv('ANIMAN_DB_PATH', str(source))
     destination = tmp_path / 'backup.sqlite3'
-    with sqlite3.connect(source) as db:
+    with closing(sqlite3.connect(source)) as db, db:
         db.execute('PRAGMA journal_mode=WAL')
         db.execute('CREATE TABLE watched (episode INTEGER)')
         db.execute('INSERT INTO watched VALUES (42)')
         db.commit()
         model.backup(destination)
-        with sqlite3.connect(destination) as backup:
+        with closing(sqlite3.connect(destination)) as backup:
             assert backup.execute('SELECT episode FROM watched').fetchone() == (42,)
         with pytest.raises(ValueError, match='existing files'):
             model.backup(destination)
@@ -116,7 +117,7 @@ def test_sqlite_backup_includes_wal_data_and_does_not_overwrite(model, tmp_path,
 
 def test_failed_backup_removes_incomplete_output_after_closing_it(model, tmp_path, monkeypatch):
     source = model.paths()['database']
-    with sqlite3.connect(source) as db:
+    with closing(sqlite3.connect(source)) as db, db:
         db.execute('CREATE TABLE library (id INTEGER)')
     import shutil
     def fail(*_): raise OSError('Simulated write failure')
@@ -126,6 +127,72 @@ def test_failed_backup_removes_incomplete_output_after_closing_it(model, tmp_pat
         model.backup(target)
     assert not target.exists()
     assert not list(tmp_path.glob('.animelab-backup-*'))
+
+
+@pytest.mark.parametrize('failure_phase', [None, 'backup', 'verification', 'copy'])
+def test_backup_releases_windows_file_locks_on_success_and_failure(model, tmp_path, monkeypatch, failure_phase):
+    """Keep connections alive and enforce Windows' refusal to unlink open files."""
+    source = model.paths()['database']
+    with closing(sqlite3.connect(source)) as db, db:
+        db.execute('CREATE TABLE watched (episode INTEGER)')
+        db.execute('INSERT INTO watched VALUES (42)')
+    connections = []
+    connect = sqlite3.connect
+    unlink = Path.unlink
+    copy = __import__('shutil').copyfileobj
+
+    class TrackedConnection(sqlite3.Connection):
+        closed = False
+
+        def close(self):
+            super().close()
+            self.closed = True
+
+        def backup(self, *args, **kwargs):
+            if failure_phase == 'backup':
+                raise OSError('Simulated backup failure')
+            return super().backup(*args, **kwargs)
+
+        def execute(self, statement, *args):
+            if statement == 'PRAGMA quick_check' and failure_phase == 'verification':
+                raise OSError('Simulated verification failure')
+            return super().execute(statement, *args)
+
+    def tracked_connect(filename, *args, **kwargs):
+        connection = connect(filename, *args, factory=TrackedConnection, **kwargs)
+        # Retaining the objects prevents GC from accidentally hiding leaked locks.
+        connections.append((str(filename), connection))
+        return connection
+
+    def windows_unlink(path, *args, **kwargs):
+        if any(filename == str(path) and not db.closed for filename, db in connections):
+            raise PermissionError('Windows refuses to delete an open SQLite file')
+        return unlink(path, *args, **kwargs)
+
+    def publish(*args):
+        assert connections and all(db.closed for _, db in connections)
+        if failure_phase == 'copy':
+            raise OSError('Simulated copy failure')
+        return copy(*args)
+
+    monkeypatch.setattr(sqlite3, 'connect', tracked_connect)
+    monkeypatch.setattr(Path, 'unlink', windows_unlink)
+    monkeypatch.setattr('shutil.copyfileobj', publish)
+    target = tmp_path / 'backup.sqlite3'
+    try:
+        if failure_phase:
+            with pytest.raises(OSError, match='Simulated ' + failure_phase):
+                model.backup(target)
+            assert not target.exists()
+        else:
+            model.backup(target)
+            with closing(connect(target)) as snapshot:
+                assert snapshot.execute('SELECT episode FROM watched').fetchone() == (42,)
+        assert connections and all(db.closed for _, db in connections)
+        assert not list(tmp_path.glob('.animelab-backup-*'))
+    finally:
+        for _, db in connections:
+            db.close()
 
 
 def test_launcher_starts_applies_profile_and_stops_real_engine(tmp_path, monkeypatch):

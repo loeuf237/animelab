@@ -1,5 +1,6 @@
 """Offline proxy preferences use the same SQLite table as the running engine."""
 import re
+from contextlib import closing
 import sqlite3
 
 FIELDS = {'enabled': False, 'proxy_type': 'http', 'host': '', 'port': '',
@@ -8,7 +9,7 @@ FIELDS = {'enabled': False, 'proxy_type': 'http', 'host': '', 'port': '',
 
 def raw_settings(path):
     if path.is_file():
-        with sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True) as db:
+        with closing(sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True)) as db:
             db.row_factory = sqlite3.Row
             try:
                 row = db.execute('SELECT * FROM network_proxy_settings WHERE id=1').fetchone()
@@ -43,7 +44,7 @@ def save_proxy(path, values):
     from animan.database import init_db
     path.parent.mkdir(parents=True, exist_ok=True)
     init_db(str(path))
-    with sqlite3.connect(path) as db:
+    with closing(sqlite3.connect(path)) as db, db:
         db.execute('''INSERT INTO network_proxy_settings
             (id, enabled, proxy_type, host, port, username, password, custom_url)
             VALUES (1, :enabled, :proxy_type, :host, :port, :username, :password, :custom_url)
