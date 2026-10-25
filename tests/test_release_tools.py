@@ -1,4 +1,5 @@
 import hashlib
+import os
 import sys
 import json
 import subprocess
@@ -62,5 +63,7 @@ def test_archives_ship_quoted_administration_shortcuts(tmp_path, windows, mac, b
         text = shortcut.read_text()
         assert flag in text and binary in text
         assert ('"%~dp0' + binary + '"') in text if windows else ('"./' + binary + '"') in text
-        if not windows:
+        # Target format and host filesystem are independent: Windows can generate
+        # these POSIX scripts, but cannot represent their Unix executable bits.
+        if not windows and os.name == 'posix':
             assert shortcut.stat().st_mode & 0o111
