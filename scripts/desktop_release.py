@@ -16,7 +16,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from animan import __version__
+from animelab import __version__
 
 
 def release_metadata():
@@ -117,8 +117,8 @@ def check():
     if result.returncode: raise RuntimeError('Packaged offline check failed')
     # This checks subprocess collection, private administration assets and graceful exit.
     # The previous backend-only self-test could not detect the Windows GUI regression.
-    from animan.desktop.control import remote_call
-    from animan.desktop.state import InstanceLock, read_json
+    from animelab.desktop.control import remote_call
+    from animelab.desktop.state import InstanceLock, read_json
     with tempfile.TemporaryDirectory(prefix='animelab-packaged-lifecycle-') as temporary:
         root = Path(temporary)
         env = {**os.environ, 'HOME': temporary, 'USERPROFILE': temporary,

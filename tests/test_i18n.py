@@ -1,8 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
 from run import app
-from animan.database import init_db
-from animan.services.i18n_service import (
+from animelab.database import init_db
+from animelab.services.i18n_service import (
     i18n_service,
     t,
     current_lang,
@@ -14,9 +14,9 @@ from animan.services.i18n_service import (
 @pytest.fixture(autouse=True)
 def mock_source_feeds(monkeypatch):
     from unittest.mock import AsyncMock
-    from animan.services.scraping_service import scraping_service
-    from animan.services.voiranime_service import voiranime_service
-    from animan.services.animepahe_service import animepahe_service
+    from animelab.services.scraping_service import scraping_service
+    from animelab.services.voiranime_service import voiranime_service
+    from animelab.services.animepahe_service import animepahe_service
     for service in (scraping_service, voiranime_service, animepahe_service):
         monkeypatch.setattr(service, "get_latest_releases", AsyncMock(return_value=[]))
 

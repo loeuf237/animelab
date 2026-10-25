@@ -8,8 +8,8 @@ import httpx
 import pytest
 from curl_cffi.requests import Cookies
 
-from animan.services.proxy_service import proxy_service
-from animan.services.source_http import SourceHTTPService, VerificationRequired, RateLimited, SourceNetworkError, USER_AGENT, PROFILE
+from animelab.services.proxy_service import proxy_service
+from animelab.services.source_http import SourceHTTPService, VerificationRequired, RateLimited, SourceNetworkError, USER_AGENT, PROFILE
 
 
 class FakeSession:
@@ -27,7 +27,7 @@ class FakeSession:
 
 @pytest.fixture
 def transport(tmp_path, monkeypatch):
-    monkeypatch.setattr('animan.services.source_http.is_safe_url', lambda url: url.startswith('https://'))
+    monkeypatch.setattr('animelab.services.source_http.is_safe_url', lambda url: url.startswith('https://'))
     monkeypatch.setattr(proxy_service, 'get_random_proxy', lambda: None)
     services = []
     def make(handler, **options):
@@ -197,8 +197,8 @@ async def test_challenge_media_stream_releases_connection(transport):
 
 @pytest.mark.asyncio
 async def test_download_challenge_is_persisted_without_retry_and_resumes_after_verification(monkeypatch,tmp_path):
-    from animan.services.download_manager import DownloadManagerService, library_service
-    from animan.models.download_task import DownloadTask, DownloadStatus
+    from animelab.services.download_manager import DownloadManagerService, library_service
+    from animelab.models.download_task import DownloadTask, DownloadStatus
     manager=DownloadManagerService()
     task=DownloadTask(fileUrl='https://cdn.example/episode.mp4', savePath=str(tmp_path/'episode.mp4'))
     challenge=VerificationRequired('https://cdn.example/episode.mp4')
@@ -217,8 +217,8 @@ async def test_download_challenge_is_persisted_without_retry_and_resumes_after_v
 
 @pytest.mark.asyncio
 async def test_hls_rate_limit_stops_segment_retries(monkeypatch, tmp_path):
-    from animan.services.download_manager import DownloadManagerService
-    from animan.models.download_task import DownloadTask
+    from animelab.services.download_manager import DownloadManagerService
+    from animelab.models.download_task import DownloadTask
     blocked = RateLimited(response('https://cdn.example/segment.ts', 429), 120)
     calls = []
     class Client:
@@ -240,8 +240,8 @@ async def test_hls_rate_limit_stops_segment_retries(monkeypatch, tmp_path):
 async def test_native_hls_aes128_uses_shared_transport_and_correct_media_sequence(monkeypatch,tmp_path):
     from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
     from cryptography.hazmat.primitives.padding import PKCS7
-    from animan.services.download_manager import DownloadManagerService
-    from animan.models.download_task import DownloadTask
+    from animelab.services.download_manager import DownloadManagerService
+    from animelab.models.download_task import DownloadTask
     key=b'0123456789abcdef'
     plaintext=b'video segment for unit test'
     padder=PKCS7(128).padder()
@@ -306,7 +306,7 @@ async def test_real_curl_transport_decompresses_once_and_streams_without_bufferi
     thread=threading.Thread(target=server.serve_forever,daemon=True)
     thread.start()
     url=f'http://127.0.0.1:{server.server_port}/test'
-    monkeypatch.setattr('animan.services.source_http.is_safe_url',lambda candidate:candidate==url)
+    monkeypatch.setattr('animelab.services.source_http.is_safe_url',lambda candidate:candidate==url)
     service=transport(lambda *args:None)
     service.session_factory=Session
     try:

@@ -2,8 +2,8 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 from run import app
-from animan.services.source_settings_service import source_settings_service
-from animan.services.voiranime_service import VoirAnimeScrapingService
+from animelab.services.source_settings_service import source_settings_service
+from animelab.services.voiranime_service import VoirAnimeScrapingService
 
 
 @pytest.fixture

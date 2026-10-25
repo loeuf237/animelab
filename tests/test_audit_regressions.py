@@ -10,13 +10,13 @@ from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from animan.database import Base
-from animan.models.anime import AnimeDetail, Episode
-from animan.models.download_task import DownloadTask, DownloadStatus
-from animan.routers import anime, download, library, media
-from animan.services.library_service import library_service
+from animelab.database import Base
+from animelab.models.anime import AnimeDetail, Episode
+from animelab.models.download_task import DownloadTask, DownloadStatus
+from animelab.routers import anime, download, library, media
+from animelab.services.library_service import library_service
 
-library_module = importlib.import_module("animan.services.library_service")
+library_module = importlib.import_module("animelab.services.library_service")
 
 
 @pytest.fixture

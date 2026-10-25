@@ -9,10 +9,10 @@ from urllib.request import ProxyHandler, build_opener
 
 import pytest
 
-from animan.desktop.launcher_model import LauncherModel
-from animan.desktop.options import DEFAULTS, engine_environment, normalize_config
-from animan.desktop.state import load_config
-from animan.desktop.supervisor import Supervisor, choose_port
+from animelab.desktop.launcher_model import LauncherModel
+from animelab.desktop.options import DEFAULTS, engine_environment, normalize_config
+from animelab.desktop.state import load_config
+from animelab.desktop.supervisor import Supervisor, choose_port
 
 
 @pytest.fixture
@@ -90,8 +90,8 @@ def test_offline_proxy_edits_preserve_masked_credentials_and_stay_out_of_exports
 
 
 def test_native_connect_timeout_reaches_shared_transport(monkeypatch):
-    from animan.config import settings
-    from animan.services.source_http import source_http
+    from animelab.config import settings
+    from animelab.services.source_http import source_http
     monkeypatch.setenv('ANIMAN_DESKTOP_PREFERENCES', '{}')
     monkeypatch.setattr(settings, 'CONNECTION_TIMEOUT', 23)
     assert source_http.timeout(45) == (23, 45)
@@ -235,14 +235,14 @@ def test_launcher_starts_applies_profile_and_stops_real_engine(tmp_path, monkeyp
 @pytest.fixture
 def qt_app():
     pytest.importorskip('PySide6.QtWidgets')
-    from animan.desktop.launcher_widgets import application
+    from animelab.desktop.launcher_widgets import application
     return application()
 
 
 @pytest.mark.parametrize('language', ['fr', 'en'])
 def test_native_tabs_fields_and_save_without_starting_engine(model, monkeypatch, language, qt_app):
-    from animan.desktop.launcher import NativeLauncher
-    from animan.desktop.launcher_panels import TABS
+    from animelab.desktop.launcher import NativeLauncher
+    from animelab.desktop.launcher_panels import TABS
     from PySide6.QtWidgets import QMessageBox
     from PySide6.QtGui import QRawFont
     from PySide6.QtTest import QTest
@@ -285,12 +285,12 @@ def test_native_tabs_fields_and_save_without_starting_engine(model, monkeypatch,
         assert ui.variables['openUi'].get() is not previous
         checkbox.click()
         # Cancelled folder selection must keep the user's current value.
-        monkeypatch.setattr('animan.desktop.launcher.choose_directory', lambda *args: '')
+        monkeypatch.setattr('animelab.desktop.launcher.choose_directory', lambda *args: '')
         before = ui.variables['downloadDir'].get()
         ui.choose_download_directory()
         assert ui.variables['downloadDir'].get() == before
         chosen = str(model.directory / 'Séries téléchargées')
-        monkeypatch.setattr('animan.desktop.launcher.choose_directory', lambda *args: chosen)
+        monkeypatch.setattr('animelab.desktop.launcher.choose_directory', lambda *args: chosen)
         ui.choose_download_directory()
         assert ui.variables['downloadDir'].get() == chosen
         ui.select_tab('server')
@@ -313,7 +313,7 @@ def test_native_tabs_fields_and_save_without_starting_engine(model, monkeypatch,
 
 def test_native_dialog_routing_and_unicode_paths(monkeypatch, qt_app, tmp_path):
     from PySide6.QtWidgets import QFileDialog
-    from animan.desktop import launcher_dialogs as dialogs
+    from animelab.desktop import launcher_dialogs as dialogs
     selected = str(tmp_path / 'Séries étiquetées')
     def native_directory(parent, title, initial, options):
         assert options & QFileDialog.Option.ShowDirsOnly

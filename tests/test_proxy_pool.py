@@ -7,16 +7,16 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from animan.services.proxy_service import ProxyService
-from animan.services.proxy_pool import ProxyPool, PROVIDERS, HEALTH_TTL, normalize_proxy, parse_list
-from animan.services.source_http import VerificationRequired, RateLimited
+from animelab.services.proxy_service import ProxyService
+from animelab.services.proxy_pool import ProxyPool, PROVIDERS, HEALTH_TTL, normalize_proxy, parse_list
+from animelab.services.source_http import VerificationRequired, RateLimited
 from test_source_http import transport, response
 
 
 @pytest.fixture
 def pool(tmp_path, monkeypatch):
     pool = ProxyPool(ProxyService(str(tmp_path / 'network.sqlite')))
-    monkeypatch.setattr('animan.services.proxy_pool.proxy_pool', pool)
+    monkeypatch.setattr('animelab.services.proxy_pool.proxy_pool', pool)
     return pool
 
 
@@ -166,7 +166,7 @@ async def test_health_watch_checks_only_when_opted_in_and_obeys_five_minute_budg
     ticks, checks = 0, 0
     # A fresh runner can have less than five minutes of machine uptime. Zero
     # means no probe yet, not a probe performed at boot.
-    monkeypatch.setattr('animan.services.proxy_pool.time.monotonic', lambda: 100.0)
+    monkeypatch.setattr('animelab.services.proxy_pool.time.monotonic', lambda: 100.0)
     async def tick(_):
         nonlocal ticks
         ticks += 1
@@ -176,7 +176,7 @@ async def test_health_watch_checks_only_when_opted_in_and_obeys_five_minute_budg
         nonlocal checks
         checks += 1
         pool.last_check = time.monotonic()
-    monkeypatch.setattr('animan.services.proxy_pool.asyncio.sleep', tick)
+    monkeypatch.setattr('animelab.services.proxy_pool.asyncio.sleep', tick)
     monkeypatch.setattr(pool, 'check', check)
     with pytest.raises(asyncio.CancelledError): await pool.watch()
     assert ticks == 4 and checks == 1
@@ -226,7 +226,7 @@ def test_successful_auto_retry_and_manual_config_deferred_until_stream_finishes(
     service = transport(handler)
     assert service.client().get('https://source.example/').status_code == 200
     state = service.state('https://source.example/')
-    from animan.services.proxy_service import proxy_service
+    from animelab.services.proxy_service import proxy_service
     monkeypatch.setattr(proxy_service, 'get_random_proxy', lambda: 'http://manual:8080')
     with service.lease(state):
         service.apply_proxy_settings()
@@ -315,7 +315,7 @@ async def test_automatic_rotation_notifies_the_download_scheduler_on_its_event_l
 
 
 def test_pool_api_restricts_mutations_and_masks_import(pool, monkeypatch):
-    from animan.routers.network import router
+    from animelab.routers.network import router
     app = FastAPI(); app.include_router(router)
     with TestClient(app, client=('203.0.113.10', 123)) as remote:
         assert remote.get('/api/network/proxy-pool').status_code == 200
@@ -330,10 +330,10 @@ def test_pool_api_restricts_mutations_and_masks_import(pool, monkeypatch):
 
 
 def test_rotation_endpoint_known_domain_resumes_and_rejects_open_browser(pool, transport, monkeypatch):
-    from animan.routers import network
+    from animelab.routers import network
     service = transport(lambda s, m, u, k: response(u))
     service.state('https://source.example/')
-    monkeypatch.setattr('animan.services.source_http.source_http', service)
+    monkeypatch.setattr('animelab.services.source_http.source_http', service)
     monkeypatch.setattr(network.download_manager, 'resume_verified_domain', lambda domain: 2)
     pool.entries = {'http://8.8.8.8:8080': entry()}
     app = FastAPI(); app.include_router(network.router)
@@ -359,7 +359,7 @@ def test_restart_does_not_restore_cookies_from_a_different_proxy(pool, transport
 
 
 def test_public_proxy_keeps_tls_verification_even_if_manual_option_disabled(pool, transport, monkeypatch):
-    from animan.config import settings
+    from animelab.config import settings
     monkeypatch.setattr(settings, 'SSL_VERIFY', False)
     service = transport(lambda s, m, u, k: response(u))
     state = service.state('https://source.example/')
@@ -374,7 +374,7 @@ def test_public_proxy_keeps_tls_verification_even_if_manual_option_disabled(pool
 async def test_cached_native_feed_uses_automatic_rotation_when_already_blocked(pool, transport, monkeypatch, service_class):
     import importlib
     name = {'ScrapingService': 'scraping_service', 'VoirAnimeScrapingService': 'voiranime_service', 'AnimepaheService': 'animepahe_service'}[service_class]
-    module = importlib.import_module('animan.services.' + name)
+    module = importlib.import_module('animelab.services.' + name)
     cls = getattr(module, service_class)
     native = cls.__new__(cls)
     native.base_url = 'https://source.example/'

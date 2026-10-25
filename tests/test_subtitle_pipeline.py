@@ -9,12 +9,12 @@ from unittest.mock import AsyncMock
 import httpx
 import pytest
 
-from animan.models.download_task import DownloadTask, DownloadStatus
-from animan.services.download_manager import download_manager as manager, SubtitleError
-from animan.services.library_service import library_service
-from animan.services.scraping_service import scraping_service
-from animan.services.subtitle_service import normalize_subtitles
-from animan.services.verification_service import verification_service
+from animelab.models.download_task import DownloadTask, DownloadStatus
+from animelab.services.download_manager import download_manager as manager, SubtitleError
+from animelab.services.library_service import library_service
+from animelab.services.scraping_service import scraping_service
+from animelab.services.subtitle_service import normalize_subtitles
+from animelab.services.verification_service import verification_service
 
 SRT = b"1\n00:00:00,000 --> 00:00:01,000\nBonjour\n\n"
 
@@ -175,7 +175,7 @@ def test_existing_mkv_is_preserved_and_new_export_gets_unique_name(video, monkey
             raise OSError(errno.EACCES if hardlinks == "permission_denied" else errno.EOPNOTSUPP, "Hard links unavailable")
         monkeypatch.setattr(os, "link", unsupported)
         if hardlinks == "android":
-            from animan import media_tools
+            from animelab import media_tools
             monkeypatch.setattr(media_tools, "is_native", lambda: True)
             # Exercise the real mux/probe pipeline, isolating the storage policy
             # from the Android-only JNI implementation.
@@ -200,8 +200,8 @@ def test_normalize_rejects_invalid_structure():
 
 @pytest.mark.asyncio
 async def test_imported_download_propagates_subtitle_list(tmp_path, isolated, monkeypatch):
-    from animan.services.extension_service import extension_service
-    from animan.services.extractors import extractor_registry
+    from animelab.services.extension_service import extension_service
+    from animelab.services.extractors import extractor_registry
     episode = task(tmp_path / "episode.mp4", [])
     episode.source = "custom"
     episode.fileUrl = "https://player.example/embed/123"
@@ -223,7 +223,7 @@ async def test_imported_download_propagates_subtitle_list(tmp_path, isolated, mo
 
 
 def test_resume_does_not_hide_pending_subtitle_failure(tmp_path, isolated, monkeypatch):
-    from animan.services.verification_service import VerificationResult
+    from animelab.services.verification_service import VerificationResult
     video = tmp_path / "episode.mp4"
     video.write_bytes(b"x" * (1024 * 1024 + 1))
     episode = task(video, [{"url": "https://cdn.example/fr.srt"}])
@@ -324,8 +324,8 @@ async def test_expired_subtitle_url_is_refreshed_once_without_losing_metadata(vi
         seen.append(request.url.path)
         return httpx.Response(403 if request.url.path == "/expired.srt" else 200, content=SRT)
     mock_http(monkeypatch, handler)
-    from animan.services.extension_service import extension_service
-    from animan.services.extractors import extractor_registry
+    from animelab.services.extension_service import extension_service
+    from animelab.services.extractors import extractor_registry
     monkeypatch.setattr(extension_service, "get_container_source_by_id", lambda source: None)
     monkeypatch.setattr(extension_service, "get_enabled_container_sources", lambda: [])
     monkeypatch.setattr(extractor_registry, "is_known_embed", lambda url: True)

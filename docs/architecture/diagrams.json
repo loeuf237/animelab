@@ -11,82 +11,82 @@
       "proposed": false,
       "references": [
         {
-          "path": "animan/models/anime.py",
+          "path": "animelab/models/anime.py",
           "symbol": "AnimeDetail",
           "line": 33
         },
         {
-          "path": "animan/models/anime.py",
+          "path": "animelab/models/anime.py",
           "symbol": "AnimeResult",
           "line": 22
         },
         {
-          "path": "animan/models/anime.py",
+          "path": "animelab/models/anime.py",
           "symbol": "Episode",
           "line": 11
         },
         {
-          "path": "animan/models/download_task.py",
+          "path": "animelab/models/download_task.py",
           "symbol": "DownloadTask",
           "line": 220
         },
         {
-          "path": "animan/models/download_task.py",
+          "path": "animelab/models/download_task.py",
           "symbol": "DownloadTaskEntity.to_task",
           "line": 178
         },
         {
-          "path": "animan/models/download_task.py",
+          "path": "animelab/models/download_task.py",
           "symbol": "SpeedTracker",
           "line": 31
         },
         {
-          "path": "animan/models/download_task.py",
+          "path": "animelab/models/download_task.py",
           "symbol": "DownloadStatus",
           "line": 91
         },
         {
-          "path": "animan/models/download_task.py",
+          "path": "animelab/models/download_task.py",
           "symbol": "ExportStatus",
           "line": 104
         },
         {
-          "path": "animan/models/auto_download.py",
+          "path": "animelab/models/auto_download.py",
           "symbol": "AutoDownloadEpisode",
           "line": 13
         },
         {
-          "path": "animan/models/favorite.py",
+          "path": "animelab/models/favorite.py",
           "symbol": "FavoriteAnime",
           "line": 5
         },
         {
-          "path": "animan/models/watch_progress.py",
+          "path": "animelab/models/watch_progress.py",
           "symbol": "WatchProgress",
           "line": 4
         },
         {
-          "path": "animan/models/playback.py",
+          "path": "animelab/models/playback.py",
           "symbol": "PlaybackProgress",
           "line": 7
         },
         {
-          "path": "animan/migrations.py",
+          "path": "animelab/migrations.py",
           "symbol": "Migration",
           "line": 8
         },
         {
-          "path": "animan/migrations.py",
+          "path": "animelab/migrations.py",
           "symbol": "migrate",
           "line": 194
         },
         {
-          "path": "animan/database.py",
+          "path": "animelab/database.py",
           "symbol": "transaction",
           "line": 51
         },
         {
-          "path": "animan/database.py",
+          "path": "animelab/database.py",
           "symbol": "sqlite_connection",
           "line": 35
         }
@@ -103,72 +103,72 @@
       "proposed": false,
       "references": [
         {
-          "path": "animan/services/download_manager.py",
+          "path": "animelab/services/download_manager.py",
           "symbol": "DownloadManagerService",
           "line": 63
         },
         {
-          "path": "animan/services/download_manager.py",
+          "path": "animelab/services/download_manager.py",
           "symbol": "ResolvedVideoInfo",
           "line": 48
         },
         {
-          "path": "animan/services/library_service.py",
+          "path": "animelab/services/library_service.py",
           "symbol": "LibraryService",
           "line": 11
         },
         {
-          "path": "animan/services/verification_service.py",
+          "path": "animelab/services/verification_service.py",
           "symbol": "DownloadVerificationService",
           "line": 47
         },
         {
-          "path": "animan/services/verification_service.py",
+          "path": "animelab/services/verification_service.py",
           "symbol": "VerificationResult",
           "line": 30
         },
         {
-          "path": "animan/services/watchdog_service.py",
+          "path": "animelab/services/watchdog_service.py",
           "symbol": "WatchdogService",
           "line": 12
         },
         {
-          "path": "animan/media_tools.py",
+          "path": "animelab/media_tools.py",
           "symbol": "run",
           "line": 30
         },
         {
-          "path": "animan/platform_events.py",
+          "path": "animelab/platform_events.py",
           "symbol": "completed",
           "line": 13
         },
         {
-          "path": "animan/services/download_stages/transfer.py",
+          "path": "animelab/services/download_stages/transfer.py",
           "symbol": "TransferWorker",
           "line": 39
         },
         {
-          "path": "animan/services/download_stages/media.py",
+          "path": "animelab/services/download_stages/media.py",
           "symbol": "MediaPipeline",
           "line": 38
         },
         {
-          "path": "animan/services/download_stages/export.py",
+          "path": "animelab/services/download_stages/export.py",
           "symbol": "ExportCoordinator",
           "line": 22
         },
         {
-          "path": "animan/services/download_stages/scheduler.py",
+          "path": "animelab/services/download_stages/scheduler.py",
           "symbol": "DownloadScheduler",
           "line": 21
         },
         {
-          "path": "animan/services/download_stages/budget.py",
+          "path": "animelab/services/download_stages/budget.py",
           "symbol": "StageBudget",
           "line": 8
         },
         {
-          "path": "animan/services/download_stages/state.py",
+          "path": "animelab/services/download_stages/state.py",
           "symbol": "transition",
           "line": 19
         }
@@ -185,97 +185,97 @@
       "proposed": false,
       "references": [
         {
-          "path": "animan/services/source_catalogue.py",
+          "path": "animelab/services/source_catalogue.py",
           "symbol": "SourceCatalogueService",
           "line": 24
         },
         {
-          "path": "animan/services/scraping_service.py",
+          "path": "animelab/services/scraping_service.py",
           "symbol": "ScrapingService",
           "line": 28
         },
         {
-          "path": "animan/services/voiranime_service.py",
+          "path": "animelab/services/voiranime_service.py",
           "symbol": "VoirAnimeScrapingService",
           "line": 26
         },
         {
-          "path": "animan/services/animepahe_service.py",
+          "path": "animelab/services/animepahe_service.py",
           "symbol": "AnimepaheService",
           "line": 25
         },
         {
-          "path": "animan/services/extension_service.py",
+          "path": "animelab/services/extension_service.py",
           "symbol": "ExtensionService",
           "line": 32
         },
         {
-          "path": "animan/services/aniyomi_dex_parser.py",
+          "path": "animelab/services/aniyomi_dex_parser.py",
           "symbol": "SourceRecipe",
           "line": 18
         },
         {
-          "path": "animan/services/aniyomi_dex_parser.py",
+          "path": "animelab/services/aniyomi_dex_parser.py",
           "symbol": "AniyomiDexParser",
           "line": 156
         },
         {
-          "path": "animan/services/aniyomi_container.py",
+          "path": "animelab/services/aniyomi_container.py",
           "symbol": "AniyomiContainerSource",
           "line": 90
         },
         {
-          "path": "animan/services/recipe_runtime.py",
+          "path": "animelab/services/recipe_runtime.py",
           "symbol": "RecipeRuntime",
           "line": 42
         },
         {
-          "path": "animan/services/recipe_plans.py",
+          "path": "animelab/services/recipe_plans.py",
           "symbol": "compile_operations",
           "line": 22
         },
         {
-          "path": "animan/services/extractors/base.py",
+          "path": "animelab/services/extractors/base.py",
           "symbol": "BaseVideoExtractor",
           "line": 46
         },
         {
-          "path": "animan/services/extractors/base.py",
+          "path": "animelab/services/extractors/base.py",
           "symbol": "ExtractorResult",
           "line": 16
         },
         {
-          "path": "animan/services/extractors/registry.py",
+          "path": "animelab/services/extractors/registry.py",
           "symbol": "ExtractorRegistry",
           "line": 24
         },
         {
-          "path": "animan/services/extractors/ytdlp_fallback.py",
+          "path": "animelab/services/extractors/ytdlp_fallback.py",
           "symbol": "YtDlpFallbackExtractor",
           "line": 21
         },
         {
-          "path": "animan/services/source_registry.py",
+          "path": "animelab/services/source_registry.py",
           "symbol": "SourceRegistry",
           "line": 125
         },
         {
-          "path": "animan/services/source_registry.py",
+          "path": "animelab/services/source_registry.py",
           "symbol": "RegisteredSource",
           "line": 40
         },
         {
-          "path": "animan/services/source_registry.py",
+          "path": "animelab/services/source_registry.py",
           "symbol": "SourceProvider",
           "line": 16
         },
         {
-          "path": "animan/services/source_registry.py",
+          "path": "animelab/services/source_registry.py",
           "symbol": "SourceCapabilities",
           "line": 24
         },
         {
-          "path": "animan/services/extension_observability.py",
+          "path": "animelab/services/extension_observability.py",
           "symbol": "ExtensionObservability",
           "line": 63
         }
@@ -292,57 +292,57 @@
       "proposed": false,
       "references": [
         {
-          "path": "animan/services/source_http.py",
+          "path": "animelab/services/source_http.py",
           "symbol": "SourceHTTPService",
           "line": 96
         },
         {
-          "path": "animan/services/source_http.py",
+          "path": "animelab/services/source_http.py",
           "symbol": "DomainSession",
           "line": 79
         },
         {
-          "path": "animan/services/source_http.py",
+          "path": "animelab/services/source_http.py",
           "symbol": "SourceClient",
           "line": 508
         },
         {
-          "path": "animan/services/source_http.py",
+          "path": "animelab/services/source_http.py",
           "symbol": "AsyncSourceClient",
           "line": 540
         },
         {
-          "path": "animan/services/source_http.py",
+          "path": "animelab/services/source_http.py",
           "symbol": "SourceStreamResponse",
           "line": 690
         },
         {
-          "path": "animan/services/source_http.py",
+          "path": "animelab/services/source_http.py",
           "symbol": "VerificationRequired",
           "line": 35
         },
         {
-          "path": "animan/services/source_http.py",
+          "path": "animelab/services/source_http.py",
           "symbol": "RateLimited",
           "line": 52
         },
         {
-          "path": "animan/services/source_http.py",
+          "path": "animelab/services/source_http.py",
           "symbol": "SourceNetworkError",
           "line": 45
         },
         {
-          "path": "animan/services/proxy_pool.py",
+          "path": "animelab/services/proxy_pool.py",
           "symbol": "ProxyPool",
           "line": 79
         },
         {
-          "path": "animan/services/proxy_service.py",
+          "path": "animelab/services/proxy_service.py",
           "symbol": "ProxyService",
           "line": 26
         },
         {
-          "path": "animan/services/browser_verification.py",
+          "path": "animelab/services/browser_verification.py",
           "symbol": "BrowserVerificationService",
           "line": 20
         }
@@ -409,7 +409,7 @@
           "line": 37
         },
         {
-          "path": "animan/android_security.py",
+          "path": "animelab/android_security.py",
           "symbol": "AndroidSessionMiddleware",
           "line": 7
         }
@@ -426,17 +426,17 @@
       "proposed": false,
       "references": [
         {
-          "path": "animan/routers/anime.py",
+          "path": "animelab/routers/anime.py",
           "symbol": "search_api",
           "line": 94
         },
         {
-          "path": "animan/routers/download.py",
+          "path": "animelab/routers/download.py",
           "symbol": "start_download",
           "line": 45
         },
         {
-          "path": "animan/routers/library.py",
+          "path": "animelab/routers/library.py",
           "symbol": "mark_watched",
           "line": 162
         }
@@ -453,17 +453,17 @@
       "proposed": false,
       "references": [
         {
-          "path": "animan/routers/network.py",
+          "path": "animelab/routers/network.py",
           "symbol": "rotate_proxy",
           "line": 78
         },
         {
-          "path": "animan/routers/network.py",
+          "path": "animelab/routers/network.py",
           "symbol": "complete",
           "line": 129
         },
         {
-          "path": "animan/routers/library.py",
+          "path": "animelab/routers/library.py",
           "symbol": "android_storage_action",
           "line": 278
         }
@@ -480,17 +480,17 @@
       "proposed": false,
       "references": [
         {
-          "path": "animan/routers/anime.py",
+          "path": "animelab/routers/anime.py",
           "symbol": "search_api",
           "line": 94
         },
         {
-          "path": "animan/services/browser_verification.py",
+          "path": "animelab/services/browser_verification.py",
           "symbol": "BrowserVerificationService.complete",
           "line": 133
         },
         {
-          "path": "animan/routers/network.py",
+          "path": "animelab/routers/network.py",
           "symbol": "complete",
           "line": 129
         }
@@ -507,17 +507,17 @@
       "proposed": false,
       "references": [
         {
-          "path": "animan/services/download_manager.py",
+          "path": "animelab/services/download_manager.py",
           "symbol": "DownloadManagerService._execute_download",
           "line": 1563
         },
         {
-          "path": "animan/services/download_manager.py",
+          "path": "animelab/services/download_manager.py",
           "symbol": "DownloadManagerService._finalize_task",
           "line": 1584
         },
         {
-          "path": "animan/services/download_manager.py",
+          "path": "animelab/services/download_manager.py",
           "symbol": "DownloadManagerService._publish_mux_file",
           "line": 1612
         }
@@ -534,17 +534,17 @@
       "proposed": false,
       "references": [
         {
-          "path": "animan/services/source_http.py",
+          "path": "animelab/services/source_http.py",
           "symbol": "SourceHTTPService.rotate_proxy",
           "line": 244
         },
         {
-          "path": "animan/services/download_manager.py",
+          "path": "animelab/services/download_manager.py",
           "symbol": "DownloadManagerService._download_single_file",
           "line": 1566
         },
         {
-          "path": "animan/services/download_resume.py",
+          "path": "animelab/services/download_resume.py",
           "symbol": "prepare_hls_cache",
           "line": 56
         }
@@ -561,22 +561,22 @@
       "proposed": false,
       "references": [
         {
-          "path": "animan/services/extension_service.py",
+          "path": "animelab/services/extension_service.py",
           "symbol": "ExtensionService.import_repository",
           "line": 51
         },
         {
-          "path": "animan/services/extension_service.py",
+          "path": "animelab/services/extension_service.py",
           "symbol": "ExtensionService.toggle_extension",
           "line": 295
         },
         {
-          "path": "animan/services/aniyomi_dex_parser.py",
+          "path": "animelab/services/aniyomi_dex_parser.py",
           "symbol": "AniyomiDexParser.parse_apk",
           "line": 160
         },
         {
-          "path": "animan/services/extension_service.py",
+          "path": "animelab/services/extension_service.py",
           "symbol": "ExtensionService.restore_recipe",
           "line": 843
         }
@@ -598,12 +598,12 @@
           "line": 37
         },
         {
-          "path": "animan/routers/library.py",
+          "path": "animelab/routers/library.py",
           "symbol": "android_export_download",
           "line": 294
         },
         {
-          "path": "animan/services/download_manager.py",
+          "path": "animelab/services/download_manager.py",
           "symbol": "DownloadManagerService.export_task",
           "line": 1581
         },
@@ -630,22 +630,22 @@
       "proposed": false,
       "references": [
         {
-          "path": "animan/services/watchdog_service.py",
+          "path": "animelab/services/watchdog_service.py",
           "symbol": "WatchdogService._run_loop",
           "line": 30
         },
         {
-          "path": "animan/services/watchdog_service.py",
+          "path": "animelab/services/watchdog_service.py",
           "symbol": "WatchdogService._check_anime",
           "line": 72
         },
         {
-          "path": "animan/services/library_service.py",
+          "path": "animelab/services/library_service.py",
           "symbol": "LibraryService.discover_auto_episodes",
           "line": 80
         },
         {
-          "path": "animan/models/auto_download.py",
+          "path": "animelab/models/auto_download.py",
           "symbol": "AutoDownloadEpisode",
           "line": 13
         }
@@ -662,32 +662,32 @@
       "proposed": false,
       "references": [
         {
-          "path": "animan/routers/media.py",
+          "path": "animelab/routers/media.py",
           "symbol": "resolve_stream",
           "line": 210
         },
         {
-          "path": "animan/routers/media.py",
+          "path": "animelab/routers/media.py",
           "symbol": "stream_video",
           "line": 496
         },
         {
-          "path": "animan/routers/media.py",
+          "path": "animelab/routers/media.py",
           "symbol": "hls_proxy_playlist",
           "line": 678
         },
         {
-          "path": "animan/routers/library.py",
+          "path": "animelab/routers/library.py",
           "symbol": "mark_watched",
           "line": 162
         },
         {
-          "path": "animan/services/playback_service.py",
+          "path": "animelab/services/playback_service.py",
           "symbol": "PlaybackService.open",
           "line": 51
         },
         {
-          "path": "animan/services/playback_service.py",
+          "path": "animelab/services/playback_service.py",
           "symbol": "PlaybackService.save",
           "line": 74
         }
@@ -714,7 +714,7 @@
           "line": 45
         },
         {
-          "path": "animan/services/tmdb_service.py",
+          "path": "animelab/services/tmdb_service.py",
           "symbol": "TmdbService.enrich_anime_detail",
           "line": 184
         }
@@ -741,7 +741,7 @@
           "line": 14
         },
         {
-          "path": "animan/android_security.py",
+          "path": "animelab/android_security.py",
           "symbol": "AndroidSessionMiddleware",
           "line": 7
         }

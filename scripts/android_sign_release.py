@@ -29,7 +29,7 @@ def signing_identity():
         return key, values
     if key.exists(): raise RuntimeError('Existing keystore has no signing configuration; do not overwrite it')
     password = secrets.token_urlsafe(48)
-    values = {'alias': 'animan', 'store_password': password, 'key_password': password}
+    values = {'alias': 'animelab', 'store_password': password, 'key_password': password}
     env = {**os.environ, 'ANIMAN_LOCAL_STORE_PASS': password, 'ANIMAN_LOCAL_KEY_PASS': password}
     subprocess.run(['keytool', '-genkeypair', '-noprompt', '-keystore', str(key), '-storetype', 'PKCS12',
                     '-alias', values['alias'], '-keyalg', 'RSA', '-keysize', '3072', '-validity', '10000',

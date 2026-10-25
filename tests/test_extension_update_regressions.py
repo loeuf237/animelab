@@ -5,16 +5,16 @@ from unittest.mock import AsyncMock
 import httpx
 import pytest
 
-from animan.services.aniyomi_dex_parser import SourceRecipe, AniyomiDexParser
-from animan.services.extension_service import ExtensionService
+from animelab.services.aniyomi_dex_parser import SourceRecipe, AniyomiDexParser
+from animelab.services.extension_service import ExtensionService
 
 
 @pytest.fixture
 def installed(tmp_path, monkeypatch):
     cache = tmp_path / 'apks'
     cache.mkdir()
-    monkeypatch.setattr('animan.services.extension_service.APKS_DIR', cache)
-    monkeypatch.setattr('animan.services.extension_service.is_safe_url', lambda url: True)
+    monkeypatch.setattr('animelab.services.extension_service.APKS_DIR', cache)
+    monkeypatch.setattr('animelab.services.extension_service.is_safe_url', lambda url: True)
     service = ExtensionService(str(tmp_path / 'library.sqlite'))
     recipe = SourceRecipe(pkg='review.source', name='Review', base_url='https://source.example',
                           search_selector='.old-card', popular_selector='.old-card', popular_request_path='/popular')
@@ -38,7 +38,7 @@ def row_for(service, ext_id):
 @pytest.mark.asyncio
 @pytest.mark.parametrize('failure', ['http500', 'network', 'invalid_apk', 'invalid_dex', 'broken_dex_tables', 'missing_url', 'challenge'])
 async def test_failed_upgrade_keeps_version_recipe_history_and_active_source(installed, monkeypatch, failure):
-    from animan.services.source_http import VerificationRequired
+    from animelab.services.source_http import VerificationRequired
     service, ext_id, cache = installed
     if failure == 'missing_url':
         with service._get_conn() as conn:
@@ -64,7 +64,7 @@ async def test_failed_upgrade_keeps_version_recipe_history_and_active_source(ins
             content = buffer.getvalue()
         get = AsyncMock(return_value=httpx.Response(500 if failure == 'http500' else 200,
                                                   content=content, request=request))
-    monkeypatch.setattr('animan.services.source_http.AsyncSourceClient.get', get)
+    monkeypatch.setattr('animelab.services.source_http.AsyncSourceClient.get', get)
     with pytest.raises(VerificationRequired if failure == 'challenge' else ValueError):
         await service.update_extension(ext_id)
     after = row_for(service, ext_id)
@@ -82,7 +82,7 @@ async def test_upgrade_does_not_fall_back_to_an_older_cached_apk(installed, monk
     old_bytes = extension_apk(selector='.old-card')
     service._apk_cache_path(before).write_bytes(old_bytes)
     (cache / 'review.source.apk').write_bytes(old_bytes)
-    monkeypatch.setattr('animan.services.source_http.AsyncSourceClient.get', AsyncMock(side_effect=httpx.ConnectError('offline')))
+    monkeypatch.setattr('animelab.services.source_http.AsyncSourceClient.get', AsyncMock(side_effect=httpx.ConnectError('offline')))
     with pytest.raises(ValueError):
         await service.update_extension(ext_id)
     assert row_for(service, ext_id) == before
@@ -99,7 +99,7 @@ async def test_compile_ignores_unversioned_and_other_version_cache(installed, mo
     new_bytes = extension_apk(selector='.new-card')
     get = AsyncMock(return_value=httpx.Response(200, content=new_bytes,
                     request=httpx.Request('GET', target['apk_url'])))
-    monkeypatch.setattr('animan.services.source_http.AsyncSourceClient.get', get)
+    monkeypatch.setattr('animelab.services.source_http.AsyncSourceClient.get', get)
     recipe = await service._compile_extension_recipe(target)
     assert recipe['popular_selector'] == '.new-card'
     assert get.await_count == 1
@@ -118,7 +118,7 @@ async def test_update_persists_new_domain_only_after_success_and_restart(install
     async def get(client, url, **kwargs):
         return httpx.Response(200, request=httpx.Request('GET', url), **(
             {'json':remote} if url.endswith('.json') else {'content':extension_apk('https://newsource.example')}))
-    monkeypatch.setattr('animan.services.source_http.AsyncSourceClient.get', get)
+    monkeypatch.setattr('animelab.services.source_http.AsyncSourceClient.get', get)
     await service.check_updates()
     pending = row_for(service, ext_id)
     assert pending['installed_version'] == '1' and pending['base_url'] == 'https://source.example'
@@ -152,8 +152,8 @@ async def test_api_markers_can_be_configured_but_invalid_css_is_rejected(install
 
 
 def test_pending_domain_migration_keeps_version_8_installations(tmp_path):
-    from animan.database import create_database_engine
-    from animan.migrations import migrate, MIGRATIONS
+    from animelab.database import create_database_engine
+    from animelab.migrations import migrate, MIGRATIONS
     engine = create_database_engine('sqlite:///' + str(tmp_path / 'version8.sqlite'))
     try:
         migrate(engine, MIGRATIONS[:8])
@@ -177,7 +177,7 @@ async def test_index_without_new_apk_url_does_not_reinstall_old_apk_as_new(insta
     get = AsyncMock(return_value=httpx.Response(200,
         json=[{'pkg':'review.source', 'version':'2'}],
         request=httpx.Request('GET', 'https://repo.example/index.json')))
-    monkeypatch.setattr('animan.services.source_http.AsyncSourceClient.get', get)
+    monkeypatch.setattr('animelab.services.source_http.AsyncSourceClient.get', get)
     await service.check_updates()
     before = row_for(service, ext_id)
     get.reset_mock()
@@ -193,7 +193,7 @@ async def test_enabling_a_missing_recipe_does_not_mask_an_upgrade_failure(instal
     with service._get_conn() as conn:
         conn.execute('UPDATE imported_extensions SET recipe_json=NULL,is_enabled=0 WHERE id=?', (ext_id,))
     before = row_for(service, ext_id)
-    monkeypatch.setattr('animan.services.source_http.AsyncSourceClient.get', AsyncMock(side_effect=httpx.ConnectError('offline')))
+    monkeypatch.setattr('animelab.services.source_http.AsyncSourceClient.get', AsyncMock(side_effect=httpx.ConnectError('offline')))
     with pytest.raises(ValueError):
         await service.toggle_extension(ext_id, True)
     assert row_for(service, ext_id) == before

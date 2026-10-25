@@ -4,9 +4,9 @@ from unittest.mock import patch, AsyncMock, MagicMock
 from fastapi.testclient import TestClient
 
 from run import app
-from animan.services.aniyomi_dex_parser import AniyomiDexParser, SourceRecipe
-from animan.services.aniyomi_container import AniyomiContainerSource
-from animan.services.extension_service import ExtensionService
+from animelab.services.aniyomi_dex_parser import AniyomiDexParser, SourceRecipe
+from animelab.services.aniyomi_container import AniyomiContainerSource
+from animelab.services.extension_service import ExtensionService
 
 @pytest.fixture(scope="module")
 def client():
@@ -83,7 +83,7 @@ async def test_container_source_parsing():
         </body>
     </html>
     """
-    with patch("animan.services.aniyomi_container.is_safe_url", return_value=True):
+    with patch("animelab.services.aniyomi_container.is_safe_url", return_value=True):
         with patch.object(source, "_fetch_html", new_callable=AsyncMock) as mock_fetch:
             mock_fetch.return_value = sample_detail_html
             detail = await source.get_anime_detail("https://testsource.example.com/anime/naruto-shippuden")
@@ -129,7 +129,7 @@ async def test_extension_service_business_rules(tmp_path):
     mock_resp1.status_code = 200
     mock_resp1.json.return_value = repo1_data
 
-    with patch("animan.services.source_http.AsyncSourceClient.get", new_callable=AsyncMock) as mock_get:
+    with patch("animelab.services.source_http.AsyncSourceClient.get", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = mock_resp1
         res1 = await service.import_repository("https://example.com/repo1/index.min.json")
         assert res1["success"] is True
@@ -159,7 +159,7 @@ async def test_extension_service_business_rules(tmp_path):
     mock_resp2.status_code = 200
     mock_resp2.json.return_value = repo2_data
 
-    with patch("animan.services.source_http.AsyncSourceClient.get", new_callable=AsyncMock) as mock_get:
+    with patch("animelab.services.source_http.AsyncSourceClient.get", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = mock_resp2
         res2 = await service.import_repository("https://example.com/repo2/index.min.json")
         assert res2["success"] is True
@@ -173,7 +173,7 @@ async def test_extension_service_business_rules(tmp_path):
 
     # Activation manuelle d'une extension par l'utilisateur
     gamma_id = visible2[0]["id"]
-    with patch("animan.services.extension_service.is_safe_url", return_value=True), patch.object(service, "_compile_extension_recipe", new_callable=AsyncMock) as mock_compile:
+    with patch("animelab.services.extension_service.is_safe_url", return_value=True), patch.object(service, "_compile_extension_recipe", new_callable=AsyncMock) as mock_compile:
         mock_compile.return_value = SourceRecipe(
             pkg="eu.kanade.tachiyomi.animeextension.en.repo2_gamma",
             name="Repo2 Gamma",
@@ -214,7 +214,7 @@ def test_api_extensions_routes(client):
 @pytest.mark.asyncio
 async def test_hanime_search_and_detail():
     """Vérifie la recherche et les détails pour l'extension Hanime.tv via le catalogue API."""
-    from animan.services.aniyomi_container import AniyomiContainerSource
+    from animelab.services.aniyomi_container import AniyomiContainerSource
     recipe = SourceRecipe(
         pkg="eu.kanade.tachiyomi.animeextension.en.hanime",
         name="Hanime",
@@ -271,7 +271,7 @@ async def test_hanime_search_and_detail():
 @pytest.mark.asyncio
 async def test_resolve_imported_video_stream():
     """Vérifie la résolution de flux directs pour les hébergeurs embed vidéo (Vidmoly, Sibnet)."""
-    from animan.services.download_manager import download_manager
+    from animelab.services.download_manager import download_manager
 
     # Test Vidmoly/Ansembed
     mock_html_vidmoly = """
@@ -281,7 +281,7 @@ async def test_resolve_imported_video_stream():
     });
     </script></body></html>
     """
-    with patch("animan.services.extractors.base.source_http.async_client") as mock_client_ctx:
+    with patch("animelab.services.extractors.base.source_http.async_client") as mock_client_ctx:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.text = mock_html_vidmoly
@@ -305,7 +305,7 @@ async def test_resolve_imported_video_stream():
     </script>
     </body></html>
     """
-    with patch("animan.services.extractors.base.source_http.async_client") as mock_client_ctx:
+    with patch("animelab.services.extractors.base.source_http.async_client") as mock_client_ctx:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.text = mock_html_sibnet
@@ -324,10 +324,10 @@ async def test_resolve_imported_video_stream():
 
 def test_download_task_source_propagation():
     """Vérifie la propagation du champ source dans start_download et start_batch_download."""
-    from animan.services.download_manager import download_manager
+    from animelab.services.download_manager import download_manager
 
-    with patch("animan.services.download_manager.library_service.save_task"), \
-         patch("animan.services.download_manager.library_service.save_tasks_batch"), \
+    with patch("animelab.services.download_manager.library_service.save_task"), \
+         patch("animelab.services.download_manager.library_service.save_tasks_batch"), \
          patch.object(download_manager, "check_existing_file", return_value=None), \
          patch.object(download_manager, "_trigger_process_queue"):
 
@@ -415,8 +415,8 @@ async def test_extension_update_detection_and_user_triggered_upgrade(tmp_path, e
     mock_resp.content = extension_apk('https://anime-sama.to')
     mock_resp.json.side_effect = lambda: repo_v1
 
-    with patch("animan.services.source_http.AsyncSourceClient.get", new_callable=AsyncMock) as mock_get, \
-         patch("animan.services.extension_service.is_safe_url", return_value=True):
+    with patch("animelab.services.source_http.AsyncSourceClient.get", new_callable=AsyncMock) as mock_get, \
+         patch("animelab.services.extension_service.is_safe_url", return_value=True):
         mock_get.return_value = mock_resp
         await service.import_repository("https://example.com/repo/index.min.json")
         ext = service.get_visible_extensions()[0]

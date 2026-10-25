@@ -26,7 +26,7 @@ def generate():
             icon = icon.convert("RGB")
         icon.save(path, **options)
 
-    for base in (ROOT / "frontend/public", ROOT / "animan/static"):
+    for base in (ROOT / "frontend/public", ROOT / "animelab/static"):
         for name, size in {"icon-192.png": 192, "icon-512.png": 512,
                            "icon-maskable.png": 512, "favicon.png": 64,
                            "apple-touch-icon.png": 180, "logo.jpg": 512}.items():
@@ -42,14 +42,14 @@ def generate():
         digest = hashlib.sha256((public / path.lstrip("/")).read_bytes()).hexdigest()[:12]
         return f"{path}?v={digest}"
 
-    for base in (public, ROOT / "animan/static"):
+    for base in (public, ROOT / "animelab/static"):
         manifest = base / "manifest.json"
         data = json.loads(manifest.read_text())
         for group in [data.get("icons", []), *(s.get("icons", []) for s in data.get("shortcuts", []))]:
             for icon in group:
                 icon["src"] = versioned(icon["src"])
         manifest.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
-    for path in [ROOT / "frontend/index.html", ROOT / "animan/templates/fragments/navbar.html"]:
+    for path in [ROOT / "frontend/index.html", ROOT / "animelab/templates/fragments/navbar.html"]:
         text = re.sub(r'(?P<prefix>(?:src|href)=")(?P<url>/img/(?:icon-[^"?]+\.png|favicon\.png|apple-touch-icon\.png))(?:\?[^"\s]*)?"',
                       lambda match: match["prefix"] + versioned(match["url"]) + '"', path.read_text())
         text = re.sub(r'href="/manifest\.json(?:\?[^"\s]*)?"',

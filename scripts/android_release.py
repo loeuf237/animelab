@@ -68,7 +68,7 @@ def inspect_apk(path, require_optimized=False):
                     elif content.startswith(b"PK"):
                         inspect_zip(io.BytesIO(content), name + "/", depth + 1)
     inspect_zip(path)
-    for marker in ("frontend/dist/index.html", "android_runtime.py", "animan/services/download_manager", "curl_cffi/_wrapper", "pydantic_core/_pydantic_core", "libffmpegkit"):
+    for marker in ("frontend/dist/index.html", "android_runtime.py", "animelab/services/download_manager", "curl_cffi/_wrapper", "pydantic_core/_pydantic_core", "libffmpegkit"):
         if not any(marker in name for name in names):
             raise ValueError("Missing packaged engine component: " + marker)
     if not native:

@@ -5,9 +5,9 @@ from unittest.mock import AsyncMock, MagicMock
 import httpx
 import pytest
 
-from animan.services.browser_verification import BrowserVerificationService
-from animan.services.source_http import SourceHTTPService, VerificationRequired
-from animan.services.proxy_service import proxy_service
+from animelab.services.browser_verification import BrowserVerificationService
+from animelab.services.source_http import SourceHTTPService, VerificationRequired
+from animelab.services.proxy_service import proxy_service
 
 
 @pytest.fixture
@@ -82,7 +82,7 @@ async def test_verification_cannot_open_an_arbitrary_domain(verification):
 @pytest.mark.asyncio
 async def test_closed_browser_can_be_reopened(verification, monkeypatch):
     import importlib
-    module = importlib.import_module('animan.services.browser_verification')
+    module = importlib.import_module('animelab.services.browser_verification')
     service, transport, state = verification
     old = MagicMock()
     old.poll.return_value = 0
@@ -92,7 +92,7 @@ async def test_closed_browser_can_be_reopened(verification, monkeypatch):
     new.wait.return_value = 0
     monkeypatch.setattr(service, 'installed_browsers', lambda: [{'name': 'installed', 'path': '/fake/browser'}])
     monkeypatch.setattr(module, 'is_safe_url', lambda url: True)
-    monkeypatch.setattr(importlib.import_module('animan.services.verification_platform').subprocess, 'Popen', lambda *args, **kwargs: new)
+    monkeypatch.setattr(importlib.import_module('animelab.services.verification_platform').subprocess, 'Popen', lambda *args, **kwargs: new)
     monkeypatch.setenv('DISPLAY', ':test')
     job = await service.start('SOURCE.EXAMPLE')
     assert job['domain'] == 'source.example' and job['id'] != 'job'
@@ -101,10 +101,10 @@ async def test_closed_browser_can_be_reopened(verification, monkeypatch):
 
 
 def test_download_resume_requires_validated_domain(verification, monkeypatch):
-    from animan.services.download_manager import DownloadManagerService, library_service
-    from animan.models.download_task import DownloadTask, DownloadStatus
+    from animelab.services.download_manager import DownloadManagerService, library_service
+    from animelab.models.download_task import DownloadTask, DownloadStatus
     import importlib
-    module=importlib.import_module('animan.services.download_manager')
+    module=importlib.import_module('animelab.services.download_manager')
     service, transport, state = verification
     manager=DownloadManagerService()
     task=DownloadTask(status=DownloadStatus.VERIFICATION_REQUIRED,verificationUrl=state.blocked_url)
@@ -141,7 +141,7 @@ async def test_installed_chrome_cookie_exchange_with_local_server(tmp_path, monk
     server=ThreadingHTTPServer(('127.0.0.1',0),Handler)
     threading.Thread(target=server.serve_forever,daemon=True).start()
     base=f'http://127.0.0.1:{server.server_port}'
-    monkeypatch.setattr('animan.services.source_http.is_safe_url',lambda url:url.startswith(base+'/'))
+    monkeypatch.setattr('animelab.services.source_http.is_safe_url',lambda url:url.startswith(base+'/'))
     monkeypatch.setattr(proxy_service,'get_random_proxy',lambda:None)
     transport=SourceHTTPService(storage=tmp_path/'cookies',min_interval=0)
     service=BrowserVerificationService(transport)

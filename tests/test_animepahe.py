@@ -4,9 +4,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from run import app
-from animan.security import is_safe_url
-from animan.services.animepahe_service import animepahe_service
-from animan.models.anime import AnimeResult, AnimeDetail
+from animelab.security import is_safe_url
+from animelab.services.animepahe_service import animepahe_service
+from animelab.models.anime import AnimeResult, AnimeDetail
 
 
 @pytest.fixture(autouse=True)
@@ -222,14 +222,14 @@ async def test_kwik_stream_extraction_unpack():
         async def get(self, url):
             return MockResponse()
 
-    with patch("animan.services.animepahe_service.source_http.async_client", side_effect=MockAsyncClient):
+    with patch("animelab.services.animepahe_service.source_http.async_client", side_effect=MockAsyncClient):
         stream_url = await animepahe_service.extract_kwik_stream("https://kwik.cx/e/testembed")
         assert stream_url is not None
         assert "https://na-01.kwik.cx/teststream.mp4" in stream_url
 
 
 def test_animepahe_security_ssrf_whitelist():
-    from animan.security import ALLOWED_SCRAPING_DOMAINS
+    from animelab.security import ALLOWED_SCRAPING_DOMAINS
 
     # Whitelisted legitimate AnimePahe and Kwik domains
     assert is_safe_url("https://animepahe.ru/anime/test", allowed_domains=ALLOWED_SCRAPING_DOMAINS) is True
@@ -246,7 +246,7 @@ def test_animepahe_security_ssrf_whitelist():
 
 
 def test_routes_animepahe_search_integration(monkeypatch):
-    from animan.routers import anime as anime_router
+    from animelab.routers import anime as anime_router
     monkeypatch.setattr(anime_router.scraping_service, 'search_anime', AsyncMock(return_value=[]))
     monkeypatch.setattr(anime_router.voiranime_service, 'search_anime', AsyncMock(return_value=[]))
     monkeypatch.setattr(anime_router.extension_service, 'get_enabled_container_sources', lambda: [])
@@ -315,7 +315,7 @@ async def test_resolve_stream_animepahe():
 
 @pytest.mark.asyncio
 async def test_animepahe_episode_size_estimation_avoids_kwik_spam():
-    from animan.services.download_manager import download_manager
+    from animelab.services.download_manager import download_manager
 
     with patch.object(animepahe_service, "get_episode_sources", new_callable=AsyncMock) as mock_sources:
         mock_sources.return_value = [

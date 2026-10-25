@@ -2,9 +2,9 @@ import pytest
 from pathlib import Path
 from fastapi.testclient import TestClient
 from run import app
-from animan.config import settings
-from animan.security import is_safe_url, is_safe_path, anonymize_path
-from animan.services.download_manager import download_manager
+from animelab.config import settings
+from animelab.security import is_safe_url, is_safe_path, anonymize_path
+from animelab.services.download_manager import download_manager
 
 @pytest.fixture(scope="module")
 def client():

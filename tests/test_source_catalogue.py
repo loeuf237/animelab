@@ -6,13 +6,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from run import app
-from animan.models.anime import AnimeResult
-from animan.routers import anime as anime_router
-from animan.services.source_catalogue import SourceCatalogueService, CatalogueError
-from animan.services.source_http import VerificationRequired
-from animan.services.aniyomi_container import AniyomiContainerSource
-from animan.services.aniyomi_dex_parser import SourceRecipe
-from animan.services.extension_service import extension_service
+from animelab.models.anime import AnimeResult
+from animelab.routers import anime as anime_router
+from animelab.services.source_catalogue import SourceCatalogueService, CatalogueError
+from animelab.services.source_http import VerificationRequired
+from animelab.services.aniyomi_container import AniyomiContainerSource
+from animelab.services.aniyomi_dex_parser import SourceRecipe
+from animelab.services.extension_service import extension_service
 
 
 @pytest.fixture
@@ -40,9 +40,9 @@ def test_global_search_keeps_results_and_exposes_challenges(providers, monkeypat
 
 def test_targeted_search_challenge_and_cookie_validation_retry(providers, monkeypatch, tmp_path):
     from curl_cffi.requests import Cookies
-    from animan.services.source_http import SourceHTTPService
-    from animan.services.browser_verification import BrowserVerificationService
-    from animan.routers import network
+    from animelab.services.source_http import SourceHTTPService
+    from animelab.services.browser_verification import BrowserVerificationService
+    from animelab.routers import network
     import time
     url = 'https://source.example/search?q=naruto'
     class Session:
@@ -52,7 +52,7 @@ def test_targeted_search_challenge_and_cookie_validation_retry(providers, monkey
             return httpx.Response(200 if success else 403, text='Naruto' if success else 'challenge',
                 headers={'cache-control':'no-store', **({} if success else {'cf-mitigated':'challenge'})}, request=httpx.Request(method, target))
         def close(self): pass
-    monkeypatch.setattr('animan.services.source_http.is_safe_url', lambda target: target == url)
+    monkeypatch.setattr('animelab.services.source_http.is_safe_url', lambda target: target == url)
     transport = SourceHTTPService(storage=tmp_path, min_interval=0, session_factory=Session)
     browser = BrowserVerificationService(transport)
     browser._cdp = AsyncMock(return_value={'cookies':[{'name':'clearance','value':'verified','domain':'source.example'}]})
@@ -175,7 +175,7 @@ async def test_franime_api_tags_search_and_pagination(catalogue, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_animesama_multi_group_tags_and_custom_feeds(catalogue, monkeypatch):
-    from animan.services.aniyomi_dex_parser import AniyomiDexParser
+    from animelab.services.aniyomi_dex_parser import AniyomiDexParser
     recipe = SourceRecipe(pkg='eu.kanade.tachiyomi.animeextension.fr.animesama', name='Anime-Sama')
     AniyomiDexParser._fill_heuristics(recipe)
     source = AniyomiContainerSource(recipe)

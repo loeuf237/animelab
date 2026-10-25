@@ -3,13 +3,13 @@ import sqlite3
 
 import pytest
 
-from animan.config import settings
-from animan.database import init_db, create_database_engine
-from animan.migrations import migrate, MIGRATIONS
-from animan.services import download_preferences
-from animan.services.download_manager import DownloadManagerService
-from animan.services.proxy_service import proxy_service
-from animan.services.voiranime_service import voiranime_service
+from animelab.config import settings
+from animelab.database import init_db, create_database_engine
+from animelab.migrations import migrate, MIGRATIONS
+from animelab.services import download_preferences
+from animelab.services.download_manager import DownloadManagerService
+from animelab.services.proxy_service import proxy_service
+from animelab.services.voiranime_service import voiranime_service
 
 
 @pytest.fixture

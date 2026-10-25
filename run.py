@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import os
-from animan.diagnostics import install_logging
+from animelab.diagnostics import install_logging
 install_logging()
 logging.basicConfig(
     level=logging.INFO,
@@ -18,19 +18,19 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
-from animan.services.source_http import source_http, VerificationRequired
-from animan.services.browser_verification import browser_verification
-from animan.routers.network import router as network_router
-from animan.config import settings
-from animan import __version__
-from animan.database import init_db
-from animan.services.download_manager import download_manager
-from animan.services.scraping_service import scraping_service
-from animan.services.voiranime_service import voiranime_service
-from animan.services.animepahe_service import animepahe_service
-from animan.services.watchdog_service import watchdog_service
-from animan.services.i18n_service import current_request_lang, detect_client_language
-from animan.routers import (
+from animelab.services.source_http import source_http, VerificationRequired
+from animelab.services.browser_verification import browser_verification
+from animelab.routers.network import router as network_router
+from animelab.config import settings
+from animelab import __version__
+from animelab.database import init_db
+from animelab.services.download_manager import download_manager
+from animelab.services.scraping_service import scraping_service
+from animelab.services.voiranime_service import voiranime_service
+from animelab.services.animepahe_service import animepahe_service
+from animelab.services.watchdog_service import watchdog_service
+from animelab.services.i18n_service import current_request_lang, detect_client_language
+from animelab.routers import (
     anime_router,
     download_router,
     library_router,
@@ -40,7 +40,7 @@ from animan.routers import (
     i18n_router,
 )
 
-logger = logging.getLogger("animan")
+logger = logging.getLogger("animelab")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -58,7 +58,7 @@ async def lifespan(app: FastAPI):
     bg_tasks = [
         asyncio.create_task(browser_verification.watch()),
     ]
-    from animan.services.proxy_pool import proxy_pool
+    from animelab.services.proxy_pool import proxy_pool
     bg_tasks.append(asyncio.create_task(proxy_pool.watch()))
     if os.getenv("ANIMAN_STARTUP_REFRESH", "true").lower() not in ("false", "0", "no"):
         bg_tasks.append(asyncio.create_task(proxy_pool.refresh()))
@@ -231,13 +231,13 @@ async def get_offline_page():
     )
 
 # Enregistrement des routeurs
-from animan.routers.playback import router as playback_router
+from animelab.routers.playback import router as playback_router
 app.include_router(playback_router)
-from animan.routers.diagnostics import router as diagnostics_router
+from animelab.routers.diagnostics import router as diagnostics_router
 app.include_router(diagnostics_router)
-from animan.api_errors import ErrorContractMiddleware, install_error_handlers
+from animelab.api_errors import ErrorContractMiddleware, install_error_handlers
 install_error_handlers(app)
-from animan.api_contracts import install_contract_schema
+from animelab.api_contracts import install_contract_schema
 install_contract_schema(app)
 app.add_middleware(ErrorContractMiddleware)
 # Validate Host before CSRF checks, CORS preflights and route handling.
@@ -314,7 +314,7 @@ if __name__ == "__main__":
         port=settings.PORT,
         log_level="info",
         reload=reload_enabled,
-        reload_dirs=["animan", "."] if reload_enabled else None,
+        reload_dirs=["animelab", "."] if reload_enabled else None,
         timeout_keep_alive=30,
         timeout_graceful_shutdown=10,
     )

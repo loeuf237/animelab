@@ -2,18 +2,18 @@
 !include theme.iuml
 title AnimeLab — classes du domaine et persistance actuelle
 top to bottom direction
-' @source animan/models/anime.py:AnimeDetail
-' @source animan/models/anime.py:AnimeResult
-' @source animan/models/anime.py:Episode
-' @source animan/models/download_task.py:DownloadTask
-' @source animan/models/download_task.py:DownloadTaskEntity.to_task
-' @source animan/models/download_task.py:SpeedTracker
-' @source animan/models/download_task.py:DownloadStatus
-' @source animan/models/download_task.py:ExportStatus
-' @source animan/models/auto_download.py:AutoDownloadEpisode
-' @source animan/models/favorite.py:FavoriteAnime
-' @source animan/models/watch_progress.py:WatchProgress
-' @source animan/models/playback.py:PlaybackProgress
+' @source animelab/models/anime.py:AnimeDetail
+' @source animelab/models/anime.py:AnimeResult
+' @source animelab/models/anime.py:Episode
+' @source animelab/models/download_task.py:DownloadTask
+' @source animelab/models/download_task.py:DownloadTaskEntity.to_task
+' @source animelab/models/download_task.py:SpeedTracker
+' @source animelab/models/download_task.py:DownloadStatus
+' @source animelab/models/download_task.py:ExportStatus
+' @source animelab/models/auto_download.py:AutoDownloadEpisode
+' @source animelab/models/favorite.py:FavoriteAnime
+' @source animelab/models/watch_progress.py:WatchProgress
+' @source animelab/models/playback.py:PlaybackProgress
 package "DTO Pydantic — catalogue" {
   class AnimeResult {
     id: str
@@ -172,10 +172,10 @@ BEGIN IMMEDIATE ; retour arrière DDL + données sur échec.
 Transactions ORM : tâche, progression, export et suivi.
 Connexions partagées : WAL, busy_timeout, foreign_keys.
 end note
-' @source animan/migrations.py:Migration
-' @source animan/migrations.py:migrate
-' @source animan/database.py:transaction
-' @source animan/database.py:sqlite_connection
+' @source animelab/migrations.py:Migration
+' @source animelab/migrations.py:migrate
+' @source animelab/database.py:transaction
+' @source animelab/database.py:sqlite_connection
 class PlaybackProgress <<table>> {
   source: str
   animeUrl: str

@@ -15,12 +15,12 @@ from scripts.android_optimize import deduplicate_sources, optimize_requirements,
 def test_dedup_only_removes_identical_public_copies(tmp_path):
     paths = {
         "frontend/dist/img/logo.png": b"same",
-        "animan/static/img/logo.png": b"same",
+        "animelab/static/img/logo.png": b"same",
         "frontend/dist/img/custom.png": b"custom",
         "frontend/dist/img/changed.png": b"new",
-        "animan/static/img/changed.png": b"old",
+        "animelab/static/img/changed.png": b"old",
         "frontend/dist/manifest.json": b"{}",
-        "animan/static/manifest.json": b"{}",
+        "animelab/static/manifest.json": b"{}",
         "frontend/dist/assets/player.js": b"same",
         "frontend/dist/index.html": b"same",
     }

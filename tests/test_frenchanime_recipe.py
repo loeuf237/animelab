@@ -5,12 +5,12 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from animan.services.aniyomi_container import AniyomiContainerSource, _safe_select
-from animan.services.aniyomi_dex_parser import AniyomiDexParser, SourceRecipe
-from animan.services.extension_service import ExtensionService
-from animan.services.recipe_plans import source_key
-from animan.services.source_catalogue import SourceCatalogueService
-from animan.services.source_registry import SourceRegistry
+from animelab.services.aniyomi_container import AniyomiContainerSource, _safe_select
+from animelab.services.aniyomi_dex_parser import AniyomiDexParser, SourceRecipe
+from animelab.services.extension_service import ExtensionService
+from animelab.services.recipe_plans import source_key
+from animelab.services.source_catalogue import SourceCatalogueService
+from animelab.services.source_registry import SourceRegistry
 
 PKG = 'eu.kanade.tachiyomi.animeextension.fr.frenchanime'
 BASE = 'https://french-anime.com'
@@ -98,7 +98,7 @@ def test_unknown_api_operation_is_reported_as_unsupported():
 
 
 def test_no_runtime_dependency_on_removed_adapter_directory():
-    root = Path(__file__).resolve().parents[1] / 'animan/services'
+    root = Path(__file__).resolve().parents[1] / 'animelab/services'
     assert not (root / 'container_adapters').exists()
     for path in root.rglob('*.py'):
-        assert 'from animan.services.container_adapters' not in path.read_text()
+        assert 'from animelab.services.container_adapters' not in path.read_text()

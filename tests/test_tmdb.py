@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import patch, AsyncMock
-from animan.models.anime import AnimeDetail, Episode
-from animan.services.tmdb_service import tmdb_service
+from animelab.models.anime import AnimeDetail, Episode
+from animelab.services.tmdb_service import tmdb_service
 
 def test_tmdb_sanitize_title():
     assert tmdb_service.sanitize_title("One Piece (VF)") == "One Piece"

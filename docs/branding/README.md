@@ -12,7 +12,7 @@ Artwork was created with the built-in `image_gen` tool. Exact generation prompts
 
 To regenerate the derived assets, install Pillow (`python -m pip install 'Pillow>=10,<13'`) and run `python scripts/branding.py`. The script creates:
 
-- Web favicons, Apple touch icon, 192px and 512px PWA icons, and the maskable icon, in both `frontend/public` and `animan/static`.
+- Web favicons, Apple touch icon, 192px and 512px PWA icons, and the maskable icon, in both `frontend/public` and `animelab/static`.
 - Android launcher resources for all five density buckets and adaptive launcher icons for Android 8+.
 - Windows `.ico` and macOS `.icns` files in this directory, referenced by the desktop packaging specification.
 

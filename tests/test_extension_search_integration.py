@@ -3,10 +3,10 @@ from unittest.mock import patch, AsyncMock, MagicMock
 from fastapi.testclient import TestClient
 
 from run import app
-from animan.models.anime import AnimeResult
-from animan.services.aniyomi_dex_parser import AniyomiDexParser, SourceRecipe
-from animan.services.aniyomi_container import AniyomiContainerSource
-from animan.services.extension_service import extension_service
+from animelab.models.anime import AnimeResult
+from animelab.services.aniyomi_dex_parser import AniyomiDexParser, SourceRecipe
+from animelab.services.aniyomi_container import AniyomiContainerSource
+from animelab.services.extension_service import extension_service
 
 
 @pytest.fixture
@@ -126,7 +126,7 @@ async def test_animesama_detail_episodes_parsing():
 
 
 def test_api_search_includes_extensions(client, monkeypatch):
-    from animan.routers import anime
+    from animelab.routers import anime
     for source in (anime.scraping_service, anime.voiranime_service, anime.animepahe_service):
         monkeypatch.setattr(source, "search_anime", AsyncMock(return_value=[]))
     mock_source = MagicMock()

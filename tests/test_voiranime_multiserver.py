@@ -4,10 +4,10 @@ from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 
 from run import app
-from animan.database import init_db
-from animan.models.download_task import DownloadTask, DownloadTaskEntity, DownloadStatus
-from animan.services.voiranime_service import voiranime_service, VoirAnimeScrapingService
-from animan.services.download_manager import download_manager
+from animelab.database import init_db
+from animelab.models.download_task import DownloadTask, DownloadTaskEntity, DownloadStatus
+from animelab.services.voiranime_service import voiranime_service, VoirAnimeScrapingService
+from animelab.services.download_manager import download_manager
 
 init_db()
 client = TestClient(app)
@@ -208,7 +208,7 @@ def test_settings_api_voiranime_default_server():
 
 def test_api_episode_size_and_servers_endpoints():
     # Test /api/episode/servers with mocked response
-    with patch("animan.services.voiranime_service.voiranime_service.get_episode_servers", return_value=["myTV", "stape", "voe"]):
+    with patch("animelab.services.voiranime_service.voiranime_service.get_episode_servers", return_value=["myTV", "stape", "voe"]):
         r_servers = client.get("/api/episode/servers?url=https://voir-anime.to/anime/test/ep-1")
         assert r_servers.status_code == 200
         res_data = r_servers.json()

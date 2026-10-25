@@ -1,7 +1,7 @@
 import pytest
-from animan.database import init_db
-from animan.services.library_service import library_service
-from animan.models.download_task import DownloadTask, DownloadStatus
+from animelab.database import init_db
+from animelab.services.library_service import library_service
+from animelab.models.download_task import DownloadTask, DownloadStatus
 
 @pytest.fixture(autouse=True)
 def setup_db():

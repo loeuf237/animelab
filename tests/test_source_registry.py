@@ -4,13 +4,13 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from animan.api_errors import APIProblem
-from animan.models.anime import AnimeResult,AnimeDetail,Episode
-from animan.services.aniyomi_container import AniyomiContainerSource
-from animan.services.aniyomi_dex_parser import SourceRecipe
-from animan.services.source_registry import SourceProvider,SourceRegistry
-from animan.services.source_catalogue import SourceCatalogueService
-from animan.routers import anime as router
+from animelab.api_errors import APIProblem
+from animelab.models.anime import AnimeResult,AnimeDetail,Episode
+from animelab.services.aniyomi_container import AniyomiContainerSource
+from animelab.services.aniyomi_dex_parser import SourceRecipe
+from animelab.services.source_registry import SourceProvider,SourceRegistry
+from animelab.services.source_catalogue import SourceCatalogueService
+from animelab.routers import anime as router
 
 
 def provider(sid):
@@ -30,7 +30,7 @@ async def test_all_source_entry_points_share_the_registry_without_mutating_provi
         get_container_source_by_id=lambda key:extension if key==extension.pkg else None)
     registry=SourceRegistry(natives,extensions)
     monkeypatch.setattr(router,'source_registry',registry)
-    monkeypatch.setattr('animan.services.source_catalogue.source_registry',registry)
+    monkeypatch.setattr('animelab.services.source_catalogue.source_registry',registry)
     monkeypatch.setattr(router.library_service,'get_all_favorites',lambda:[])
     monkeypatch.setattr(router.library_service,'get_history',lambda:[])
     registered=registry.get(sid)

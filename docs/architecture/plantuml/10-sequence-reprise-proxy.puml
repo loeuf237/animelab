@@ -1,8 +1,8 @@
 @startuml
 !include theme.iuml
-' @source animan/services/source_http.py:SourceHTTPService.rotate_proxy
-' @source animan/services/download_manager.py:DownloadManagerService._download_single_file
-' @source animan/services/download_resume.py:prepare_hls_cache
+' @source animelab/services/source_http.py:SourceHTTPService.rotate_proxy
+' @source animelab/services/download_manager.py:DownloadManagerService._download_single_file
+' @source animelab/services/download_resume.py:prepare_hls_cache
 title AnimeLab — rotation de proxy et reprise sans mélanger les représentations
 autonumber
 actor Utilisateur as U

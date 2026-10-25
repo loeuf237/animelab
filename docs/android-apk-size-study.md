@@ -83,7 +83,7 @@ exercise actual Python imports, TLS, browser impersonation and JNI after buildin
 **2. Deduplicate web images and manifests.**
 Seven identical-content entries account for **882,510 B** of redundant compressed
 payload. About 0.66 MB is a second set of assets under `frontend/dist/` while the
-same files are served from `animan/static/`. The remaining major duplicate is
+same files are served from `animelab/static/`. The remaining major duplicate is
 `icon-maskable.png`, currently byte-identical to `icon-512.png`.
 
 Remove redundant Android build inputs and preserve the `/img/*` and manifest URLs
@@ -124,7 +124,7 @@ Replacing the entire ORM or FastAPI solely to save space would have a much large
 maintenance and regression cost.
 
 **Narrow extraction: 0.194 MB of duplicated Python source.**
-`extractPackages("animan")` includes `.py` files alongside `.pyc` files. Investigate
+`extractPackages("animelab")` includes `.py` files alongside `.pyc` files. Investigate
 whether automatic data-file extraction is sufficient for the static/template
 directories. Verify filesystem paths, Jinja templates and startup before changing
 this option. Chaquopy documents [extraction and bytecode packaging](https://chaquo.com/chaquopy/doc/current/android.html#packaging);

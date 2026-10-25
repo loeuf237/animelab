@@ -33,7 +33,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY requirements.txt ./
 RUN python -m pip install --no-cache-dir -r requirements.txt
-COPY animan/ ./animan/
+COPY animelab/ ./animelab/
 COPY run.py ./
 COPY LICENSE NOTICE ./
 COPY --from=frontend /build/dist/ ./frontend/dist/

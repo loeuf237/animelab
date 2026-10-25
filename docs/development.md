@@ -84,7 +84,7 @@ Review the diff and rerun checks after any automatic changes.
 
 ## Checks and progressive adoption
 
-- **Ruff** checks Python correctness rules (`E9`, `F`) throughout `animan/`,
+- **Ruff** checks Python correctness rules (`E9`, `F`) throughout `animelab/`,
   `scripts/`, `tests/` and the three application entry points. Unused imports and
   local variables (`F401`, `F841`) are deferred; Python style formatting is not
   enforced yet. Three fixture-importing test files allow intentional fixture-name

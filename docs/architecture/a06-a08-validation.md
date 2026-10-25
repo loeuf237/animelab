@@ -6,7 +6,7 @@ afin de reproduire les fautes sans dépendre des protections des sites.
 
 ## A06 — Contrats API et erreurs exploitables
 
-`animan/api_contracts.py` valide les entrées des routes historiques qui lisaient
+`animelab/api_contracts.py` valide les entrées des routes historiques qui lisaient
 directement `request.json()` et les réponses JSON des API. Les corps déjà typés
 par FastAPI conservent leur validation native. Les champs supplémentaires
 existants sont conservés, notamment les indicateurs d'épisodes vus/téléchargés.

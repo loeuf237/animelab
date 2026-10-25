@@ -15,7 +15,7 @@ _loop = None
 class VerificationWindow:
     def __init__(self, url, bridge):
         self.url, self.bridge = url, bridge
-        from animan.services.source_http import USER_AGENT
+        from animelab.services.source_http import USER_AGENT
         self.bridge.open(url, USER_AGENT)
 
     def get_cookies(self):
@@ -49,7 +49,7 @@ def start(data_dir, cache_dir, port, token, test_mode=False):
     import tempfile
     tempfile.tempdir = cache_dir
     from java import jclass
-    from animan import media_tools, platform_events
+    from animelab import media_tools, platform_events
     media_tools.configure_android(jclass("com.animan.app.MediaBridge"), jclass("com.animan.app.CryptoBridge"))
     hooks = jclass("com.animan.app.NativeHooks")
     verification = jclass("com.animan.app.VerificationBridge")
@@ -57,9 +57,9 @@ def start(data_dir, cache_dir, port, token, test_mode=False):
     platform_events.storage_status_handler = lambda: json.loads(str(storage.status()))
     platform_events.storage_action_handler = lambda action: json.loads(str(storage.request(action)))
     import run
-    from animan.android_security import AndroidSessionMiddleware
-    from animan.models.download_task import DownloadStatus, ExportStatus
-    from animan.services.download_manager import download_manager
+    from animelab.android_security import AndroidSessionMiddleware
+    from animelab.models.download_task import DownloadStatus, ExportStatus
+    from animelab.services.download_manager import download_manager
     run.app.add_middleware(AndroidSessionMiddleware, token=token)
     run.browser_verification.platform = "android"
     run.browser_verification.webview_opener = lambda url: VerificationWindow(url, verification)
@@ -74,7 +74,7 @@ def start(data_dir, cache_dir, port, token, test_mode=False):
 
     platform_events.progress_handler = notify
     def export_completed(task):
-        from animan.services.subtitle_service import normalize_subtitles
+        from animelab.services.subtitle_service import normalize_subtitles
         if not task.savePath or not Path(task.savePath).is_file():
             raise FileNotFoundError("The private download is missing")
         paths = [task.savePath]
@@ -111,7 +111,7 @@ def start(data_dir, cache_dir, port, token, test_mode=False):
 def command(action):
     if _loop is None:
         return False
-    from animan.services.download_manager import download_manager
+    from animelab.services.download_manager import download_manager
     actions = {"pause": download_manager.pause_all_downloads, "resume": download_manager.resume_all_downloads}
     if action not in actions:
         raise ValueError("Unknown Android download action")
@@ -123,18 +123,18 @@ def native_probe(include_media=True):
     """Called by instrumentation, not by a public API or untrusted WebView."""
     import cffi, curl_cffi, pydantic, sqlalchemy, websockets, yt_dlp
     from bs4 import BeautifulSoup
-    from animan import media_tools
-    from animan.database import engine
-    from animan.services.source_http import source_http
-    from animan.models.anime import AnimeResult
+    from animelab import media_tools
+    from animelab.database import engine
+    from animelab.services.source_http import source_http
+    from animelab.models.anime import AnimeResult
     assert AnimeResult(id="probe", title="Offline", url="https://example.com").model_dump()["id"] == "probe"
     with engine.connect() as connection:
         assert connection.exec_driver_sql("SELECT 1").scalar() == 1
     assert media_tools.which("ffmpeg") and media_tools.which("ffprobe")
     # Exercise the exact publication step implicated in Errno 13 without
     # relying on ARM-translated FFmpeg command execution in the emulator.
-    from animan.config import settings
-    from animan.services.download_manager import download_manager
+    from animelab.config import settings
+    from animelab.services.download_manager import download_manager
     publish_root = Path(settings.DOWNLOAD_DIR) / "native-publish-probe"
     publish_root.mkdir(parents=True, exist_ok=True)
     original = publish_root / "episode.mkv"
@@ -171,14 +171,14 @@ def media_pipeline_probe():
     """Real JNI media operations and the shared direct/HLS/subtitle pipeline."""
     import httpx
     from java import jclass
-    from animan import media_tools
-    from animan.config import settings
-    from animan.models.download_task import DownloadTask, DownloadStatus
+    from animelab import media_tools
+    from animelab.config import settings
+    from animelab.models.download_task import DownloadTask, DownloadStatus
     import importlib
-    media_module = importlib.import_module("animan.services.download_stages.media")
-    from animan.services.download_manager import download_manager as manager
-    from animan.services.download_resume import write_metadata
-    from animan.services.verification_service import verification_service
+    media_module = importlib.import_module("animelab.services.download_stages.media")
+    from animelab.services.download_manager import download_manager as manager
+    from animelab.services.download_resume import write_metadata
+    from animelab.services.verification_service import verification_service
     root = Path(settings.DOWNLOAD_DIR) / "native-probe"
     root.mkdir(parents=True, exist_ok=True)
     source = root / "fixture.mp4"

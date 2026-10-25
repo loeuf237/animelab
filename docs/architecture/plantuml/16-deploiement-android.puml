@@ -2,7 +2,7 @@
 !include theme.iuml
 ' @source android_runtime.py:start
 ' @source android/app/src/main/java/com/animan/app/EngineHost.kt:EngineHost
-' @source animan/android_security.py:AndroidSessionMiddleware
+' @source animelab/android_security.py:AndroidSessionMiddleware
 title AnimeLab — déploiement Android autonome actuel
 top to bottom direction
 node "Appareil Android 10+ / ARM64\nAPK com.animan.app ; target SDK 35" as Device {

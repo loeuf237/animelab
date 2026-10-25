@@ -1,13 +1,13 @@
 import pytest
 from fastapi.testclient import TestClient
 from run import app
-from animan.database import init_db
+from animelab.database import init_db
 from unittest.mock import AsyncMock
 
 @pytest.fixture(scope="module")
 def client():
     init_db()
-    from animan.routers import anime
+    from animelab.routers import anime
     # Page rendering tests should not depend on a live source challenge.
     with pytest.MonkeyPatch.context() as patch:
         for source in (anime.scraping_service, anime.voiranime_service, anime.animepahe_service):
@@ -180,8 +180,8 @@ def test_system_storage_real_stats(client):
     assert "downloadDir" in data
 
 def test_clear_history_memory_sync(client):
-    from animan.services.download_manager import download_manager
-    from animan.models.download_task import DownloadTask, DownloadStatus
+    from animelab.services.download_manager import download_manager
+    from animelab.models.download_task import DownloadTask, DownloadStatus
     task = DownloadTask(
         id="test-clear-sync-1",
         animeName="Test Sync Anime",
@@ -198,14 +198,14 @@ def test_clear_history_memory_sync(client):
     assert "test-clear-sync-1" not in download_manager.tasks
 
 def test_detect_source_from_url():
-    from animan.routers.anime import detect_source_from_url
+    from animelab.routers.anime import detect_source_from_url
     assert detect_source_from_url("https://voir-anime.to/anime/toradora/") == "voir-anime"
     assert detect_source_from_url("https://voiranime.to/anime/toradora/") == "voir-anime"
     assert detect_source_from_url("https://w16.french-manga.net/anime/naruto/") == "french-manga"
     assert detect_source_from_url("https://unknown.com/anime/test", fallback="default-source") == "default-source"
 
 def test_search_api_contextual_and_grouping(client, monkeypatch):
-    from animan.models.anime import AnimeResult
+    from animelab.models.anime import AnimeResult
 
     # Mock French-Manga and VoirAnime results
     async def mock_fm_search(q):
@@ -224,10 +224,10 @@ def test_search_api_contextual_and_grouping(client, monkeypatch):
             AnimeResult(id="ap1", title="AP Anime 1", url="https://animepahe.ru/anime/1", source="animepahe")
         ]
 
-    from animan.services.scraping_service import scraping_service
-    from animan.services.voiranime_service import voiranime_service
-    from animan.services.animepahe_service import animepahe_service
-    from animan.services.extension_service import extension_service
+    from animelab.services.scraping_service import scraping_service
+    from animelab.services.voiranime_service import voiranime_service
+    from animelab.services.animepahe_service import animepahe_service
+    from animelab.services.extension_service import extension_service
     monkeypatch.setattr(scraping_service, "search_anime", mock_fm_search)
     monkeypatch.setattr(voiranime_service, "search_anime", mock_va_search)
     monkeypatch.setattr(animepahe_service, "search_anime", mock_ap_search)
@@ -258,7 +258,7 @@ def test_search_api_contextual_and_grouping(client, monkeypatch):
     assert data[0]["source"] == "voir-anime"
 
 def test_tachiyomi_detail_page_and_source_correction(client, monkeypatch):
-    from animan.models.anime import AnimeDetail, Episode
+    from animelab.models.anime import AnimeDetail, Episode
 
     async def mock_va_detail(url):
         return AnimeDetail(
@@ -274,7 +274,7 @@ def test_tachiyomi_detail_page_and_source_correction(client, monkeypatch):
             source="voir-anime"
         )
 
-    from animan.routers import anime as anime_router
+    from animelab.routers import anime as anime_router
     monkeypatch.setattr(anime_router.voiranime_service, "get_anime_detail", mock_va_detail)
 
     # User gave a VoirAnime URL with wrong source=french-manga

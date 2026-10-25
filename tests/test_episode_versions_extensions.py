@@ -1,12 +1,12 @@
 import json
 from unittest.mock import AsyncMock, MagicMock
 import pytest
-from animan.models.download_task import DownloadTask, DownloadStatus
-from animan.services.download_manager import download_manager as manager
-from animan.services.library_service import library_service
-from animan.services.extension_service import ExtensionService
-from animan.services.aniyomi_dex_parser import SourceRecipe, AniyomiDexParser
-from animan.services.aniyomi_container import AniyomiContainerSource
+from animelab.models.download_task import DownloadTask, DownloadStatus
+from animelab.services.download_manager import download_manager as manager
+from animelab.services.library_service import library_service
+from animelab.services.extension_service import ExtensionService
+from animelab.services.aniyomi_dex_parser import SourceRecipe, AniyomiDexParser
+from animelab.services.aniyomi_container import AniyomiContainerSource
 
 
 @pytest.fixture
@@ -117,7 +117,7 @@ async def test_repository_refresh_invalidates_changed_recipes_and_removes_stale(
     response = MagicMock()
     response.status_code = 200
     response.json.side_effect = lambda: rows
-    monkeypatch.setattr('animan.services.source_http.AsyncSourceClient.get', AsyncMock(return_value=response))
+    monkeypatch.setattr('animelab.services.source_http.AsyncSourceClient.get', AsyncMock(return_value=response))
     await service.import_repository('https://repo.example/index.min.json')
     first = service.get_visible_extensions()[0]
     await service.configure_extension(first['id'], {'base_url':'https://alpha.example','search_selector':'article'})
@@ -161,7 +161,7 @@ def test_repeated_requests_do_not_queue_same_episode_twice(isolated, monkeypatch
 async def test_source_http_blocks_redirect_to_private_host(isolated, monkeypatch, tmp_path):
     import httpx
     from curl_cffi.requests import Cookies
-    from animan.services.source_http import SourceHTTPService
+    from animelab.services.source_http import SourceHTTPService
     calls = []
     class FakeSession:
         def __init__(self, **kwargs): self.cookies = Cookies()
@@ -170,7 +170,7 @@ async def test_source_http_blocks_redirect_to_private_host(isolated, monkeypatch
             return httpx.Response(302, headers={'location':'http://127.0.0.1/admin'}, request=httpx.Request(method, url))
         def close(self): pass
     transport = SourceHTTPService(storage=tmp_path, session_factory=FakeSession)
-    monkeypatch.setattr('animan.services.aniyomi_container.source_http', transport)
+    monkeypatch.setattr('animelab.services.aniyomi_container.source_http', transport)
     source = AniyomiContainerSource(SourceRecipe(pkg='test', base_url='https://source.example'))
     try:
         with pytest.raises(ValueError, match='URL source non autorisée'):

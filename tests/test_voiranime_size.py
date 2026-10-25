@@ -4,9 +4,9 @@ from unittest.mock import patch, MagicMock, AsyncMock
 from fastapi.testclient import TestClient
 
 from run import app
-from animan.database import init_db
-from animan.services.voiranime_service import voiranime_service
-from animan.services.download_manager import download_manager, ResolvedVideoInfo
+from animelab.database import init_db
+from animelab.services.voiranime_service import voiranime_service
+from animelab.services.download_manager import download_manager, ResolvedVideoInfo
 
 init_db()
 client = TestClient(app)

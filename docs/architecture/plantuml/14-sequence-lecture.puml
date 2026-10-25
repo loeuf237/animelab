@@ -1,11 +1,11 @@
 @startuml
 !include theme.iuml
-' @source animan/routers/media.py:resolve_stream
-' @source animan/routers/media.py:stream_video
-' @source animan/routers/media.py:hls_proxy_playlist
-' @source animan/routers/library.py:mark_watched
-' @source animan/services/playback_service.py:PlaybackService.open
-' @source animan/services/playback_service.py:PlaybackService.save
+' @source animelab/routers/media.py:resolve_stream
+' @source animelab/routers/media.py:stream_video
+' @source animelab/routers/media.py:hls_proxy_playlist
+' @source animelab/routers/library.py:mark_watched
+' @source animelab/services/playback_service.py:PlaybackService.open
+' @source animelab/services/playback_service.py:PlaybackService.save
 title AnimeLab — lecture locale ou distante et progression
 autonumber
 actor Utilisateur as U
