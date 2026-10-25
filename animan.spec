@@ -16,6 +16,10 @@ datas = [(str(project / 'animan' / 'templates'), 'animan/templates'),
          (str(frontend), 'frontend/dist'),
          (str(project / 'LICENSE'), '.'),
          (str(project / 'NOTICE'), '.'),
+         (str(project / 'docs/branding/animelab.ico'), 'desktop-assets'),
+         (str(project / 'animan/desktop/panel.html'), 'animan/desktop'),
+         (str(project / 'animan/desktop/panel.js'), 'animan/desktop'),
+         (str(project / 'animan/desktop/panel.css'), 'animan/desktop'),
          (str(project / 'docs' / 'desktop-distribution.md'), '.')]
 datas += collect_data_files('webview') + collect_data_files('curl_cffi')
 metadata = project / 'build' / 'release-metadata'
