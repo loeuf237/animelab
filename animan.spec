@@ -16,11 +16,13 @@ datas = [(str(project / 'animan' / 'templates'), 'animan/templates'),
          (str(frontend), 'frontend/dist'),
          (str(project / 'LICENSE'), '.'),
          (str(project / 'NOTICE'), '.'),
+         (str(project / 'docs/licenses'), 'third-party-licenses/Qt'),
          (str(project / 'docs/branding/animelab.ico'), 'desktop-assets'),
          (str(project / 'animan/desktop/panel.html'), 'animan/desktop'),
          (str(project / 'animan/desktop/panel.js'), 'animan/desktop'),
          (str(project / 'animan/desktop/panel.css'), 'animan/desktop'),
          (str(project / 'docs' / 'desktop-distribution.md'), '.')]
+datas += collect_data_files('PySide6', includes=['*.json', 'Qt/translations/qtbase_fr.qm'])
 datas += collect_data_files('webview') + collect_data_files('curl_cffi')
 metadata = project / 'build' / 'release-metadata'
 if metadata.exists(): datas.append((str(metadata), 'release-metadata'))
@@ -31,7 +33,7 @@ for name in ('ffmpeg', 'ffprobe'):
     binaries.append((str(Path(source).resolve()), 'bin'))
 hiddenimports = ['uvicorn.logging', 'uvicorn.loops.auto', 'uvicorn.loops.asyncio',
     'uvicorn.protocols.http.h11_impl', 'uvicorn.protocols.websockets.websockets_impl',
-    'uvicorn.lifespan.on', 'sqlalchemy.dialects.sqlite', 'yt_dlp', '__cffi_backend']
+    'uvicorn.lifespan.on', 'sqlalchemy.dialects.sqlite', 'yt_dlp', '_cffi_backend', 'PySide6.QtWidgets']
 hiddenimports += collect_submodules('animan.services.extractors')
 hiddenimports += ['animan.services.recipe_runtime', 'animan.services.recipe_plans']
 if sys.platform == 'win32':
@@ -42,8 +44,11 @@ else:
     hiddenimports += ['webview.platforms.gtk']
 a = Analysis([str(project / 'desktop.py')], pathex=[str(project)], binaries=binaries,
     datas=datas, hiddenimports=hiddenimports,
-    excludes=['pytest', 'tkinter', 'matplotlib', 'numpy', 'pandas', 'scipy',
-              'PyQt5', 'PyQt6', 'PySide2', 'PySide6', 'cefpython3'], noarchive=False)
+    # Avoid copying every icon/theme installed on the build machine into releases.
+    hooksconfig={'gi': {'icons': ['Adwaita', 'hicolor'], 'themes': ['Adwaita'], 'languages': ['en', 'fr']}},
+    excludes=['pytest', 'matplotlib', 'numpy', 'pandas', 'scipy',
+              'PyQt5', 'PyQt6', 'PySide2', 'tkinter', 'webview.platforms.qt', 'PySide6.QtWebEngineCore',
+              'PySide6.QtWebEngineWidgets', 'PySide6.QtQml', 'PySide6.QtQuick', 'cefpython3'], noarchive=False)
 pyz = PYZ(a.pure)
 exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name='AnimeLab',
     icon=str(project / 'docs/branding/animelab.ico') if sys.platform == 'win32' else None,

@@ -63,6 +63,16 @@ def start_server(port):
     settings.PORT, settings.HOST = port, "127.0.0.1"
     settings.ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
     from run import app
+    if os.getenv('ANIMAN_DESKTOP_PREFERENCES'):
+        from contextlib import asynccontextmanager
+        from animan.desktop.options import apply_download_preferences
+        original_lifespan = app.router.lifespan_context
+        @asynccontextmanager
+        async def desktop_lifespan(application):
+            async with original_lifespan(application):
+                apply_download_preferences()
+                yield
+        app.router.lifespan_context = desktop_lifespan
     import uvicorn
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port,
         log_level="warning", log_config=None, access_log=False, timeout_graceful_shutdown=10))
@@ -102,6 +112,9 @@ def self_test():
                 response.raise_for_status()
                 assert response.json()["info"]["version"] == __version__
             import webview
+            from PySide6.QtCore import QLibraryInfo
+            if not Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.PluginsPath)).is_dir():
+                raise RuntimeError('Bundled Qt platform plugins are missing')
             from animan.services.extractors import extractor_registry
             import yt_dlp
             target = Path(directory) / "probe.mp4"
@@ -167,7 +180,9 @@ def run_engine(args, workdir):
                 time.sleep(.2)
         else:
             from animan.desktop.window import open_window
-            open_window(f'http://127.0.0.1:{args.port}/spa/', args.control_url, workdir)
+            from animan.desktop.state import load_config, state_directory
+            from animan.desktop.options import ui_path
+            open_window(f'http://127.0.0.1:{args.port}' + ui_path(load_config(state_directory())), args.control_url, workdir)
     finally:
         # Lifespan shutdown pauses/persists transfers on the server event loop.
         server.should_exit = True
@@ -183,7 +198,9 @@ def main():
     parser.add_argument("--version", action="version", version=__version__)
     parser.add_argument("--self-test", action="store_true", help="Offline packaged backend/frontend/media checks")
     parser.add_argument("--headless", action="store_true", help="Run without opening a window")
-    parser.add_argument('--admin', action='store_true', help='Open desktop administration in the browser')
+    parser.add_argument('--admin', '--launcher', dest='admin', action='store_true', help='Open the native tabbed desktop launcher')
+    parser.add_argument('--launch', action='store_true', help='Start the engine directly with saved settings')
+    parser.add_argument('--web-admin', action='store_true', help='Open the recovery administration page in a browser')
     parser.add_argument('--browser', action='store_true', help='Use the installed browser instead of a native window')
     parser.add_argument('--port', type=int, help='Local server port (1-65535); saved for future launches')
     commands = parser.add_mutually_exclusive_group()
@@ -192,6 +209,7 @@ def main():
     commands.add_argument('--diagnose', action='store_true', help='Export quick desktop diagnostics as JSON')
     parser.add_argument('--report-file', type=Path, help='Destination JSON for --status or --diagnose')
     parser.add_argument('--gui-self-test', action='store_true', help='Create, render and close a real native window')
+    parser.add_argument('--launcher-self-test', action='store_true', help='Render every native launcher tab and close')
     parser.add_argument('--worker', help=argparse.SUPPRESS)
     parser.add_argument('--control-url', help=argparse.SUPPRESS)
     args = parser.parse_args()
@@ -203,6 +221,16 @@ def main():
         from animan.desktop.window import open_window
         with tempfile.TemporaryDirectory(prefix='animelab-gui-check-') as temporary:
             open_window(workdir=Path(temporary), probe=True)
+        return
+    if args.launcher_self_test:
+        from animan.desktop.launcher import open_launcher
+        with tempfile.TemporaryDirectory(prefix='animelab-launcher-check-') as temporary:
+            directory = Path(temporary) / 'desktop'
+            directory.mkdir()
+            os.environ.update(ANIMAN_DB_PATH=str(Path(temporary) / 'library.sqlite3'),
+                              ANIMAN_CACHE_DIR=str(Path(temporary) / 'cache'),
+                              ANIMAN_DOWNLOAD_DIR=str(Path(temporary) / 'downloads'))
+            open_launcher(directory, probe=True)
         return
     from animan.desktop.state import InstanceLock, load_config, state_directory, valid_port, write_json
     from animan.desktop.control import remote_call, running_record
@@ -243,6 +271,22 @@ def main():
                 write_json(args.report_file, result)
         print(json.dumps(result, indent=2))
         return
+    if args.admin or not (args.launch or args.headless or args.browser or args.web_admin):
+        if args.port is not None:
+            from animan.desktop.launcher_model import LauncherModel
+            model = LauncherModel(directory)
+            try:
+                config = model.config()
+            except ValueError:
+                config = {'port': valid_port(args.port), 'browser': True}
+            model.save({**config, 'port': valid_port(args.port)})
+        try:
+            from animan.desktop.launcher import open_launcher
+            open_launcher(directory)
+            return
+        except Exception:
+            logger.exception('Native launcher unavailable; opening browser administration')
+            args.web_admin = True
     lock = InstanceLock(directory)
     if not lock.acquire():
         # Wait briefly if another launcher is still creating its control plane.
@@ -257,7 +301,7 @@ def main():
                     })
                 if not args.headless:
                     target = f"http://127.0.0.1:{record['port']}/#{record['token']}"
-                    webbrowser.open(target if args.admin or not status['ready'] else status['url'])
+                    webbrowser.open(target if args.web_admin or not status['ready'] else status['url'])
                 return
             except (OSError, ValueError):
                 time.sleep(.1)
@@ -276,7 +320,7 @@ def main():
             config['port'] = valid_port(int(os.environ['ANIMAN_PORT']))
         if args.browser:
             config['browser'] = True
-        Supervisor(directory, config, headless=args.headless, admin=args.admin).run()
+        Supervisor(directory, config, headless=args.headless, admin=args.web_admin).run()
     finally:
         lock.release()
 
@@ -286,7 +330,7 @@ if __name__ == "__main__":
         main()
     except Exception:
         logger.exception("AnimeLab failed to start or complete its package checks")
-        if sys.platform == 'win32' and not any(flag in sys.argv for flag in ('--worker', '--self-test', '--gui-self-test')):
+        if sys.platform == 'win32' and not any(flag in sys.argv for flag in ('--worker', '--self-test', '--gui-self-test', '--launcher-self-test')):
             import ctypes
             ctypes.windll.user32.MessageBoxW(None,
                 'AnimeLab could not start. Check ~/.animan/desktop/desktop.log in your user folder.\n'

@@ -104,3 +104,6 @@ android/wheels/
 frontend/test-results/
 frontend/playwright-report/
 artifacts/mobile-ui/
+
+# Local desktop launcher review captures
+artifacts/launcher-ui/

@@ -2,7 +2,7 @@
 from pathlib import Path
 import sys
 import threading
-import webbrowser
+import subprocess
 
 
 def window_icon():
@@ -51,7 +51,12 @@ def open_window(url=None, control_url=None, workdir=None, probe=False):
             window.destroy()
         threading.Thread(target=watch_stop, daemon=True).start()
 
-    menu = [Menu('AnimeLab', [MenuAction('Administration', lambda: webbrowser.open(control_url)),
+    def administration():
+        from .supervisor import launcher_command
+        kwargs = {'creationflags': subprocess.CREATE_NO_WINDOW} if sys.platform == 'win32' else {'start_new_session': True}
+        subprocess.Popen(launcher_command() + ['--launcher'], stdin=subprocess.DEVNULL,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **kwargs)
+    menu = [Menu('AnimeLab', [MenuAction('Administration', administration),
                              MenuAction('Quit / Quitter', window.destroy)])] if control_url else []
     from animan.services.browser_verification import browser_verification
     if not probe:
@@ -59,7 +64,7 @@ def open_window(url=None, control_url=None, workdir=None, probe=False):
             'AnimeLab — Site verification', target, width=900, height=700)
     try:
         webview.start(user_agent=USER_AGENT, icon=window_icon(), menu=menu,
-                      gui='edgechromium' if sys.platform == 'win32' else None)
+                      gui='edgechromium' if sys.platform == 'win32' else 'cocoa' if sys.platform == 'darwin' else 'gtk')
     finally:
         browser_verification.webview_opener = None
     if probe and (not marker.is_set() or not (workdir / 'loaded').exists()):

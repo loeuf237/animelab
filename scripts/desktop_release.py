@@ -69,6 +69,17 @@ def gui_check():
         if logfile.exists(): print(logfile.read_text(encoding='utf-8'))
 
 
+def launcher_check():
+    command = [sys.executable, str(ROOT / 'desktop.py')] if '--source' in sys.argv else [str(packaged_binary())]
+    logfile = ROOT / 'build/native-launcher-check.log'
+    logfile.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        subprocess.run(command + ['--launcher-self-test'], timeout=60, check=True,
+                       env={**os.environ, 'ANIMAN_LOG_FILE': str(logfile)})
+    finally:
+        if logfile.exists(): print(logfile.read_text(encoding='utf-8'))
+
+
 def check():
     binary = packaged_binary()
     logfile = ROOT / 'build' / 'packaged-self-test.log'
@@ -195,4 +206,5 @@ def checksums():
 
 
 if __name__ == '__main__':
-    {'prepare':prepare,'check':check,'gui-check':gui_check,'archive':archive,'checksums':checksums}[sys.argv[1]]()
+    {'prepare':prepare,'check':check,'gui-check':gui_check,'launcher-check':launcher_check,
+     'archive':archive,'checksums':checksums}[sys.argv[1]]()

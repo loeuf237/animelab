@@ -27,17 +27,21 @@ jobs:
           version: '0.13.1'
           python-version: '3.12'
           enable-cache: true
-      - run: uv sync --locked
+      - run: uv sync --locked --group desktop
       - name: Test desktop administration and launch regressions
-        run: uv run --locked python -m pytest tests/test_desktop_admin.py tests/test_release_tools.py -q
+        run: uv run --locked --group desktop python -m pytest tests/test_desktop_admin.py tests/test_native_launcher.py tests/test_release_tools.py -q
+      - name: Render all native launcher tabs
+        run: uv run --locked --group desktop python scripts/desktop_release.py launcher-check --source
       - name: Render and close a native Edge WebView2 window
-        run: uv run --locked --with pywebview==6.2.1 python scripts/desktop_release.py gui-check --source
+        run: uv run --locked --group desktop --with pywebview==6.2.1 python scripts/desktop_release.py gui-check --source
       - name: Preserve native window failure details
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: windows-launcher-checks
-          path: build/native-window-check.log
+          path: |
+            build/native-window-check.log
+            build/native-launcher-check.log
           if-no-files-found: ignore
           retention-days: 7
 
