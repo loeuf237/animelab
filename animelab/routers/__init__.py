@@ -15,4 +15,3 @@ __all__ = [
     "sources_router",
     "i18n_router",
 ]
-

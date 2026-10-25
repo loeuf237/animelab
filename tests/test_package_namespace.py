@@ -66,4 +66,3 @@ print(json.dumps({'database': str(settings.DATABASE_PATH), 'desktop': str(state_
     gradle = (ROOT / 'android/app/build.gradle.kts').read_text()
     assert 'applicationId = "com.animan.app"' in gradle
     assert 'extractPackages("animelab")' in gradle and 'include("animelab/**")' in gradle
-
