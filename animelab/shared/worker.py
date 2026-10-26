@@ -2,6 +2,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 import json
+import hashlib
 import os
 from pathlib import Path
 import socket
@@ -64,7 +65,8 @@ def main():
                 watchdog_service.stop()
                 await download_manager.shutdown()
             temporary = ready.with_suffix('.tmp')
-            temporary.write_text(json.dumps({'pid': os.getpid(), 'port': listener.getsockname()[1]}))
+            temporary.write_text(json.dumps({'pid': os.getpid(), 'port': listener.getsockname()[1],
+                                             'instance': hashlib.sha256(token.encode()).hexdigest()}))
             temporary.replace(ready)
             faulthandler.cancel_dump_traceback_later()
             startup_trace.close()

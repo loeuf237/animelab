@@ -1,5 +1,6 @@
 """Bounded, supervised engine processes with an independent HOME per account."""
 import asyncio
+import hashlib
 from dataclasses import dataclass
 import json
 import os
@@ -100,7 +101,9 @@ class Workers:
                         raise RuntimeError('Private engine failed to start; inspect its engine.log on the server')
                     try:
                         value = json.loads(ready.read_text())
-                        if value['pid'] == process.pid and 0 < value['port'] < 65536:
+                        # Windows venv redirectors may report a different child PID.
+                        # Match this launch's unique capability digest, not the wrapper PID.
+                        if value.get('instance') == hashlib.sha256(token.encode()).hexdigest() and 0 < value['port'] < 65536:
                             worker.port = value['port']
                             return worker
                     except (OSError, ValueError, KeyError, TypeError):

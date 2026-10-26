@@ -329,3 +329,33 @@ async def test_idle_sse_connection_closes_after_session_revocation(accounts):
             response = await asyncio.wait_for(task, timeout=5)
             assert response.status_code == 200
             assert closed
+
+
+@pytest.mark.asyncio
+async def test_worker_readiness_accepts_redirector_pid_but_rejects_other_launch(tmp_path, monkeypatch):
+    import hashlib
+    from animelab.shared import workers as module
+    pool = Workers(tmp_path, startup_timeout=0.3)
+    identity = uuid.uuid4().hex
+    stopped = []
+    async def stop(worker):
+        stopped.append(worker)
+        worker.process.stdin.close()
+    monkeypatch.setattr(pool, '_stop', stop)
+    valid = False
+    def start(command, **kwargs):
+        from io import BytesIO
+        home = Path(kwargs['env']['HOME'])
+        token = kwargs['env']['ANIMELAB_SHARED_WORKER_TOKEN']
+        value = dict(pid=9999, port=12345,
+                     instance=hashlib.sha256(token.encode()).hexdigest() if valid else 'stale launch')
+        (home / 'ready.json').write_text(json.dumps(value))
+        return SimpleNamespace(pid=1234, stdin=BytesIO(), poll=lambda: None)
+    monkeypatch.setattr(module.subprocess, 'Popen', start)
+    with pytest.raises(RuntimeError, match='startup timed out'):
+        await pool.get(identity)
+    assert len(stopped) == 1 and not pool.running
+    valid = True
+    worker = await pool.get(identity)
+    assert worker.port == 12345 and worker.process.pid != 9999
+    await pool.close()
