@@ -5,6 +5,7 @@ from email.utils import formatdate
 from http.cookies import SimpleCookie
 import json
 import os
+from animelab.environment import update_environment
 from pathlib import Path
 import time
 from urllib.parse import urlparse
@@ -13,10 +14,67 @@ _loop = None
 
 
 class VerificationWindow:
+    _seeds = {}
+
+    @classmethod
+    def seed_cookies(cls, url, cookies, bridge):
+        cls._seeds[url] = cookies
+        cls._write_cookies(url, cookies, bridge)
+
+    @staticmethod
+    def _write_cookies(url, cookies, bridge):
+        headers = []
+        for item in cookies:
+            jar = SimpleCookie()
+            jar[item["name"]] = item["value"]
+            cookie = jar[item["name"]]
+            cookie["path"] = item.get("path", "/")
+            if item.get("domain", "").startswith("."): cookie["domain"] = item["domain"]
+            cookie["secure"] = bool(item.get("secure"))
+            cookie["httponly"] = bool(item.get("httpOnly"))
+            if item.get('sameSite'): cookie['samesite'] = item['sameSite']
+            if item.get("expires"): cookie["expires"] = formatdate(item["expires"], usegmt=True)
+            headers.append(cookie.OutputString())
+        bridge.setCookies(url, json.dumps(headers))
+
     def __init__(self, url, bridge):
         self.url, self.bridge = url, bridge
+        self.metadata = {(item["domain"], item["path"], item["name"]): item for item in self._seeds.pop(url, [])}
         from animelab.services.source_http import USER_AGENT
         self.bridge.open(url, USER_AGENT)
+
+    def set_cookies(self, cookies):
+        self._write_cookies(self.url, cookies, self.bridge)
+        for item in cookies:
+            key = (item['domain'], item['path'], item['name'])
+            if item.get('expires') and item['expires'] <= time.time():
+                self.metadata.pop(key, None)
+            else:
+                self.metadata[key] = item
+
+    def get_cookie_records(self):
+        jar = SimpleCookie()
+        jar.load(str(self.bridge.cookies(self.url)))
+        result = []
+        for name, cookie in jar.items():
+            matches = [item for item in self.metadata.values() if item['name'] == name]
+            if len(matches) > 1:
+                # CookieManager omits domain/path: do not guess which duplicate
+                # was modified, or collapse distinct HTTP sessions into one.
+                result.extend(dict(item) for item in matches)
+                continue
+            previous = matches[0] if matches else None
+            item = dict(previous) if previous else {
+                'domain': urlparse(self.url).hostname,
+                'path': '/' if name in ('cf_clearance', '__cf_bm') else urlparse(self.url).path or '/',
+                'secure': urlparse(self.url).scheme == 'https', 'httpOnly': True,
+                'expires': time.time() + 3600}
+            if previous and previous.get('expires') and previous['expires'] <= time.time():
+                item['expires'] = time.time() + 3600
+            item.update(name=name, value=cookie.value)
+            self.metadata[(item['domain'], item['path'], name)] = item
+            result.append(item)
+        return result
 
     def get_cookies(self):
         jar = SimpleCookie()
@@ -36,7 +94,7 @@ class VerificationWindow:
 
 def start(data_dir, cache_dir, port, token, test_mode=False):
     global _loop
-    os.environ.update({
+    update_environment({
         # Shared engine cache also contains installed extensions and user proxy
         # lists. Android may evict cacheDir, so preserve this state in filesDir.
         "ANIMAN_DATA_DIR": data_dir, "ANIMAN_CACHE_DIR": str(Path(data_dir) / "engine-state"),
@@ -45,7 +103,7 @@ def start(data_dir, cache_dir, port, token, test_mode=False):
         "ANIMAN_HOST": "127.0.0.1", "ANIMAN_PORT": str(port),
     })
     if test_mode:
-        os.environ["ANIMAN_STARTUP_REFRESH"] = "false"
+        update_environment(ANIMAN_STARTUP_REFRESH="false")
     import tempfile
     tempfile.tempdir = cache_dir
     from java import jclass
@@ -62,7 +120,9 @@ def start(data_dir, cache_dir, port, token, test_mode=False):
     from animelab.services.download_manager import download_manager
     run.app.add_middleware(AndroidSessionMiddleware, token=token)
     run.browser_verification.platform = "android"
-    run.browser_verification.webview_opener = lambda url: VerificationWindow(url, verification)
+    opener = lambda url: VerificationWindow(url, verification)
+    opener.seed_cookies = lambda url, cookies: VerificationWindow.seed_cookies(url, cookies, verification)
+    run.browser_verification.webview_opener = opener
 
     def notify(task):
         active = [t for t in download_manager.get_all_tasks() if t.status in (

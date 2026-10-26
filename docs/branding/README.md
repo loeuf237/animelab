@@ -1,14 +1,14 @@
 # AnimeLab identity
 
-The owner selected **01 — Orbit A**, the violet and mint folded A with a play symbol, on 21 October 2026. The application and repository were previously called Animan.
+The current artwork was supplied by the owner on 26 October 2026. The original
+image is preserved unchanged as [animelab-logo-source.png](animelab-logo-source.png).
+It combines a flask, an anime illustration and the AnimeLab wordmark.
 
-| Concept | Original artwork | Decision |
-| --- | --- | --- |
-| 01 — Orbit A | [Violet and mint A](concepts/01-orbit-a.png) | Selected |
-| 02 — Fox | [Coral origami fox](concepts/02-fox.png) | Alternative retained |
-| 03 — Comet | [Cyan and cobalt comet](concepts/03-comet.png) | Alternative retained |
-
-Artwork was created with the built-in `image_gen` tool. Exact generation prompts and the selection are recorded in [prompts.json](prompts.json). The selected PNG is the canonical raster master; it is not an editable vector source. No font or character from an anime franchise is used as an app mascot.
+The full image is used for the README/wordmark. Launcher icons use only the flask
+region, with white padding and safe areas for Android adaptive and PWA maskable
+icons. This is a deterministic crop/resize of the supplied image; no generative
+redrawing is involved. The former A, fox and comet concepts remain in `concepts/`
+as historical proposals, and are no longer the icon-generation source.
 
 To regenerate the derived assets, install Pillow (`python -m pip install 'Pillow>=10,<13'`) and run `python scripts/branding.py`. The script creates:
 
@@ -24,6 +24,6 @@ The Vue navigation imports `frontend/src/assets/brand-icon.png`, so Vite generat
 
 The displayed product name is **AnimeLab**. The repository is `loeuf237/animelab`. New binary packages use `AnimeLab` filenames. Historical release assets and validation evidence keep their original filenames.
 
-The following existing identifiers deliberately remain stable: Python imports from `animan`, environment settings `ANIMAN_*`, API/session headers, browser preferences/cookies, `.animan` data directory, `Downloads/Animan`, Android application ID and Kotlin namespace `com.animan.app`, MediaStore export registry and document-provider grants, and Android signing identity. Changing these would require a separate migration and could otherwise disconnect existing libraries or prevent an APK update. The local checkout may keep its current directory name.
+The Python import namespace is now `animelab`. New desktop downloads and Android shared exports use `Downloads/AnimeLab`; existing files are not moved, and explicitly chosen folders remain selected. The following existing identifiers deliberately remain stable: legacy environment settings `ANIMAN_*` (with `ANIMELAB_*` preferred), API/session headers, language/session cookies, `.animan` data directory, Android application ID and Kotlin namespace `com.animan.app`, MediaStore export registry and document-provider grants, and Android signing identity. Changing these would require a separate migration and could otherwise disconnect existing libraries or prevent an APK update. The local checkout may keep its current directory name. See [the inventory and migration options](../legacy-identifiers.md).
 
-The service worker cache revision changes with the branding update so installed web clients can refresh their assets. Branding changes take effect in Android and desktop packages when those packages are rebuilt; they do not modify already published APKs.
+The generated branding URLs change with the artwork digest so installed web clients can refresh their assets. Branding changes take effect in Android and desktop packages when those packages are rebuilt; they do not modify already published APKs.

@@ -22,9 +22,11 @@ Existing installation state remains compatible:
 
 - Environment variables retain the `ANIMAN_` prefix, including the existing
   `ANIMAN_RELOAD` behavior.
-- User files remain in `~/.animan`, `db/animan.sqlite3` and `Downloads/Animan`
-  unless configured otherwise. Library schemas and saved download paths do not
-  change as part of this refactor.
+- Private application state remains in `~/.animan` and `db/animan.sqlite3`.
+  New desktop downloads default to `~/Downloads/AnimeLab`; Android publishes new
+  exports to `Downloads/AnimeLab` (or `Movies/AnimeLab` for subtitle providers
+  requiring that collection). Existing task paths, export URIs and explicitly
+  chosen destinations are preserved; old files are not moved or duplicated.
 - Android keeps `com.animan.app` (including JNI bridge class names), its signing
   identity and existing storage grants. The macOS bundle identifier also stays
   unchanged.
@@ -33,3 +35,5 @@ Existing installation state remains compatible:
 These identifiers are persisted compatibility contracts, not Python package
 names. Renaming them independently would require a dedicated data/installation
 migration.
+
+See [the remaining legacy identifiers and migration options](legacy-identifiers.md).

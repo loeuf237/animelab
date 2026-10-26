@@ -7,21 +7,40 @@ from pathlib import Path
 import hashlib
 import json
 import re
-from PIL import Image
+from PIL import Image, ImageOps
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "docs/branding/concepts/01-orbit-a.png"
+SOURCE = ROOT / "docs/branding/animelab-logo-source.png"
 
 
 def generate():
     with Image.open(SOURCE) as image:
-        master = image.convert("RGBA")
-    if master.width != master.height:
+        artwork = image.convert("RGBA")
+    if artwork.width != artwork.height:
         raise ValueError("App icon master must be square")
+    # Keep the supplied full artwork intact. Small app icons use its flask,
+    # without the wordmark, so the mark stays legible at launcher/favicon sizes.
+    width, height = artwork.size
+    flask = artwork.crop((round(width * .24), round(height * .035),
+                          round(width * .76), round(height * .766)))
+    master = Image.new("RGBA", (1024, 1024), "white")
+    flask = ImageOps.contain(flask, (880, 880), Image.Resampling.LANCZOS)
+    master.alpha_composite(flask, ((1024 - flask.width) // 2, (1024 - flask.height) // 2))
+    artwork.save(ROOT / 'docs/branding/animelab-wordmark.png')
 
     def save(path, size, **options):
         path.parent.mkdir(parents=True, exist_ok=True)
-        icon = master.resize((size, size), Image.Resampling.LANCZOS)
+        source = master
+        if path.name == 'icon-maskable.png':
+            source = Image.new('RGBA', (1024, 1024), 'white')
+            safe = master.resize((820, 820), Image.Resampling.LANCZOS)
+            source.alpha_composite(safe, (102, 102))
+        # Adaptive launchers crop the outer 108dp layer to a 72dp safe area.
+        if path.name == 'ic_launcher_foreground.png':
+            source = Image.new('RGBA', (1024, 1024), (255, 255, 255, 0))
+            safe = master.resize((682, 682), Image.Resampling.LANCZOS)
+            source.alpha_composite(safe, (171, 171))
+        icon = source.resize((size, size), Image.Resampling.LANCZOS)
         if path.suffix == ".jpg":
             icon = icon.convert("RGB")
         icon.save(path, **options)
@@ -74,7 +93,7 @@ def generate():
                         '</adaptive-icon>\n')
     colors = res / "values/launcher_colors.xml"
     colors.write_text('<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
-                      '    <color name="launcher_background">#060B33</color>\n</resources>\n')
+                      '    <color name="launcher_background">#FFFFFF</color>\n</resources>\n')
     save(ROOT / "docs/branding/animelab.ico", 256,
          sizes=[(s, s) for s in (16, 24, 32, 48, 64, 128, 256)])
     save(ROOT / "docs/branding/animelab.icns", 1024)

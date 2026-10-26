@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, watch, onScopeDispose } from 'vue'
 import { api, ApiError } from '@/api/client'
 import type { NetworkSession, NetworkOptions, VerificationMode, VerificationJob } from '@/types/api'
 import type { SourceChallenge } from '@/types'
@@ -88,22 +88,61 @@ export const useVerificationStore = defineStore('verification', () => {
       busy.value = false
     }
   }
+  let timer: ReturnType<typeof setTimeout> | null = null
+  async function verified(result: { domain: string; resumed?: number }) {
+    job.value = null
+    const retries = [...pending.entries()].filter(([, request]) =>
+      request.domains.has(result.domain),
+    )
+    for (const [key] of retries) pending.delete(key)
+    await Promise.allSettled(retries.map(([, request]) => request.retry()))
+    notice.value = retries.length
+      ? 'Accès vérifié. La recherche ou le catalogue a été actualisé.'
+      : `Accès vérifié. ${result.resumed || 0} téléchargement(s) repris.`
+    await refresh()
+  }
+  async function poll(id: string) {
+    if (job.value?.id !== id) return
+    if (!busy.value) {
+      try {
+        const result = await api.getVerificationStatus(id)
+        if (job.value?.id !== id) return
+        if (result.status === 'completed') {
+          busy.value = true
+          try {
+            await verified(result)
+          } finally {
+            busy.value = false
+          }
+          return
+        }
+      } catch (exc) {
+        if (exc instanceof ApiError && exc.status === 404 && job.value?.id === id) job.value = null
+      }
+    }
+    if (job.value?.id === id)
+      timer = setTimeout(() => {
+        void poll(id)
+      }, 2000)
+  }
+  watch(job, (value) => {
+    if (timer) clearTimeout(timer)
+    timer = value
+      ? setTimeout(() => {
+          void poll(value.id)
+        }, 1000)
+      : null
+  })
+  onScopeDispose(() => {
+    if (timer) clearTimeout(timer)
+  })
   async function complete() {
     if (!job.value || busy.value) return
     busy.value = true
     error.value = ''
     try {
       const result = await api.completeNetworkVerification(job.value.id)
-      job.value = null
-      const retries = [...pending.entries()].filter(([, request]) =>
-        request.domains.has(result.domain),
-      )
-      for (const [key] of retries) pending.delete(key)
-      await Promise.allSettled(retries.map(([, request]) => request.retry()))
-      notice.value = retries.length
-        ? 'Accès vérifié. La recherche ou le catalogue a été actualisé.'
-        : `Accès vérifié. ${result.resumed} téléchargement(s) repris.`
-      await refresh()
+      await verified(result)
     } catch (exc) {
       error.value = exc instanceof Error ? exc.message : 'Le site demande encore une vérification.'
       if (

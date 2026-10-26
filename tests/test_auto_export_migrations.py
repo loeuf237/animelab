@@ -29,7 +29,7 @@ def exports(monkeypatch, tmp_path):
     manager = DownloadManagerService()
     monkeypatch.setattr(manager, "broadcast_update", lambda task: None)
     monkeypatch.setattr(manager, "_trigger_process_queue", lambda: None)
-    monkeypatch.setattr(platform_events, "storage_status_handler", lambda: {"authorized": True, "destination": "Downloads/Animan"})
+    monkeypatch.setattr(platform_events, "storage_status_handler", lambda: {"authorized": True, "destination": "Downloads/AnimeLab"})
     monkeypatch.setattr(platform_events, "completed_handler", None)
     monkeypatch.setattr(verification_service, "verify_file", lambda **kwargs: VerificationResult(valid=True, status="VALID"))
     source = tmp_path / "private.mp4"
@@ -61,7 +61,7 @@ async def test_failed_export_is_independent_persistent_and_retryable_offline(exp
     def copy_local(task):
         from pathlib import Path
         public.write_bytes(Path(task.savePath).read_bytes())
-        return {"uris": ["content://downloads/7"], "destination": "Downloads/Animan"}
+        return {"uris": ["content://downloads/7"], "destination": "Downloads/AnimeLab"}
     monkeypatch.setattr(platform_events, "completed_handler", copy_local)
     # A retry operates only on the existing private file.
     from animelab.services.source_http import source_http
@@ -71,7 +71,7 @@ async def test_failed_export_is_independent_persistent_and_retryable_offline(exp
     assert again.exportStatus == ExportStatus.EXPORTED and again.exportError is None
     assert again.exportAttempts == 2 and again.exportedAt
     assert again.to_dict()["exportUris"] == ["content://downloads/7"]
-    assert library_service.get_task_entity(task.id).to_task().exportDestination == "Downloads/Animan"
+    assert library_service.get_task_entity(task.id).to_task().exportDestination == "Downloads/AnimeLab"
 
 
 @pytest.mark.asyncio
@@ -98,7 +98,7 @@ async def test_two_simultaneous_exports_do_not_start_two_native_copies(exports, 
     def blocked(task):
         started.set()
         assert finish.wait(5)
-        return {"uris": ["content://downloads/8"], "destination": "Downloads/Animan"}
+        return {"uris": ["content://downloads/8"], "destination": "Downloads/AnimeLab"}
     monkeypatch.setattr(platform_events, "completed_handler", blocked)
     first = asyncio.create_task(manager.export_task(task, manual=True))
     try:

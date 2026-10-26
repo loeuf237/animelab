@@ -8,6 +8,7 @@ import copy
 import hashlib
 import json
 import os
+from animelab.environment import getenv
 import threading
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -437,7 +438,7 @@ class SourceHTTPService:
     def timeout(value):
         if isinstance(value, httpx.Timeout):
             return (value.connect or 15.0, value.read or 300.0)
-        if os.getenv('ANIMAN_DESKTOP_PREFERENCES') and isinstance(value, (int, float)):
+        if getenv('ANIMAN_DESKTOP_PREFERENCES') and isinstance(value, (int, float)):
             from animelab.config import settings
             return (settings.CONNECTION_TIMEOUT, value)
         return value
@@ -460,9 +461,13 @@ class SourceHTTPService:
                 expires = item.get("expires")
                 if expires and expires > 0 and expires <= time.time():
                     continue
-                state.cookies.set_cookie(self.cookie(domain, item["name"], item["value"],
-                                                     item.get("path", "/"), item.get("secure", True),
-                                                     int(expires) if expires and expires > 0 else None))
+                cookie = self.cookie(domain, item["name"], item["value"],
+                                     item.get("path", "/"), item.get("secure", True),
+                                     int(expires) if expires and expires > 0 else None)
+                if item.get('httpOnly'): cookie.set_nonstandard_attr('HttpOnly', None)
+                if item.get('sameSite') in ('Strict', 'Lax', 'None'):
+                    cookie.set_nonstandard_attr('SameSite', item['sameSite'])
+                state.cookies.set_cookie(cookie)
             state.generation += 1
             self._save(state)
             return state.generation

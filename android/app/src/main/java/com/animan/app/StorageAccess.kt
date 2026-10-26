@@ -14,6 +14,8 @@ import org.json.JSONObject
 
 /** Storage grants belong to the document provider, not to filesystem paths. */
 object StorageAccess {
+    const val MEDIA_DIRECTORY = "AnimeLab"
+    const val DEFAULT_DESTINATION = "Downloads/AnimeLab"
     private val preferences get() = EngineHost.context.getSharedPreferences("animan_storage", Context.MODE_PRIVATE)
     @Volatile var selectionPending = false
     @Volatile var actionHandler: ((String) -> Unit)? = null
@@ -64,7 +66,7 @@ object StorageAccess {
         val context = EngineHost.context
         return JSONObject().put("android", true).put("apiLevel", Build.VERSION.SDK_INT)
             .put("mode", if (uri == null) "downloads" else "directory")
-            .put("destination", if (uri == null) "Downloads/Animan" else preferences.getString("tree_name", ""))
+            .put("destination", if (uri == null) DEFAULT_DESTINATION else preferences.getString("tree_name", ""))
             .put("subtitleDestination", if (uri == null) preferences.getString("subtitle_destination", null) ?: JSONObject.NULL else JSONObject.NULL)
             .put("authorized", allowed).put("selectionPending", selectionPending)
             .put("notificationsGranted", NotificationManagerCompat.from(context).areNotificationsEnabled() &&

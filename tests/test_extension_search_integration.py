@@ -76,14 +76,18 @@ async def test_animesama_html_search_parsing():
     </html>
     """
 
-    with patch.object(source, "_fetch_html", new_callable=AsyncMock) as mock_fetch:
-        mock_fetch.return_value = mock_html
+    async def fetch(url, **kwargs):
+        if '/catalogue/?' in url:
+            return mock_html
+        title = 'Naruto' if '/naruto/' in url else 'Boruto'
+        return f'<h1>{title}</h1><script>panneauAnime("Saison 1", "saison1/vostfr");</script>'
+    with patch.object(source, "_fetch_html", side_effect=fetch):
         results = await source.search_anime("naruto")
 
     assert len(results) == 2
-    assert results[0].title == "Naruto"
-    assert results[0].url == "https://anime-sama.to/catalogue/naruto/"
-    assert results[1].title == "Boruto"
+    assert results[0].title == "Naruto — Saison 1"
+    assert results[0].url == "https://anime-sama.to/catalogue/naruto/saison1/vostfr"
+    assert results[1].title == "Boruto — Saison 1"
 
 
 @pytest.mark.asyncio

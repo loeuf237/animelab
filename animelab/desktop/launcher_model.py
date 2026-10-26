@@ -2,6 +2,7 @@
 import json
 from contextlib import closing
 import os
+from animelab.environment import getenv
 from pathlib import Path
 import shutil
 import socket
@@ -27,7 +28,7 @@ class LauncherModel:
         if not (self.directory / 'config.json').exists():
             data['browser'] = True
         if 'launcher' not in data:
-            path = Path(os.getenv('ANIMAN_DB_PATH', str(self.directory.parent / 'db/animan.sqlite3')))
+            path = Path(getenv('ANIMAN_DB_PATH', str(self.directory.parent / 'db/animan.sqlite3')))
             if path.is_file():
                 try:
                     with closing(sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True, timeout=1)) as db:
@@ -189,10 +190,10 @@ class LauncherModel:
         # here, so editing preferences cannot initialize the user's database.
         return {
             'data': self.directory.parent,
-            'database': Path(os.getenv('ANIMAN_DB_PATH', str(self.directory.parent / 'db/animan.sqlite3'))),
-            'cache': Path(os.getenv('ANIMAN_CACHE_DIR', str(self.directory.parent / 'cache'))),
-            'downloads': Path(preferences(config)['downloadDir'] or os.getenv('ANIMAN_DOWNLOAD_DIR',
-                str(Path.home() / 'Downloads/Animan'))).expanduser(),
+            'database': Path(getenv('ANIMAN_DB_PATH', str(self.directory.parent / 'db/animan.sqlite3'))),
+            'cache': Path(getenv('ANIMAN_CACHE_DIR', str(self.directory.parent / 'cache'))),
+            'downloads': Path(preferences(config)['downloadDir'] or getenv('ANIMAN_DOWNLOAD_DIR',
+                str(Path.home() / 'Downloads/AnimeLab'))).expanduser(),
             'logs': self.directory,
         }
 

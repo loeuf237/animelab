@@ -28,7 +28,7 @@ opt choix d'un dossier personnalisé
   Storage --> UI : authorized=true ; destination
 end
 note over Storage,Grant
-Mode par défaut Downloads/Animan : MediaStore, sans
+Mode par défaut Downloads/AnimeLab : MediaStore, sans
 permission globale de stockage sur Android 10+.
 Une permission de dossier révoquée doit être redemandée.
 end note

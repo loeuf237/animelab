@@ -14,7 +14,7 @@ from animelab.services.scraping_service import scraping_service
 from animelab.services.voiranime_service import voiranime_service
 from animelab.services.animepahe_service import animepahe_service
 from animelab.services.extension_service import extension_service
-from animelab.services.aniyomi_container import _safe_select, _safe_select_one
+from animelab.services.aniyomi_container import _safe_select, _safe_select_one, _item_title
 
 
 class CatalogueError(ValueError):
@@ -216,8 +216,8 @@ class SourceCatalogueService:
             if any(part in href for part in (recipe.runtime.get('exclude_urls', []) if recipe else [])): continue
             if href in seen or urlparse(href).scheme not in ('http', 'https'): continue
             image = _safe_select_one(card, (recipe.item_thumb_selector if recipe else '') or 'img')
-            title_el = _safe_select_one(card, (recipe.item_title_selector if recipe else '') or 'h2, h3, h4, .title, .movie-title')
-            title = (title_el.get_text(' ', strip=True) if title_el else '') or link.get('title') or (image.get('alt') if image else '') or link.get_text(' ', strip=True)
+            title = _item_title(card, link, (recipe.item_title_selector if recipe else '') or
+                                'h2, h3, h4, .title, .movie-title', image)
             if not title: continue
             seen.add(href)
             raw_image = (image.get('data-src') or image.get('data-lazy-src') or image.get('src') or '') if image else ''
@@ -415,7 +415,7 @@ class SourceCatalogueService:
                 else:
                     selector = recipe.search_selector if mode == 'search' else recipe.latest_selector if mode == 'latest' else recipe.popular_selector
                 next_selector = recipe.search_next_selector if mode == 'search' else recipe.latest_next_selector if mode == 'latest' else recipe.popular_next_selector
-                items = self.parse_generic(html, url, service, selector)
+                items = await service.data_runtime.expand_listing(self.parse_generic(html, url, service, selector))
                 if query and selected and not any(t.get('param') for t in selected):
                     items = [i for i in items if query.casefold() in i.title.casefold()]
         page_query = bool(query and source_id != 'voir-anime' and not api_catalogue and (selected or mode != 'search') and not any(t.get('param') for t in selected))

@@ -1040,6 +1040,8 @@ class DownloadManagerService:
         return False
 
     def resume_verified_domain(self, domain: str) -> int:
+        if os.getenv('ANIMELAB_SHARED_WORKER') == '1' and os.getenv('ANIMELAB_SHARED_DOWNLOAD') != '1':
+            return 0
         ids = [task.id for task in self.tasks.values()
                if task.status == DownloadStatus.VERIFICATION_REQUIRED
                and urlparse(task.verificationUrl or "").hostname == domain]

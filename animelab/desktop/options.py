@@ -1,6 +1,7 @@
 """Validated native-launcher preferences and their engine startup mapping."""
 import math
 import os
+from animelab.environment import getenv, with_aliases
 from pathlib import Path
 
 from .state import valid_port
@@ -10,7 +11,7 @@ DEFAULTS = {
     'maxConcurrentDownloads': 3, 'globalSpeedLimit': 0, 'plexOrganization': False,
     'mediaWorkers': 1, 'connectTimeout': 15.0, 'readTimeout': 30.0,
     'authMode': 'none', 'authSessionHours': 12, 'authIdleMinutes': 30,
-    'authMaxEngines': 4,
+    'authMaxEngines': 4, 'chromiumPath': '', 'chromiumHeadless': False,
 }
 PAGES = {'home': '', 'downloads': 'downloads', 'library': 'library', 'sources': 'sources',
          'extensions': 'extensions', 'settings': 'settings'}
@@ -25,7 +26,7 @@ def normalize_config(data):
     if not isinstance(values, dict) or set(values) - DEFAULTS.keys():
         raise ValueError('Invalid launcher preferences')
     options = {**DEFAULTS, **values}
-    for name in ('openUi', 'plexOrganization'):
+    for name in ('openUi', 'plexOrganization', 'chromiumHeadless'):
         if type(options[name]) is not bool: raise ValueError('Invalid boolean preference: ' + name)
     for name, maximum in [('maxConcurrentDownloads', 32), ('mediaWorkers', 8), ('globalSpeedLimit', 1_000_000_000)]:
         value = options[name]
@@ -46,6 +47,14 @@ def normalize_config(data):
     if (not isinstance(options['startPage'], str) or options['startPage'] not in PAGES
             or options['language'] not in ('auto', 'fr', 'en')):
         raise ValueError('Invalid language or initial page')
+    from animelab.browser_settings import executable
+    browser_path = options['chromiumPath']
+    if (not isinstance(browser_path, str) or len(browser_path) > 4096 or
+            any(c in browser_path for c in '\x00\r\n')):
+        raise ValueError('Invalid Chromium executable path')
+    # Keep the launcher usable if a previously selected browser was uninstalled.
+    if browser_path and not Path(browser_path).expanduser().is_absolute():
+        options['chromiumPath'] = executable(browser_path)
     path = options['downloadDir']
     if not isinstance(path, str) or '\x00' in path or '\n' in path or len(path) > 4096:
         raise ValueError('Invalid download directory')
@@ -77,6 +86,10 @@ def engine_environment(config, directory=None):
            'ANIMAN_MEDIA_WORKERS': str(values['mediaWorkers']),
            'ANIMAN_DESKTOP_PREFERENCES': json.dumps({key: values[key] for key in
                ('maxConcurrentDownloads', 'globalSpeedLimit', 'plexOrganization')})}
+    if values['chromiumPath']:
+        env['ANIMELAB_CHROMIUM_PATH'] = values['chromiumPath']
+    if values['chromiumPath'] or values['chromiumHeadless']:
+        env['ANIMELAB_CHROMIUM_HEADLESS'] = str(values['chromiumHeadless']).lower()
     env['ANIMELAB_DESKTOP_AUTH'] = ''
     if values['authMode'] == 'accounts':
         if directory is None:
@@ -89,12 +102,12 @@ def engine_environment(config, directory=None):
         env['ANIMAN_DOWNLOAD_DIR'] = str(Path(values['downloadDir']).expanduser())
     if values['language'] != 'auto':
         env['ANIMAN_LANGUAGE'] = values['language']
-    return env
+    return with_aliases(env)
 
 
 def apply_download_preferences():
     import json
-    data = os.environ.get('ANIMAN_DESKTOP_PREFERENCES')
+    data = getenv('ANIMAN_DESKTOP_PREFERENCES')
     if data:
         values = json.loads(data)
         from animelab.services.download_manager import download_manager

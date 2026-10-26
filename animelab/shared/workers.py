@@ -4,6 +4,7 @@ import hashlib
 from dataclasses import dataclass
 import json
 import os
+from animelab.environment import with_aliases
 from pathlib import Path
 import re
 import secrets
@@ -40,6 +41,7 @@ class Workers:
         env = {key: os.environ[key] for key in (
             'PATH', 'SYSTEMROOT', 'WINDIR', 'COMSPEC', 'LANG', 'LC_ALL',
             'SSL_CERT_FILE', 'SSL_CERT_DIR', 'LD_LIBRARY_PATH',
+            'ANIMELAB_CHROMIUM_PATH', 'ANIMELAB_CHROMIUM_HEADLESS',
         ) if key in os.environ}
         for folder in (home, home / 'tmp', home / '.animan' / 'db', home / 'downloads'):
             folder.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -56,7 +58,7 @@ class Workers:
             'ANIMELAB_SHARED_WORKER_TOKEN': token, 'ANIMELAB_SHARED_WORKER': '1',
             'PYTHONDONTWRITEBYTECODE': '1', 'PYTHONUNBUFFERED': '1',
         })
-        return env
+        return with_aliases(env)
 
     async def get(self, user_id, *, allow_download=True, authorize=None):
         async with self.lock:
@@ -169,7 +171,8 @@ class WorkerBoundary:
             return await JSONResponse({'error': 'Authentication required'}, status_code=401)(scope, receive, send)
         # A remote account must never launch a browser or an OS storage picker on the host.
         path = scope['path']
-        blocked = path.startswith(('/api/network/verification', '/api/system/android'))
+        headless = os.getenv('ANIMELAB_CHROMIUM_HEADLESS', '').lower() in ('1', 'true', 'yes')
+        blocked = path.startswith('/api/system/android') or (path.startswith('/api/network/verification') and not headless)
         if blocked:
             return await JSONResponse({'error': 'Host device actions are unavailable on a shared server'}, status_code=403)(scope, receive, send)
         return await self.app(scope, receive, send)

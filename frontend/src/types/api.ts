@@ -96,6 +96,7 @@ export interface VerificationCapability {
   id: VerificationMode | 'manual'
   available: boolean
   capturesCookies: boolean
+  headless?: boolean
   reason:
     | 'client_remote'
     | 'android_webview'

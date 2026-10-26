@@ -111,3 +111,28 @@ test('verification retries only the latest still-active searches and retains can
   await store.complete()
   assert.deepEqual(called, ['new'])
 })
+
+test('automatic verification completion refreshes pending searches without a manual click', async () => {
+  setActivePinia(createPinia())
+  const store = useVerificationStore()
+  const calls = []
+  fake.getNetworkSessions = async () => ({
+    sessions: [],
+    browsers: [],
+    modes: [],
+    webviewAvailable: false,
+  })
+  fake.getVerificationStatus = async () => ({
+    status: 'completed',
+    domain: 'source.example',
+    resumed: 2,
+  })
+  store.waitForVerification('auto-search', [{ domain: 'source.example' }], async () => {
+    calls.push('retry')
+  })
+  store.job = { id: 'automatic', domain: 'source.example', mode: 'browser' }
+  await new Promise((resolve) => setTimeout(resolve, 1300))
+  assert.deepEqual(calls, ['retry'])
+  assert.equal(store.job, null)
+  store.$dispose()
+})

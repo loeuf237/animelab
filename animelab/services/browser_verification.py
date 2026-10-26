@@ -15,11 +15,16 @@ import websockets
 from animelab.services.verification_platform import ChromiumVerification, WebViewVerification
 from animelab.security import is_safe_url
 from animelab.services.source_http import source_http, VerificationRequired
+from animelab.browser_settings import verification_settings, executable
+from animelab.services.verification_cookies import snapshot, merge
 
 
 class BrowserVerificationService:
-    def __init__(self, transport=source_http):
+    def __init__(self, transport=source_http, configuration=None):
         self.transport = transport
+        self.configuration = configuration or verification_settings
+        self.completed = {}
+        self.verified_callback = None
         self.jobs = {}
         self.webview_opener = None
         self.platform = "desktop"
@@ -37,6 +42,10 @@ class BrowserVerificationService:
         candidates += ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
                        "/Applications/Chromium.app/Contents/MacOS/Chromium",
                        "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"]
+        configured = self.configuration.snapshot()['chromiumPath']
+        if configured:
+            try: candidates = [executable(configured)]
+            except ValueError: candidates = []
         found = []
         for candidate in candidates:
             path = shutil.which(candidate)
@@ -44,24 +53,29 @@ class BrowserVerificationService:
                 found.append({"name": Path(candidate).name, "path": path})
         return found
 
+    def remote_headless(self):
+        return (os.getenv('ANIMELAB_SHARED_WORKER') == '1' and self.platform == 'desktop'
+                and self.configuration.snapshot()['headless'])
+
     def modes(self, state=None, *, client_local=True):
         proxy = state.proxy if state else None
         authenticated = bool(proxy and (urlparse(proxy).username or urlparse(proxy).password))
-        graphical = os.name == "nt" or sys.platform == "darwin" or bool(os.getenv("DISPLAY") or os.getenv("WAYLAND_DISPLAY"))
-        browser_reason = ("client_remote" if not client_local else "android_webview" if self.platform == "android"
+        graphical = os.name == "nt" or sys.platform == "darwin" or bool(os.getenv("DISPLAY") or os.getenv("WAYLAND_DISPLAY")) or self.configuration.snapshot()["headless"]
+        browser_reason = ("client_remote" if not client_local and not self.remote_headless() else "android_webview" if self.platform == "android"
                           else "no_display" if not graphical else "no_browser" if not self.installed_browsers()
                           else "authenticated_proxy" if authenticated else None)
         webview_reason = ("client_remote" if not client_local else "no_webview" if self.webview_opener is None
                           else "webview_proxy" if proxy else None)
         return [{"id": "manual", "available": True, "capturesCookies": False, "reason": None},
-                {"id": "browser", "available": browser_reason is None, "capturesCookies": True, "reason": browser_reason},
+                {"id": "browser", "available": browser_reason is None, "capturesCookies": True, "reason": browser_reason,
+                 "headless": self.configuration.snapshot()["headless"]},
                 {"id": "webview", "available": webview_reason is None, "capturesCookies": True, "reason": webview_reason}]
 
     def options(self, *, client_local=True):
         sessions = self.transport.diagnostics()
         for session in sessions:
             session["modes"] = self.modes(self.transport.state("https://" + session["domain"]), client_local=client_local)
-        return {"browsers": [{"name": b["name"]} for b in self.installed_browsers()] if client_local else [],
+        return {"browsers": [{"name": b["name"]} for b in self.installed_browsers()] if client_local or self.remote_headless() else [],
                 "webviewAvailable": client_local and self.webview_opener is not None,
                 "platform": self.platform, "clientLocal": client_local,
                 "modes": self.modes(client_local=client_local), "sessions": sessions}
@@ -94,11 +108,18 @@ class BrowserVerificationService:
             mechanism = self.mechanisms[mode]
             job["routeProxy"] = state.proxy
             job["routeGeneration"] = state.generation
-            await mechanism.open(self, job, state, browser)
+            initial = snapshot(self.transport, url, visible_only=mode == "webview")
+            job['engineCookies'], job['browserCookies'] = initial, initial
+            try:
+                await mechanism.open(self, job, state, browser)
+            except BaseException:
+                await mechanism.close(job)
+                raise
             if (job["routeProxy"], job["routeGeneration"]) != (state.proxy, state.generation):
                 await mechanism.close(job)
                 from animelab.api_errors import APIProblem
                 raise APIProblem("verification_route_changed", status=409, category="protection", action="verify")
+            job["needsProbe"] = True
             self.jobs[job["id"]] = job
             return {"id": job["id"], "domain": domain, "mode": mode}
 
@@ -107,7 +128,7 @@ class BrowserVerificationService:
         if process.poll() is not None:
             raise ValueError("Le navigateur de vérification a été fermé")
         lines = []
-        for _ in range(40):
+        for _ in range(int(job.get("cdpStartTimeout", 4) * 10)):
             try:
                 lines = job["port_file"].read_text().splitlines()
                 if len(lines) >= 2:
@@ -130,8 +151,39 @@ class BrowserVerificationService:
                             raise ValueError("Impossible de lire les cookies du navigateur")
                         return message.get("result", {})
 
+    def status(self, job_id):
+        if job_id in self.completed:
+            return {'status': 'completed', **self.completed[job_id]['result']}
+        job = self.jobs.get(job_id)
+        if not job:
+            raise ValueError('Vérification expirée ou introuvable')
+        return {'status': 'pending', 'id': job_id, 'domain': job['domain'],
+                'error': job.get('error', '')}
+
+    async def synchronize(self, job):
+        state = self.transport.state(job['url'])
+        route = (job.get('routeProxy', state.proxy), job.get('routeGeneration', state.generation))
+        mechanism = self.mechanisms[job['mode']]
+        current = snapshot(self.transport, job['url'], visible_only=job['mode'] == 'webview')
+        remote = await mechanism.cookies(self, job)
+        browser, engine, changed = await asyncio.to_thread(merge, self.transport, job['url'], remote,
+            job.get('browserCookies', {}), job.get('engineCookies', current), route, job['mode'] == 'webview')
+        updates = [value for key, value in engine.items() if browser.get(key) != value]
+        updates += [{**value, 'value': '', 'expires': 1} for key, value in browser.items() if key not in engine]
+        if updates:
+            await mechanism.push(self, job, updates)
+        # A route change during CDP/Android I/O invalidates this entire exchange.
+        if route != (state.proxy, state.generation):
+            from animelab.api_errors import APIProblem
+            raise APIProblem('verification_route_changed', status=409, category='protection', action='verify')
+        job['browserCookies'], job['engineCookies'] = engine, engine
+        if changed: job['needsProbe'] = True
+        return changed
+
     async def complete(self, job_id):
         async with self._lock:
+            if job_id in self.completed:
+                return self.completed[job_id]['result']
             return await self._complete(job_id)
 
     async def _complete(self, job_id):
@@ -148,12 +200,7 @@ class BrowserVerificationService:
                 from animelab.api_errors import APIProblem
                 raise APIProblem("verification_route_changed", status=409, category="protection", action="verify")
         check_route()
-        cookies = await self.mechanisms[job["mode"]].cookies(self, job)
-        check_route()
-        generation = await asyncio.to_thread(self.transport.import_cookies, job["url"], cookies,
-                                             expected_route=(state.proxy, state.generation))
-        if "routeProxy" in job:
-            job["routeGeneration"] = generation
+        await self.synchronize(job)
         check_route()
         # Check the upstream response, rather than trusting a user's confirmation.
         media = any(x in urlparse(job["url"]).path.lower() for x in (".mp4", ".m3u8", ".ts", ".m4s"))
@@ -175,8 +222,12 @@ class BrowserVerificationService:
             state.blocked_url = None
             state.last_error = None
             state.generation += 1
+        result = {"success": True, "domain": job["domain"]}
+        if self.verified_callback:
+            result['resumed'] = self.verified_callback(job['domain'])
         await self.cancel(job_id)
-        return {"success": True, "domain": job["domain"]}
+        self.completed[job_id] = {'created': time.monotonic(), 'result': result}
+        return result
 
     async def cancel(self, job_id):
         job = self.jobs.pop(job_id, None)
@@ -184,14 +235,37 @@ class BrowserVerificationService:
             await self.mechanisms[job["mode"]].close(job)
 
     async def expire(self):
+        for job_id, value in list(self.completed.items()):
+            if time.monotonic() - value['created'] > 600:
+                self.completed.pop(job_id, None)
         for job_id, job in list(self.jobs.items()):
             if time.monotonic() - job["created"] > 600:
                 await self.cancel(job_id)
 
     async def watch(self):
         while True:
-            await asyncio.sleep(30)
-            await self.expire()
+            await asyncio.sleep(1)
+            async with self._lock:
+                await self.expire()
+                for job_id, job in list(self.jobs.items()):
+                    try:
+                        changed = await self.synchronize(job)
+                        if changed or job.pop('needsProbe', False):
+                            job['needsProbe'] = False
+                            await self._complete(job_id)
+                        job['error'] = ''
+                    except VerificationRequired:
+                        pass  # The page still needs a user's verification.
+                    except (ValueError, httpx.HTTPError, OSError) as exc:
+                        from animelab.diagnostics import redact_text
+                        job['error'] = redact_text(str(exc))
+                    except Exception as exc:
+                        from animelab.api_errors import APIProblem
+                        from animelab.diagnostics import redact_text
+                        job['error'] = exc.problem.code if isinstance(exc, APIProblem) else redact_text(str(exc))
+                        process = job.get('process')
+                        if process and process.poll() is not None:
+                            await self.cancel(job_id)
             await asyncio.to_thread(self.transport.close_idle)
 
     async def close(self):

@@ -196,7 +196,7 @@ async def test_storage_controls_validate_actions_and_retry_export(monkeypatch, t
         assert (await client.post('/api/system/android/export', json={'taskId': task.id})).status_code == 409
         assert task.status == DownloadStatus.COMPLETED and source.read_bytes() == b'private media'
         assert task.error is None and 'Folder access was revoked' in task.exportError
-        monkeypatch.setattr(platform_events, 'completed_handler', lambda task: {'uris': ['content://downloads/1'], 'destination': 'Downloads/Animan'})
+        monkeypatch.setattr(platform_events, 'completed_handler', lambda task: {'uris': ['content://downloads/1'], 'destination': 'Downloads/AnimeLab'})
         assert (await client.post('/api/system/android/export', json={'taskId': task.id})).json()['success']
         assert task.error is None and task.exportError is None and task.exportStatus == 'EXPORTED' and source.exists()
         task.status = DownloadStatus.PAUSED

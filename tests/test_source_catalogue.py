@@ -211,18 +211,22 @@ async def test_animesama_multi_group_tags_and_custom_feeds(catalogue, monkeypatc
         return sample_html, url
 
     monkeypatch.setattr(catalogue, 'html', fetch)
+    async def series_html(url, **kwargs):
+        title = 'Frieren' if '/frieren/' in url else 'Solo Leveling'
+        return f'<h1>{title}</h1><script>panneauAnime("Saison 1", "saison1/vostfr");</script>'
+    monkeypatch.setattr(source, '_fetch_html', series_html)
 
     # Test custom feed "feed:pepites"
     pepites_page = await catalogue.browse(recipe.pkg, 'feed:pepites')
     assert len(pepites_page['results']) == 1
-    assert pepites_page['results'][0].title == 'Frieren'
+    assert pepites_page['results'][0].title == 'Frieren — Saison 1'
 
     # Test multi-parameter filter groups (genre[] + type[] + langue[])
     action_tag = next(t['id'] for t in filters['tags'] if t['group'] == 'Genres' and t['value'] == 'Action')
     type_tag = next(t['id'] for t in filters['tags'] if t['group'] == 'Type' and t['value'] == 'Anime')
     lang_tag = next(t['id'] for t in filters['tags'] if t['group'] == 'Langue' and t['value'] == 'VOSTFR')
     filtered_page = await catalogue.browse(recipe.pkg, 'catalogue', '', [action_tag, type_tag, lang_tag])
-    assert any(r.title == 'Solo Leveling' for r in filtered_page['results'])
+    assert any(r.title == 'Solo Leveling — Saison 1' for r in filtered_page['results'])
     parsed = parse_qs(urlparse(requests[-1]).query)
     assert parsed['genre[]'] == ['Action']
     assert parsed['type[]'] == ['Anime']

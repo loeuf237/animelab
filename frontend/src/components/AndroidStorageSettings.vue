@@ -20,7 +20,7 @@
     <p>
       {{
         tx(
-          'Downloads/Animan fonctionne sans accès global au stockage. Pour un autre dossier ou une carte SD, utilisez le sélecteur Android pour autoriser l’accès.',
+          'Downloads/AnimeLab fonctionne sans accès global au stockage. Pour un autre dossier ou une carte SD, utilisez le sélecteur Android pour autoriser l’accès.',
         )
       }}
     </p>
@@ -45,7 +45,7 @@
         :disabled="busy || state.selectionPending"
         @click="act('use_downloads')"
       >
-        {{ tx('Utiliser Downloads/Animan') }}
+        {{ tx('Utiliser Downloads/AnimeLab') }}
       </button>
       <button class="btn btn-secondary" :disabled="busy" @click="act('open_downloads')">
         {{ tx('Ouvrir le dossier') }}

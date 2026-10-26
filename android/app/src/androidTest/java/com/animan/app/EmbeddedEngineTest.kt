@@ -121,7 +121,7 @@ class EmbeddedEngineTest {
             waitForHome(scenario, "Recreated WebView did not become visible")
             val storage = JSONObject(request("/api/system/android/storage").second)
             assertTrue(storage.getBoolean("authorized"))
-            assertEquals("Downloads/Animan", storage.getString("destination"))
+            assertEquals("Downloads/AnimeLab", storage.getString("destination"))
             assertEquals(401, request("/api/system/android/storage", false, "{\"action\":\"choose_directory\"}").first)
             val selection = JSONObject(request("/api/system/android/storage", body = "{\"action\":\"choose_directory\"}").second)
             assertTrue(selection.getBoolean("selectionPending"))

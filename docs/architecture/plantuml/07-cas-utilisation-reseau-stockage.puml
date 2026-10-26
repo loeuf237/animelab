@@ -50,7 +50,7 @@ exigent un client loopback. La WebView de capture
 n'est pas proposée avec une session utilisant un proxy.
 end note
 note bottom of Copy
-Sur Android 10+, le mode Downloads/Animan ne nécessite
+Sur Android 10+, le mode Downloads/AnimeLab ne nécessite
 pas d'autorisation globale de stockage. Un dossier choisi
 utilise une permission URI persistante (SAF).
 Sous-titres : repli Movies/AnimeLab si MediaProvider l'exige.

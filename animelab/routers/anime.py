@@ -43,7 +43,11 @@ async def search_api(
         selected[0].require('search')
 
     async def run(service):
-        return await asyncio.wait_for(service.search_anime(q.strip()), timeout=45 if getattr(service, "id", getattr(service, "pkg", "")).endswith(".franime") else 12)
+        recipe = getattr(getattr(service, 'service', service), 'recipe', None)
+        expands = bool(recipe and recipe.runtime.get('listing_expansion'))
+        source_id = getattr(service, 'id', getattr(service, 'pkg', ''))
+        timeout = 45 if expands or source_id.endswith('.franime') else 12
+        return await asyncio.wait_for(service.search_anime(q.strip()), timeout=timeout)
 
     responses = await asyncio.gather(*(run(service) for _, service in providers), return_exceptions=True)
     results, challenges, errors, seen = [], [], [], set()

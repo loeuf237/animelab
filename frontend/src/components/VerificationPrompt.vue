@@ -85,7 +85,13 @@
                     )
                   "
                 >
-                  {{ tx('Ouvrir une fenêtre de vérification') }}
+                  {{
+                    tx(
+                      mode.headless
+                        ? 'Démarrer la vérification sans fenêtre'
+                        : 'Ouvrir une fenêtre de vérification',
+                    )
+                  }}
                 </button>
               </template>
             </div>

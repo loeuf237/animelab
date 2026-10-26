@@ -18,19 +18,19 @@
   ],
   "icons": [
     {
-      "src": "/img/icon-192.png?v=bd76195972ef",
+      "src": "/img/icon-192.png?v=11bb7bf96982",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/img/icon-512.png?v=6720985ad14d",
+      "src": "/img/icon-512.png?v=df3941658ca2",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/img/icon-maskable.png?v=6720985ad14d",
+      "src": "/img/icon-maskable.png?v=88a5c90d885b",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
@@ -44,7 +44,7 @@
       "url": "/app/downloads?source=pwa_shortcut",
       "icons": [
         {
-          "src": "/img/icon-192.png?v=bd76195972ef",
+          "src": "/img/icon-192.png?v=11bb7bf96982",
           "sizes": "192x192"
         }
       ]
@@ -56,7 +56,7 @@
       "url": "/app/library?source=pwa_shortcut",
       "icons": [
         {
-          "src": "/img/icon-192.png?v=bd76195972ef",
+          "src": "/img/icon-192.png?v=11bb7bf96982",
           "sizes": "192x192"
         }
       ]
@@ -68,7 +68,7 @@
       "url": "/app/history?source=pwa_shortcut",
       "icons": [
         {
-          "src": "/img/icon-192.png?v=bd76195972ef",
+          "src": "/img/icon-192.png?v=11bb7bf96982",
           "sizes": "192x192"
         }
       ]
