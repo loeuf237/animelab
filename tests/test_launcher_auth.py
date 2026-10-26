@@ -79,7 +79,9 @@ def test_real_desktop_gateway_starts_authenticates_and_stops_account_engines(mod
         state = model.launch(config)
         assert state['ready'] and state['authMode'] == 'accounts'
         base = f"http://127.0.0.1:{state['port']}"
-        with httpx.Client(base_url=base, trust_env=False) as client:
+        # The first authenticated request starts a fresh engine; Windows imports
+        # can take longer than HTTPX's default five-second read deadline.
+        with httpx.Client(base_url=base, trust_env=False, timeout=60) as client:
             assert client.get('/api/favorites').status_code == 401
             assert client.get('/healthz').json()['mode'] == 'shared'
             login = client.post('/api/auth/login', json={'username': 'operator', 'password': PASSWORD},
@@ -87,7 +89,8 @@ def test_real_desktop_gateway_starts_authenticates_and_stops_account_engines(mod
             assert login.status_code == 200
             assert client.get('/api/auth/me').json()['user']['admin'] is True
             assert client.get('/api/favorites').json() == []
-            assert client.get('/app/').status_code == 200
+            if (Path(__file__).resolve().parents[1] / 'frontend/dist/index.html').is_file():
+                assert client.get('/app/').status_code == 200
         path = Path(model.authentication_status()['root']) / 'accounts.sqlite3'
         with closing(sqlite3.connect(path)) as db:
             created, expires = db.execute('SELECT created, expires FROM sessions LIMIT 1').fetchone()
