@@ -81,7 +81,7 @@ def test_real_desktop_gateway_starts_authenticates_and_stops_account_engines(mod
         base = f"http://127.0.0.1:{state['port']}"
         # The first authenticated request starts a fresh engine; Windows imports
         # can take longer than HTTPX's default five-second read deadline.
-        with httpx.Client(base_url=base, trust_env=False, timeout=60) as client:
+        with httpx.Client(base_url=base, trust_env=False, timeout=75) as client:
             assert client.get('/api/favorites').status_code == 401
             assert client.get('/healthz').json()['mode'] == 'shared'
             login = client.post('/api/auth/login', json={'username': 'operator', 'password': PASSWORD},
@@ -100,6 +100,11 @@ def test_real_desktop_gateway_starts_authenticates_and_stops_account_engines(mod
         with pytest.raises(ValueError, match='signed-in web account'):
             model.engine_api('/api/proxy/settings')
         assert not model.paths()['database'].exists()
+    except Exception:
+        from animelab.diagnostics import redact_text
+        for logfile in Path(model.authentication_status()['root']).glob('users/*/engine.log'):
+            print('Private engine startup diagnostics:', redact_text(logfile.read_text(errors='replace')[-16000:]))
+        raise
     finally:
         model.stop()
         if model.child is not None:

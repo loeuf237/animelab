@@ -41,6 +41,11 @@ def main():
     engine_lock = InstanceLock(Path.home(), 'engine.lock')
     if not engine_lock.acquire():
         raise SystemExit('An engine already owns this account workspace')
+    # A blocked native import must leave useful evidence before the supervisor's
+    # startup deadline, including on windowed Windows executables.
+    import faulthandler
+    startup_trace = (Path.home() / 'engine.log').open('ab')
+    faulthandler.dump_traceback_later(40, file=startup_trace)
     import uvicorn
     from run import app, lifespan
     from animelab.shared.workers import WorkerBoundary
@@ -61,6 +66,8 @@ def main():
             temporary = ready.with_suffix('.tmp')
             temporary.write_text(json.dumps({'pid': os.getpid(), 'port': listener.getsockname()[1]}))
             temporary.replace(ready)
+            faulthandler.cancel_dump_traceback_later()
+            startup_trace.close()
             try:
                 yield
             finally:
