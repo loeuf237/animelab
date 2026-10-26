@@ -120,13 +120,43 @@ is invalid, `--admin --port 8080` repairs it without modifying your library.
 
 Source installations use `uv sync --locked --group desktop` and
 `uv run --locked --group desktop python desktop.py`. Packaged builds include Qt
-Widgets; no separate Python/Qt installation is needed. The launcher uses two rows
-of five tabs, antialiased system fonts and native file dialogs where available.
+Widgets; no separate Python/Qt installation is needed. Its eleven tabs use three
+balanced rows (4/4/3), with antialiased outline fonts, full font hinting and black
+active text. Disabled controls stay gray. File dialogs use the native OS helper
+where available.
 GNOME uses the GTK platform helper; other desktops use their available native
 helper or the standard Qt chooser. Browser mode needs no GTK/WebKit WebView.
 For the optional embedded WebView from source, install `requirements-desktop.txt`
 and the GTK/WebKit system prerequisites on Linux; the desktop package already
 includes its Python dependencies.
+
+### Authentication tab
+
+Choose **None (personal use)** or **User accounts**. Personal mode is the default
+and keeps the existing personal library. For account mode, enter a username and
+a password of 12–256 characters, then click **Create the first administrator**.
+This local bootstrap cannot replace an existing administrator. The password is
+masked, cleared after submission and excluded from launcher JSON/settings exports.
+
+Set the session lifetime (1–168 hours), idle timeout (1–1440 minutes, no longer
+than the session lifetime) and maximum private engines (1–32). Save and launch;
+**Manage accounts** opens `/auth/account` for invitations, recovery and permissions.
+Subsequent password changes and account management take place in that authenticated
+web page. Session durations apply to newly issued sessions, and extending a policy
+does not revive sessions whose absolute expiry has passed.
+
+Accounts use `~/.animan/shared` by default (beside the desktop data folder), or
+`ANIMELAB_SHARED_DIR` when explicitly configured. Their libraries, downloads and
+cookies remain separate from personal-mode data. In account mode, source/proxy
+preferences are edited inside the signed-in account, not through the launcher's
+personal-mode proxy form. The desktop gateway still binds only to loopback;
+authentication does not expose it to the LAN. Use the separate shared-server
+source/Docker deployment for an HTTPS network endpoint.
+
+Packaged account engines reuse the same executable via an internal worker flag,
+with separate private directories and a lifetime pipe. No Python installation
+is required on the receiving desktop. The private account web assets are included
+in `animelab.spec`.
 
 `--self-test` checks Qt plugin resources, the packaged interface, curl library, temporary SQLite storage
 and media tools without contacting anime sources. `--launcher-self-test` renders

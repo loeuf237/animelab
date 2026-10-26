@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AnimeLab · Account</title>
+    <link rel="stylesheet" href="/auth/style.css" />
+    <script src="/auth/client.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <a class="brand" href="/app/">AnimeLab</a
+        ><button id="language" type="button">Français</button>
+      </header>
+      <h1 data-i18n="title">Your private space</h1>
+      <p data-i18n="intro">
+        Your library, progress and source sessions stay with your account.
+      </p>
+      <p id="message" role="status" aria-live="polite"></p>
+      <section id="login-panel" hidden>
+        <form id="login">
+          <h2 data-i18n="login">Sign in</h2>
+          <label
+            ><span data-i18n="username">Username</span
+            ><input
+              name="username"
+              autocomplete="username"
+              required
+              maxlength="40" /></label
+          ><label
+            ><span data-i18n="password">Password</span
+            ><input
+              type="password"
+              name="password"
+              autocomplete="current-password"
+              required
+              maxlength="256" /></label
+          ><button data-i18n="login">Sign in</button>
+        </form>
+        <details>
+          <summary data-i18n="redeem">
+            Use an invitation or recovery code
+          </summary>
+          <form id="redeem">
+            <label
+              ><span data-i18n="code">Code</span
+              ><input
+                name="code"
+                required
+                autocomplete="off"
+                maxlength="128" /></label
+            ><label
+              ><span data-i18n="inviteUsername">Username (invitation only)</span
+              ><input
+                name="username"
+                autocomplete="username"
+                maxlength="40" /></label
+            ><label
+              ><span data-i18n="newPassword"
+                >New password (at least 12 characters)</span
+              ><input
+                type="password"
+                name="password"
+                autocomplete="new-password"
+                required
+                minlength="12"
+                maxlength="256" /></label
+            ><button data-i18n="continue">Continue</button>
+          </form>
+        </details>
+        <p class="muted" data-i18n="contact">
+          Ask your administrator for an account or a recovery code. Public
+          registration is disabled.
+        </p>
+      </section>
+      <section id="account-panel" hidden>
+        <div class="session">
+          <strong id="identity"></strong
+          ><a href="/app/" data-i18n="open">Open AnimeLab</a
+          ><button id="logout" class="secondary" data-i18n="logout">
+            Sign out
+          </button>
+        </div>
+        <form id="password">
+          <h2 data-i18n="changePassword">Change password</h2>
+          <label
+            ><span data-i18n="currentPassword">Current password</span
+            ><input
+              type="password"
+              name="old_password"
+              autocomplete="current-password"
+              required
+              maxlength="256" /></label
+          ><label
+            ><span data-i18n="newPassword"
+              >New password (at least 12 characters)</span
+            ><input
+              type="password"
+              name="password"
+              autocomplete="new-password"
+              required
+              minlength="12"
+              maxlength="256" /></label
+          ><button data-i18n="save">Save</button>
+          <p class="muted" data-i18n="revoke">
+            Changing a password signs this account out on every device.
+          </p>
+        </form>
+      </section>
+      <section id="admin-panel" hidden>
+        <h2 data-i18n="admin">Account administration</h2>
+        <details>
+          <summary data-i18n="create">Create an account</summary>
+          <form id="create">
+            <label
+              ><span data-i18n="username">Username</span
+              ><input
+                name="username"
+                required
+                pattern="[A-Za-z0-9][A-Za-z0-9_.\-]{2,39}"
+                autocomplete="off"
+                maxlength="40" /></label
+            ><label
+              ><span data-i18n="initialPassword"
+                >Initial password (at least 12 characters)</span
+              ><input
+                type="password"
+                name="password"
+                autocomplete="new-password"
+                required
+                minlength="12"
+                maxlength="256" /></label
+            ><label class="check"
+              ><input type="checkbox" name="download" checked /><span
+                data-i18n="downloads"
+                >Allow downloads</span
+              ></label
+            ><label class="check"
+              ><input type="checkbox" name="extensions" /><span
+                data-i18n="extensions"
+                >Manage extensions</span
+              ></label
+            ><label class="check"
+              ><input type="checkbox" name="admin" /><span
+                data-i18n="administrator"
+                >Administrator</span
+              ></label
+            ><button data-i18n="create">Create an account</button>
+          </form>
+        </details>
+        <form id="invitation">
+          <h3 data-i18n="invite">Invite someone</h3>
+          <label class="check"
+            ><input type="checkbox" name="download" checked /><span
+              data-i18n="downloads"
+              >Allow downloads</span
+            ></label
+          ><label class="check"
+            ><input type="checkbox" name="extensions" /><span
+              data-i18n="extensions"
+              >Manage extensions</span
+            ></label
+          ><button class="secondary" data-i18n="makeInvite">
+            Generate an invitation (7 days)
+          </button>
+        </form>
+        <div id="generated" hidden>
+          <p data-i18n="shareCode">
+            Copy this code and send it privately. It is shown only once and can
+            be used once.
+          </p>
+          <textarea id="generated-code" readonly aria-label="Code"></textarea>
+        </div>
+        <h3 data-i18n="accounts">Accounts</h3>
+        <p class="muted" data-i18n="permissionsNote">
+          Changing permissions or disabling an account revokes its sessions and
+          stops its engine. An administrator has all permissions.
+        </p>
+        <div id="users"></div>
+        <h3 data-i18n="activeCodes">Active invitations and recovery codes</h3>
+        <div id="codes"></div>
+      </section>
+      <footer data-i18n="privacy">
+        Shared server · Source cookies are private. Host browser and storage
+        dialogs are unavailable.
+      </footer>
+    </main>
+  </body>
+</html>

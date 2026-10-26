@@ -1,3 +1,4 @@
+from animelab.services.extension_service import extension_service
 """Source failures must remain distinguishable from a successful empty catalogue."""
 import asyncio
 from unittest.mock import AsyncMock
@@ -35,15 +36,15 @@ async def test_empty_cache_refresh_runs_once_and_returns_first_results(original)
 
 @pytest.mark.asyncio
 async def test_home_feed_reports_protections_and_loads_more_than_four_extensions(monkeypatch):
-    for service in (router.scraping_service, router.voiranime_service, router.animepahe_service):
+    for service in (scraping_service, voiranime_service, animepahe_service):
         monkeypatch.setattr(service, 'get_latest_releases', AsyncMock(return_value=[]))
     challenge = VerificationRequired('https://animepahe.pw/api?m=airing')
-    router.animepahe_service.get_latest_releases.side_effect = challenge
+    animepahe_service.get_latest_releases.side_effect = challenge
     extensions = [SimpleNamespace(pkg=f'ext{i}', name=f'Extension {i}', base_url=f'https://ext{i}.example',
         get_latest_releases=AsyncMock(return_value=[AnimeResult(id=str(i),title=f'Anime {i}',url=f'https://ext{i}.example/anime')])) for i in range(6)]
     extensions[1].get_latest_releases.side_effect = VerificationRequired('https://ext1.example/latest')
     extensions[2].get_latest_releases.side_effect = TimeoutError()
-    monkeypatch.setattr(router.extension_service, 'get_enabled_container_sources', lambda: extensions)
+    monkeypatch.setattr(extension_service, 'get_enabled_container_sources', lambda: extensions)
     monkeypatch.setattr(router.library_service, 'get_all_favorites', lambda: [])
     monkeypatch.setattr(router.library_service, 'get_history', lambda: [])
     feed = await router.api_home_feed()

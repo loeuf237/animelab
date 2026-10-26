@@ -1,3 +1,6 @@
+from animelab.services.animepahe_service import animepahe_service
+from animelab.services.scraping_service import scraping_service
+from animelab.services.voiranime_service import voiranime_service
 from unittest.mock import AsyncMock
 from urllib.parse import parse_qs, urlparse
 
@@ -17,7 +20,7 @@ from animelab.services.extension_service import extension_service
 
 @pytest.fixture
 def providers(monkeypatch):
-    for service in (anime_router.scraping_service, anime_router.voiranime_service, anime_router.animepahe_service):
+    for service in (scraping_service, voiranime_service, animepahe_service):
         monkeypatch.setattr(service, 'search_anime', AsyncMock(return_value=[]))
     monkeypatch.setattr(extension_service, 'get_enabled_container_sources', lambda: [])
     monkeypatch.setattr(extension_service, 'get_container_source_by_id', lambda sid: None)
@@ -26,8 +29,8 @@ def providers(monkeypatch):
 
 def test_global_search_keeps_results_and_exposes_challenges(providers, monkeypatch):
     challenge = VerificationRequired('https://voir-anime.to/?s=naruto')
-    anime_router.voiranime_service.search_anime.side_effect = challenge
-    anime_router.scraping_service.search_anime.return_value = [AnimeResult(id='1', title='Naruto', url='https://fm.example/1')]
+    voiranime_service.search_anime.side_effect = challenge
+    scraping_service.search_anime.return_value = [AnimeResult(id='1', title='Naruto', url='https://fm.example/1')]
     response = providers.get('/api/search', params={'q': 'naruto', 'source': 'all', 'include_challenges': 'true'})
     assert response.status_code == 200
     data = response.json()
@@ -62,7 +65,7 @@ def test_targeted_search_challenge_and_cookie_validation_retry(providers, monkey
     async def search(q):
         response = await transport.async_client().get(url)
         return [AnimeResult(id='1', title=response.text, url='https://source.example/anime/1')]
-    monkeypatch.setattr(anime_router.voiranime_service, 'search_anime', search)
+    monkeypatch.setattr(voiranime_service, 'search_anime', search)
     try:
         initial = providers.get('/api/search?q=naruto&source=voir-anime&include_challenges=true').json()
         assert initial['challenges'][0]['domain'] == 'source.example' and not initial['results']
@@ -75,7 +78,7 @@ def test_targeted_search_challenge_and_cookie_validation_retry(providers, monkey
 
 def test_unknown_source_does_not_search_another_catalogue(providers):
     assert providers.get('/api/search?q=naruto&source=missing').status_code == 404
-    anime_router.scraping_service.search_anime.assert_not_called()
+    scraping_service.search_anime.assert_not_called()
 
 
 @pytest.fixture
@@ -106,7 +109,7 @@ async def test_empty_search_does_not_request_the_site(catalogue, monkeypatch):
     fetch = AsyncMock()
     search = AsyncMock()
     monkeypatch.setattr(catalogue, 'html', fetch)
-    monkeypatch.setattr(anime_router.scraping_service, 'search_anime', search)
+    monkeypatch.setattr(scraping_service, 'search_anime', search)
     page = await catalogue.browse('french-manga', 'search')
     assert not page['results'] and page['nextCursor'] is None
     fetch.assert_not_called()

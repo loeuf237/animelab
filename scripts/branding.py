@@ -49,7 +49,7 @@ def generate():
             for icon in group:
                 icon["src"] = versioned(icon["src"])
         manifest.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
-    for path in [ROOT / "frontend/index.html", ROOT / "animelab/templates/fragments/navbar.html"]:
+    for path in [ROOT / "frontend/index.html"]:
         text = re.sub(r'(?P<prefix>(?:src|href)=")(?P<url>/img/(?:icon-[^"?]+\.png|favicon\.png|apple-touch-icon\.png))(?:\?[^"\s]*)?"',
                       lambda match: match["prefix"] + versioned(match["url"]) + '"', path.read_text())
         text = re.sub(r'href="/manifest\.json(?:\?[^"\s]*)?"',

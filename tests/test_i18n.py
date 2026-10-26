@@ -112,91 +112,21 @@ class TestI18nApi:
         assert "error" in resp.json()
 
 
-class TestSSRTemplateTranslation:
-    def test_home_page_fr_and_en(self, client):
-        # French
-        resp_fr = client.get("/?lang=fr")
-        assert resp_fr.status_code == 200
-        assert "Accueil" in resp_fr.text
-        assert "Téléchargements" in resp_fr.text
+class TestSpaLanguageHandoff:
+    @pytest.mark.parametrize('path', ['/', '/downloads', '/library', '/history', '/settings', '/extensions'])
+    @pytest.mark.parametrize('lang', ['fr', 'en'])
+    def test_legacy_pages_preserve_language(self, client, path, lang):
+        response = client.get(path + '?lang=' + lang, follow_redirects=False)
+        assert response.status_code == 303
+        assert response.cookies.get('animan_lang') == lang
+        assert response.headers['location'].endswith('?lang=' + lang)
 
-        # English
-        resp_en = client.get("/?lang=en")
-        assert resp_en.status_code == 200
-        assert "Home" in resp_en.text
-        assert "Downloads" in resp_en.text
-        assert "Your all-in-one anime platform" in resp_en.text
-
-    def test_downloads_page_en(self, client):
-        resp = client.get("/downloads?lang=en")
-        assert resp.status_code == 200
-        assert "Downloads" in resp.text
-        assert "Completed" in resp.text
-
-    def test_library_page_en(self, client):
-        resp = client.get("/library?lang=en")
-        assert resp.status_code == 200
-        assert "Local Library" in resp.text
-
-    def test_history_page_en(self, client):
-        resp = client.get("/history?lang=en")
-        assert resp.status_code == 200
-        assert "History" in resp.text
-        assert "All" in resp.text
-
-    def test_settings_page_en(self, client):
-        resp = client.get("/settings?lang=en")
-        assert resp.status_code == 200
-        assert "Configuration" in resp.text
-        assert "General" in resp.text
-        assert "Language" in resp.text
-
-    def test_extensions_page_en(self, client):
-        resp = client.get("/extensions?lang=en")
-        assert resp.status_code == 200
-        assert "Extension" in resp.text
-
-    def test_sidebar_menu_translation(self, client):
-        # When requesting English, sidebar items must be translated to English
-        resp_en = client.get("/settings?lang=en")
-        assert resp_en.status_code == 200
-        assert 'id="nav-home"' in resp_en.text
-        assert ">Home<" in resp_en.text or "<span>Home</span>" in resp_en.text
-        assert ">Downloads<" in resp_en.text or "<span>Downloads</span>" in resp_en.text
-        assert ">Library<" in resp_en.text or "<span>Library</span>" in resp_en.text
-        assert ">History<" in resp_en.text or "<span>History</span>" in resp_en.text
-        assert ">Extensions<" in resp_en.text or "<span>Extensions</span>" in resp_en.text
-        assert ">Settings<" in resp_en.text or "<span>Settings</span>" in resp_en.text
-
-        # When requesting French, sidebar items must be translated to French
-        resp_fr = client.get("/settings?lang=fr")
-        assert resp_fr.status_code == 200
-        assert ">Accueil<" in resp_fr.text or "<span>Accueil</span>" in resp_fr.text
-        assert ">Paramètres<" in resp_fr.text or "<span>Paramètres</span>" in resp_fr.text
-
-    def test_settings_save_button_cleanup(self, client):
-        resp = client.get("/settings")
-        assert resp.status_code == 200
-        # Exactly one save-settings-btn in the document
-        assert resp.text.count('id="save-settings-btn"') == 1
-        # No save-settings-btn-bottom proxy button
-        assert "save-settings-btn-bottom" not in resp.text
-        # No save button in the header
-        assert '<header class="settings-header-pro">' in resp.text
-        header_part = resp.text.split('<header class="settings-header-pro">')[1].split('</header>')[0]
-        assert "save-settings-btn" not in header_part
-
-    def test_middleware_auto_language_detection(self):
-        # Fresh client without cookies
-        with TestClient(app) as fresh_c:
-            resp = fresh_c.get("/", headers={"accept-language": "fr-FR,fr;q=0.9"})
-            assert resp.status_code == 200
-            assert resp.cookies.get("animan_lang") == "fr"
-
-        with TestClient(app) as fresh_c2:
-            resp = fresh_c2.get("/downloads", headers={"accept-language": "en-US,en;q=0.9"})
-            assert resp.status_code == 200
-            assert resp.cookies.get("animan_lang") == "en"
+    @pytest.mark.parametrize('header, lang', [('fr-FR,fr;q=0.9', 'fr'), ('en-US,en;q=0.9', 'en')])
+    def test_middleware_auto_language_detection(self, header, lang):
+        with TestClient(app) as fresh:
+            response = fresh.get('/downloads', headers={'accept-language': header}, follow_redirects=False)
+            assert response.status_code == 303
+            assert response.cookies.get('animan_lang') == lang
 
 
 def test_catalog_uses_request_language_when_no_override(client):
@@ -207,9 +137,7 @@ def test_catalog_uses_request_language_when_no_override(client):
     assert response.json()['translations']['nav_home'] == 'Home'
 
 
-def test_legacy_home_defaults_to_animepahe_for_english(client):
-    import re
-    response = client.get('/?lang=en')
-    assert response.status_code == 200
-    assert re.search(r'value="animepahe"\s+checked', response.text)
-    assert not re.search(r'value="french-manga"\s+checked', response.text)
+def test_legacy_home_preserves_english_preference_for_spa(client):
+    response = client.get('/?lang=en', follow_redirects=False)
+    assert response.headers['location'] == '/app/?lang=en'
+    assert response.cookies.get('animan_lang') == 'en'

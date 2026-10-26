@@ -107,3 +107,7 @@ artifacts/mobile-ui/
 
 # Local desktop launcher review captures
 artifacts/launcher-ui/
+
+# Private multi-user server identities, source cookies and media
+shared-data/
+artifacts/shared-server/

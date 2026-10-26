@@ -8,8 +8,9 @@ from animelab.models.download_task import DownloadTask
 from animelab.services.download_manager import download_manager
 ```
 
-The package contains the engine, routers, services, desktop launcher, templates
-and static assets. Desktop packaging uses `animelab.spec`; Android's Chaquopy
+The package contains the engine, routers, services, desktop launcher
+and static assets. The web frontend is the Vue SPA in `frontend/`; legacy Jinja
+templates and their runtime dependency have been removed. Desktop packaging uses `animelab.spec`; Android's Chaquopy
 source sync/extraction and Docker copy the same `animelab/` tree. Application
 entry points remain `run.py`, `desktop.py` and `android_runtime.py`.
 

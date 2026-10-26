@@ -1,4 +1,4 @@
-name: Release desktop Python + Vue
+name: Release Android and desktop
 
 on:
   push:
@@ -8,12 +8,12 @@ on:
       tag_name:
         description: Existing release tag
         required: true
-        default: v0.1.3
+        default: v0.1.4
 
 permissions:
   contents: read
 concurrency:
-  group: desktop-release-${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}
+  group: unified-release-${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}
   cancel-in-progress: false
 env:
   RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}
@@ -100,6 +100,7 @@ jobs:
           name: launcher-checks-${{ matrix.label }}
           path: |
             build/packaged-self-test.log
+            build/packaged-auth-check.log
             build/native-window-check.log
             build/native-launcher-check.log
           if-no-files-found: ignore
@@ -113,9 +114,17 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  android:
+    name: Build and validate signed Android APK
+    uses: ./.github/workflows/release-android.yml
+    with:
+      tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}
+      publish: false
+    secrets: inherit
+
   publish:
-    name: Publish complete desktop release
-    needs: build
+    name: Publish complete Android and desktop release
+    needs: [build, android]
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -134,8 +143,12 @@ jobs:
           pattern: desktop-*
           path: release-assets
           merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: Android-release
+          path: release-assets
       - name: Require all platforms and calculate checksums
-        run: python scripts/desktop_release.py checksums release-assets
+        run: python scripts/desktop_release.py checksums release-assets --include-android
       - name: Publish platform archives and manifests together
         uses: softprops/action-gh-release@v2
         with:

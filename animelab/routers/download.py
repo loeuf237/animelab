@@ -6,40 +6,17 @@ import logging
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Request, Query, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from animelab.models.download_task import DownloadStatus
 from animelab.services.download_manager import download_manager
 from animelab.services.proxy_service import proxy_service
 from animelab.services.voiranime_service import voiranime_service
-from animelab.templates_config import templates
 from animelab import platform_events
 
 logger = logging.getLogger("animelab.router.download")
 router = APIRouter(route_class=ContractRoute)
 
-@router.get("/downloads", response_class=HTMLResponse)
-async def downloads_page(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="downloads.html",
-        context={
-            "tasks": download_manager.get_all_tasks(),
-            "source": "all",
-        }
-    )
-
-@router.get("/settings", response_class=HTMLResponse)
-async def settings_page(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="settings.html",
-        context={
-            "settings": download_manager.get_settings(),
-            "proxy_settings": proxy_service.get_proxy_settings(),
-            "source": "all",
-        }
-    )
 
 @router.post("/api/download")
 async def start_download(request: Request):

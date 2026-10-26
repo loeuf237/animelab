@@ -3,6 +3,14 @@ import locale
 
 TEXT = {
     'fr': {
+        'authentication': 'Authentification', 'auth_mode': 'Mode d’authentification',
+        'auth_none': 'Aucun (usage personnel)', 'auth_accounts': 'Comptes utilisateurs',
+        'session_hours': 'Durée de session (heures)', 'idle_minutes': 'Inactivité (minutes)',
+        'auth_engines': 'Moteurs privés maximum', 'create_admin': 'Créer le premier administrateur',
+        'manage_accounts': 'Gérer les comptes…', 'admin_ready': 'Un administrateur est configuré.',
+        'admin_missing': 'Créez un administrateur avant de démarrer le mode comptes.',
+        'admin_created': 'Administrateur créé. Enregistrez puis démarrez le serveur.',
+        'auth_hint': 'Le mot de passe initial reste masqué et n’est pas exporté. Les comptes utilisent un espace privé distinct de la bibliothèque personnelle.',
         'title': 'AnimeLab Desktop Launcher', 'webui': 'WebUI', 'server': 'Serveur',
         'downloads': 'Téléchargements', 'folders': 'Dossiers', 'requests': 'Requêtes',
         'proxy': 'Proxy', 'extensions': 'Extensions', 'diagnostics': 'Diagnostic',
@@ -48,6 +56,14 @@ TEXT = {
         'version': 'Version', 'private_settings': 'Les réglages exportés excluent les cookies et les identifiants de proxy.',
     },
     'en': {
+        'authentication': 'Authentication', 'auth_mode': 'Authentication mode',
+        'auth_none': 'None (personal use)', 'auth_accounts': 'User accounts',
+        'session_hours': 'Session lifetime (hours)', 'idle_minutes': 'Idle timeout (minutes)',
+        'auth_engines': 'Maximum private engines', 'create_admin': 'Create the first administrator',
+        'manage_accounts': 'Manage accounts…', 'admin_ready': 'An administrator is configured.',
+        'admin_missing': 'Create an administrator before starting account mode.',
+        'admin_created': 'Administrator created. Save settings and start the server.',
+        'auth_hint': 'The initial password stays masked and is not exported. Accounts use private storage separate from the personal library.',
         'title': 'AnimeLab Desktop Launcher', 'webui': 'WebUI', 'server': 'Server',
         'downloads': 'Downloader', 'folders': 'Directories', 'requests': 'Requests',
         'proxy': 'Proxy', 'extensions': 'Extensions', 'diagnostics': 'Diagnostics',

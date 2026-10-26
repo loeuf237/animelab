@@ -1,0 +1,20 @@
+# Add to compose.yaml explicitly; never changes the personal server by default.
+services:
+  animelab:
+    command:
+      - python
+      - -m
+      - animelab.shared
+      - --data-dir
+      - /data/shared
+      - serve
+      - --host
+      - 0.0.0.0
+      - --port
+      - '8080'
+      - --public-url
+      - ${ANIMELAB_PUBLIC_URL:?Set the HTTPS public origin, for example https://anime.example.org}
+      - --max-engines
+      - ${ANIMELAB_MAX_ENGINES:-4}
+    healthcheck:
+      test: ['CMD', 'python', '-c', "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=4).close()"]

@@ -8,20 +8,36 @@ const source = await readFile(new URL('../../animelab/static/sw.js', import.meta
 function worker(fetchImpl, cached) {
   const handlers = new Map()
   const writes = []
+  const deleted = []
   const cache = {
     match: async () => cached,
     put: async (request, response) => writes.push([request.url, await response.text()]),
   }
   vm.runInNewContext(source, {
-    self: { addEventListener: (event, handler) => handlers.set(event, handler) },
+    self: {
+      location: { origin: 'http://localhost' },
+      addEventListener: (event, handler) => handlers.set(event, handler),
+      clients: { claim: async () => {} },
+    },
     URL,
     Response,
     console,
     fetch: fetchImpl,
-    caches: { open: async () => cache, match: async () => cached },
+    caches: {
+      open: async () => cache,
+      match: async () => cached,
+      keys: async () => ['animelab-cache-v0.1.0-brand2', 'animelab-cache-v0.1.0-spa-only-1'],
+      delete: async (key) => deleted.push(key),
+    },
   })
   return {
     writes,
+    deleted,
+    activate() {
+      let result
+      handlers.get('activate')({ waitUntil: (value) => (result = value) })
+      return result
+    },
     request(path, options) {
       let result
       const request = new Request('http://localhost' + path, options)
@@ -69,4 +85,19 @@ test('logo cache updates never intercept media ranges or download streams', () =
   })
   assert.equal(sw.request('/api/media/stream/episode'), undefined)
   assert.equal(sw.request('/video.mp4', { headers: { Range: 'bytes=0-1023' } }), undefined)
+})
+
+test('private API data and account pages never use a cached response', () => {
+  const sw = worker(() => {
+    throw new Error('must go to the server')
+  })
+  assert.equal(sw.request('/api/favorites'), undefined)
+  assert.equal(sw.request('/api/playback/session'), undefined)
+  assert.equal(sw.request('/auth/account'), undefined)
+})
+
+test('upgrading removes cached legacy pages while keeping the current cache', async () => {
+  const sw = worker(() => {})
+  await sw.activate()
+  assert.deepEqual(sw.deleted, ['animelab-cache-v0.1.0-brand2'])
 })

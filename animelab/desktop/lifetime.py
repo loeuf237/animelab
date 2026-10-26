@@ -29,7 +29,8 @@ def parent_watch(control_url, workdir):
                 if failures >= 3:
                     logging.getLogger('animelab.desktop').warning('Supervisor unavailable; stopping its engine')
                     (workdir / 'stop').touch()
-                    if not done.wait(30):
+                    timeout = 70 if os.getenv('ANIMELAB_DESKTOP_AUTH') else 30
+                    if not done.wait(timeout):
                         logging.getLogger('animelab.desktop').error('Engine shutdown timed out after losing its supervisor')
                         os._exit(1)  # Only this orphaned child, after its graceful shutdown deadline.
                     return
@@ -42,7 +43,7 @@ def parent_watch(control_url, workdir):
 def acquire_engine_lock(directory, workdir):
     # A replacement supervisor waits for an orphan to finish its graceful shutdown.
     lock = InstanceLock(directory, 'engine.lock')
-    deadline = time.monotonic() + 50
+    deadline = time.monotonic() + (80 if os.getenv('ANIMELAB_DESKTOP_AUTH') else 50)
     while not lock.acquire():
         if (workdir / 'stop').exists() or time.monotonic() >= deadline:
             raise RuntimeError('Previous desktop engine is still stopping; retry from Administration')

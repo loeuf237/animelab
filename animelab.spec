@@ -11,8 +11,7 @@ from animelab import __version__
 frontend = project / 'frontend' / 'dist'
 if not (frontend / 'index.html').is_file():
     raise RuntimeError('Build the Vue frontend before packaging AnimeLab')
-datas = [(str(project / 'animelab' / 'templates'), 'animelab/templates'),
-         (str(project / 'animelab' / 'static'), 'animelab/static'),
+datas = [(str(project / 'animelab' / 'static'), 'animelab/static'),
          (str(frontend), 'frontend/dist'),
          (str(project / 'LICENSE'), '.'),
          (str(project / 'NOTICE'), '.'),
@@ -21,6 +20,7 @@ datas = [(str(project / 'animelab' / 'templates'), 'animelab/templates'),
          (str(project / 'animelab/desktop/panel.html'), 'animelab/desktop'),
          (str(project / 'animelab/desktop/panel.js'), 'animelab/desktop'),
          (str(project / 'animelab/desktop/panel.css'), 'animelab/desktop'),
+         (str(project / 'animelab/shared/web'), 'animelab/shared/web'),
          (str(project / 'docs' / 'desktop-distribution.md'), '.')]
 datas += collect_data_files('PySide6', includes=['*.json', 'Qt/translations/qtbase_fr.qm'])
 datas += collect_data_files('webview') + collect_data_files('curl_cffi')

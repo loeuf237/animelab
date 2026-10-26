@@ -29,14 +29,13 @@ def test_ssrf_image_proxy_blocks_private_ip(client):
     assert resp.status_code == 400
 
 def test_ssrf_anime_detail_blocks_internal(client):
-    resp = client.get("/anime?url=http://127.0.0.1:8080/api/admin")
-    assert resp.status_code == 200
-    assert "invalide ou non sécurisée" in resp.text
+    response = client.get('/api/anime?url=http://127.0.0.1:8080/api/admin')
+    assert response.status_code == 400
+    assert 'invalide ou non sécurisée' in response.json()['detail']
 
 def test_ssrf_voiranime_blocks_internal(client):
-    resp = client.get("/voiranime?url=http://10.0.0.1/admin")
-    assert resp.status_code == 200
-    assert "invalide ou non sécurisée" in resp.text
+    response = client.get('/api/anime?source=voir-anime&url=http://10.0.0.1/admin')
+    assert response.status_code == 400
 
 def test_is_safe_url_helper():
     assert is_safe_url("http://127.0.0.1") is False

@@ -1,5 +1,6 @@
 """Compact Qt Widgets launcher. Engine operations never run on the GUI thread."""
 from pathlib import Path
+import math
 import queue
 import sys
 import threading
@@ -26,6 +27,8 @@ class NativeLauncher(QWidget):
         self.qt_translator = QTranslator(self)
         self.root, self.model = self, LauncherModel(directory)
         self.config = self.model.config()
+        self.auth_configured = self.model.authentication_status()['configured']
+        self.auth_username, self.auth_password = Value(''), Value('')
         self.lang = language(self.config['launcher']['language'])
         self.variables = {key: Value(value) for key, value in self.config.items() if key != 'launcher'}
         self.variables.update({key: Value(value) for key, value in self.config['launcher'].items()})
@@ -71,7 +74,7 @@ class NativeLauncher(QWidget):
                 QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)):
             app.installTranslator(self.qt_translator)
         # Disconnect old field bindings before deleting their widgets.
-        for value in [*self.variables.values(), *self.proxy_variables.values(), self.speed,
+        for value in [*self.variables.values(), *self.proxy_variables.values(), self.auth_username, self.auth_password, self.speed,
                       self.address, self.status_text, self.notice_text, self.selected]:
             if value.receivers('2changed(PyObject)'):
                 value.changed.disconnect()
@@ -88,6 +91,7 @@ class NativeLauncher(QWidget):
         grid.setSpacing(0)
         self.tab_group = QButtonGroup(tabbar)
         self.tab_group.setExclusive(True)
+        columns = math.ceil(len(TABS) / math.ceil(len(TABS) / 5))
         for index, name in enumerate(TABS):
             tab = QToolButton(tabbar)
             tab.setText(self.t(name))
@@ -98,17 +102,17 @@ class NativeLauncher(QWidget):
             tab.setMinimumSize(0, 29)
             from PySide6.QtWidgets import QSizePolicy
             tab.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
-            tab.setStyleSheet('QToolButton { border: none; border-bottom: 1px solid #d6d8db; padding: 5px 2px; }'
-                'QToolButton:checked { background: white; color: #2465a3; border-bottom: 2px solid #6299cc; }'
+            tab.setStyleSheet('QToolButton { color: #000000; border: none; border-bottom: 1px solid #d6d8db; padding: 5px 2px; }'
+                'QToolButton:checked { background: white; color: #000000; border-bottom: 2px solid #6299cc; }'
                 'QToolButton:hover { background: #e8edf2; } QToolButton:focus { border: 1px solid #4389ce; }')
             tab.clicked.connect(lambda checked=False, name=name: self.select_tab(name))
             self.tab_group.addButton(tab, index)
             self.tabs.append(tab)
-            grid.addWidget(tab, index // 5, index % 5)
-        for column in range(5):
+            grid.addWidget(tab, index // columns, index % columns)
+        for column in range(columns):
             grid.setColumnStretch(column, 1)
             grid.setColumnMinimumWidth(column, max(self.tabs[index].fontMetrics().horizontalAdvance(
-                self.tabs[index].text()) + 16 for index in (column, column + 5)))
+                self.tabs[index].text()) + 16 for index in range(column, len(TABS), columns)))
         self.outer.addWidget(tabbar)
         self.stack = QStackedWidget(self)
         for name in TABS:
@@ -190,6 +194,7 @@ class NativeLauncher(QWidget):
         self.busy = True
         self.note('busy')
         for item in self.action_buttons: item.setEnabled(False)
+        self.update_auth_fields()
         def run():
             try: self.events.put(('result', operation(), success))
             except Exception as error: self.events.put(('error', redact_text(error), None))
@@ -216,6 +221,7 @@ class NativeLauncher(QWidget):
                     callback(value)
                 else:
                     self.notice_text.set('')
+                self.update_auth_fields()
         except queue.Empty:
             pass
 
@@ -224,6 +230,26 @@ class NativeLauncher(QWidget):
         if not self.polling:
             self.polling = True
             threading.Thread(target=lambda: self.events.put(('status', self.model.status(), None)), daemon=True).start()
+
+    def update_auth_fields(self, *_):
+        active = self.variables['authMode'].get() == 'accounts'
+        for key in ('username', 'password'):
+            self.fields[('authentication', key)].setEnabled(active and not self.auth_configured and not self.busy)
+        for key in ('session_hours', 'idle_minutes', 'auth_engines'):
+            self.fields[('authentication', key)].setEnabled(active and not self.busy)
+        self.auth_create_button.setEnabled(active and not self.auth_configured and not self.busy)
+        self.auth_manage_button.setEnabled(active and self.auth_configured and not self.busy)
+
+    def create_administrator(self):
+        username, password = self.auth_username.get(), self.auth_password.get()
+        self.auth_password.set('')
+        def created(state):
+            self.auth_configured = state['configured']
+            self.auth_username.set('')
+            self.auth_label.setText(self.t('admin_ready'))
+            self.update_auth_fields()
+            self.note('admin_created')
+        self.task(lambda: self.model.create_administrator(username, password), created)
 
     def save(self):
         try: values = self.collect_config()
@@ -321,6 +347,7 @@ class NativeLauncher(QWidget):
             event.ignore()
             return
         self.closed = True
+        self.auth_password.set('')
         self.dispatch_timer.stop()
         self.poll_timer.stop()
         event.accept()

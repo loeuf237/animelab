@@ -1,3 +1,6 @@
+from animelab.services.extension_service import extension_service
+from animelab.services.scraping_service import scraping_service
+from animelab.services.voiranime_service import voiranime_service
 import json
 from unittest.mock import patch, AsyncMock
 import pytest
@@ -247,9 +250,9 @@ def test_animepahe_security_ssrf_whitelist():
 
 def test_routes_animepahe_search_integration(monkeypatch):
     from animelab.routers import anime as anime_router
-    monkeypatch.setattr(anime_router.scraping_service, 'search_anime', AsyncMock(return_value=[]))
-    monkeypatch.setattr(anime_router.voiranime_service, 'search_anime', AsyncMock(return_value=[]))
-    monkeypatch.setattr(anime_router.extension_service, 'get_enabled_container_sources', lambda: [])
+    monkeypatch.setattr(scraping_service, 'search_anime', AsyncMock(return_value=[]))
+    monkeypatch.setattr(voiranime_service, 'search_anime', AsyncMock(return_value=[]))
+    monkeypatch.setattr(extension_service, 'get_enabled_container_sources', lambda: [])
     client = TestClient(app)
 
     # 1. Search with source=animepahe
@@ -269,10 +272,10 @@ def test_routes_animepahe_search_integration(monkeypatch):
     with patch.object(animepahe_service, "search_anime", new_callable=AsyncMock) as mock_search:
         mock_search.return_value = mock_results
 
-        resp = client.get("/search?q=dandadan&source=animepahe")
-        assert resp.status_code == 200
-        assert "Dandadan" in resp.text
-        assert "animepahe" in resp.text
+        resp = client.get('/search?q=dandadan&source=animepahe', follow_redirects=False)
+        assert resp.status_code == 303
+        assert resp.headers['location'] == '/app/?q=dandadan&source=animepahe&search=1'
+        mock_search.assert_not_awaited()
 
     # 2. Search API with source=all includes animepahe
     with patch.object(animepahe_service, "search_anime", new_callable=AsyncMock) as mock_search:

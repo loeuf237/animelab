@@ -40,7 +40,8 @@ def prepare(source, output, tools, tag, source_commit, candidate_run_id, signed_
     if info.get('validation_key_only') is not False or info.get('signing_certificate_sha256') != SIGNING_CERTIFICATE:
         raise ValueError('A production signing identity is required')
     version = info['version']
-    if not re.fullmatch(r'\d+\.\d+\.\d+', version) or not re.fullmatch(re.escape('android-v' + version) + r'-beta\.[1-9]\d*', tag):
+    if (not re.fullmatch(r'\d+\.\d+\.\d+', version) or
+            (tag != 'v' + version and not re.fullmatch(re.escape('android-v' + version) + r'-beta\.[1-9]\d*', tag))):
         raise ValueError('Release tag does not match APK version')
     app = source / 'AnimeLab-Android-under-test.apk'
     inspect_apk(app, require_optimized=True)

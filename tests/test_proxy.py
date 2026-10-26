@@ -144,14 +144,10 @@ def test_api_proxy_endpoints():
         assert saved_data["settings"]["enabled"] is True
         assert saved_data["settings"]["port"] == 9050
 
-        # Settings page contains proxy tab and pane
-        page_res = client.get("/settings")
-        assert page_res.status_code == 200
-        assert "data-settings-tab=\"proxy\"" in page_res.text
-        assert "settings-pane-proxy" in page_res.text
-        assert "proxy-enable-cb" in page_res.text
-        assert "proxy-type-select" in page_res.text
-        assert "test-proxy-btn" in page_res.text
+        # Proxy configuration is displayed by Vue; the old bookmark redirects.
+        page_res = client.get('/settings', follow_redirects=False)
+        assert page_res.status_code == 303
+        assert page_res.headers['location'] == '/app/settings'
 
         # Cleanup: disable proxy in shared singleton
         client.post("/api/proxy/settings", json={"enabled": False, "host": ""})

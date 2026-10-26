@@ -1,11 +1,15 @@
 # Android distribution and validation
 
-The [0.1.2 Android beta 1](https://github.com/loeuf237/animelab/releases/tag/android-v0.1.2-beta.1)
-ships one signed ARM64 APK, build provenance and checksums. It is a standalone
-application, not a wrapper requiring a running desktop server. Full ARM64
-physical-device validation remains pending for this APK; earlier A11 device
-validation is documented separately below. The published package was compiled,
-signed and tested by [GitHub Actions](https://github.com/loeuf237/animelab/actions/workflows/release-android.yml).
+The [0.1.4 release](https://github.com/loeuf237/animelab/releases/tag/v0.1.4)
+includes a signed ARM64 APK alongside the desktop archives, build provenance and
+checksums. It is a standalone application, not a wrapper requiring a desktop
+server. Full ARM64 physical-device validation remains pending for this APK;
+earlier A11 device validation is documented separately below.
+
+`release-desktop.yml` orchestrates the unified release and calls
+`release-android.yml` with the exact same tag. The reusable Android workflow
+compiles, signs and tests the APK before exposing its public release artifact.
+Publication waits for both the Android validation matrix and all desktop builds.
 
 The current target is Android 10+ / ARM64, Python 3.13 and Chaquopy 17.1.0.
 `android/requirements.txt` pins the runtime. `scripts/android_native_wheels.py`
@@ -59,7 +63,8 @@ checked before stripping. Original binaries and hashes are retained under
 `android/app/build/reports/native-optimization/`, and R8 maps under
 `android/app/build/outputs/mapping/`. CI uploads these diagnostic artifacts.
 The source synchronization removes only byte-identical public copies served
-from `animelab/static`; it retains SPA assets, templates and all extractors.
+from `animelab/static`; it retains SPA assets and all extractors. The legacy Jinja
+frontend and its runtime dependency are no longer included.
 Native libraries remain uncompressed for direct loading.
 
 The A11 source build passed the complete direct/HLS/subtitle/export probe on a
@@ -92,8 +97,8 @@ passwords only to the Gradle build step, and removes the temporary key even afte
 failure. It verifies the production certificate on both APKs and checks it again
 before publication. The existing identity is retained for in-place updates. The
 `android/keystore/` directory is ignored; never commit or publish its contents.
-Preserve a secure local backup of the release identity for updates. This
-publication uses `android-v0.1.2-beta.1` and never modifies desktop release assets.
+Preserve a secure local backup of the release identity for updates. Starting with `v0.1.4`, the APK is published in the same release as desktop assets.
+Legacy `android-v...-beta.N` tags remain available for standalone Android betas.
 
 Local signing avoids transferring the private identity to GitHub:
 

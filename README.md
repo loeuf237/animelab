@@ -10,7 +10,7 @@
 
 ## Downloads
 
-Choose a build from [GitHub Releases](https://github.com/loeuf237/animelab/releases). Desktop and Android releases are published separately.
+Choose a build from [GitHub Releases](https://github.com/loeuf237/animelab/releases). Android and desktop downloads are grouped in the same release.
 
 | Platform | Package | Getting started |
 | --- | --- | --- |
@@ -22,9 +22,9 @@ Choose a build from [GitHub Releases](https://github.com/loeuf237/animelab/relea
 
 Desktop packages include Python, the compiled interface, FFmpeg and ffprobe. Windows uses WebView2; Linux uses GTK/WebKit, with an installed-browser fallback when a native window is unavailable.
 
-Desktop builds open a native tabbed launcher. Choose your interface, port, folders and download settings, then click **Launch**. It also provides diagnostics, proxy settings, backups and graceful shutdown. See the [0.1.3 desktop release notes](docs/releases/v0.1.3.md) and [desktop tools and recovery](docs/desktop-distribution.md).
+Desktop builds open a native tabbed launcher. Choose your interface, port, folders and download settings, then click **Launch**. It also provides diagnostics, proxy settings, backups and graceful shutdown. See the [0.1.4 release notes](docs/releases/v0.1.4.md) and [desktop tools and recovery](docs/desktop-distribution.md).
 
-Android remains a **prerelease**. The [0.1.2 beta release notes](docs/releases/android-v0.1.2-beta.1.md) explain its emulator coverage and pending physical-device validation. Release assets include checksums and build information.
+Android device coverage remains **beta**. The [0.1.4 release notes](docs/releases/v0.1.4.md) explain its emulator coverage and pending full physical-device validation. Release assets include checksums and build information.
 
 In supporting browsers, install the web interface as a PWA using the browser's install or **Add to Home Screen** option. The AnimeLab server must remain available.
 
@@ -38,6 +38,15 @@ In supporting browsers, install the web interface as a PWA using the browser's i
 - **Use on mobile:** responsive screens, English/French interface, light/dark themes and global search with **Ctrl+K / Cmd+K**.
 
 On Android, completed videos can be exported to shared storage. Export failures can be retried without downloading the video again.
+
+## Shared server and accounts
+
+An optional shared-server mode provides administrator-managed accounts, invitation
+and recovery codes, permissions and private libraries, source sessions and downloads.
+It runs from source or Docker; the desktop launcher's Authentication tab also
+enables accounts locally. Personal desktop/Android mode remains the default.
+See [shared-server setup and security](docs/shared-server.md) for bootstrap commands,
+HTTPS deployment, resource limits and manual tests.
 
 ## Sources and extensions
 
@@ -80,6 +89,10 @@ uv run --locked python run.py
 
 Open **[http://localhost:8080/app/](http://localhost:8080/app/)**. Rebuild the interface after changing its source files.
 
+Vue is the only web frontend. Old bookmarks (`/downloads`, `/settings`, `/anime`,
+`/search`, etc.) redirect to the corresponding SPA screen, preserving their query
+parameters. The former Jinja pages, scripts and styles are no longer shipped.
+
 For a native desktop window, use the separate desktop packaging dependencies and the platform's WebView libraries. See [desktop package details](docs/desktop-distribution.md) for setup and compatibility. The default locked environment runs the web server; it does not install native desktop or Android build dependencies.
 
 ### Configuration and data
@@ -102,7 +115,7 @@ For local-only use without automatic reload, on Linux/macOS:
 ANIMAN_HOST=127.0.0.1 ANIMAN_RELOAD=false uv run --locked python run.py
 ```
 
-AnimeLab was previously named **Animan**. Internal `animan` package names, `ANIMAN_*` variables, `.animan` data folders and Android ID `com.animan.app` are retained for compatibility. Desktop settings and the library live under `~/.animan`; Android uses private app storage and exports completed media separately.
+AnimeLab was previously named **Animan**. The Python package is now `animelab`. Legacy `ANIMAN_*` variables, `.animan` data folders and Android ID `com.animan.app` are retained for compatibility. Desktop settings and the library live under `~/.animan`; Android uses private app storage and exports completed media separately.
 
 ## Docker
 
@@ -132,7 +145,7 @@ npm run dev
 
 Vite serves the interface at **http://localhost:5173** and proxies API requests to port **8080**.
 
-[CI](.github/workflows/ci.yml) runs on pushes and pull requests. It checks Python, the frontend build and responsive layouts, Docker persistence and Android resources. It also enforces Ruff, incremental mypy checks, ESLint, Prettier and Vue/TypeScript checks. Desktop and Android release workflows are separate.
+[CI](.github/workflows/ci.yml) runs on pushes and pull requests. It checks Python, the frontend build and responsive layouts, Docker persistence and Android resources. It also enforces Ruff, incremental mypy checks, ESLint, Prettier and Vue/TypeScript checks. The unified release workflow calls the Android build and publishes all platforms together after validation.
 
 After the source installation above, run all development checks from the repository root:
 
