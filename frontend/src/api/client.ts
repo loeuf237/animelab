@@ -110,6 +110,9 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   }
 
   if (!response.ok) {
+    if (response.status === 401 && response.headers.get('X-AnimeLab-Shared') === '1') {
+      window.location.replace('/auth/login')
+    }
     let errorDetail = response.statusText
     let data: ErrorResponse | null = null
     try {

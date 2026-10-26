@@ -13,7 +13,7 @@ from .launcher_widgets import Value
 from .state import write_json
 
 TABS = ('webui', 'server', 'downloads', 'folders', 'requests', 'proxy',
-        'extensions', 'diagnostics', 'backups', 'about')
+        'extensions', 'authentication', 'diagnostics', 'backups', 'about')
 
 
 def label(ui, parent, key):
@@ -28,6 +28,7 @@ def button(ui, parent, key, command):
     item.clicked.connect(lambda checked=False: command())
     parent.addWidget(item, 0, Qt.AlignmentFlag.AlignHCenter)
     ui.action_buttons.append(item)
+    return item
     return item
 
 
@@ -100,6 +101,22 @@ def build_page(ui, parent, name):
 
 
 class Pages:
+    @staticmethod
+    def authentication(ui, frame):
+        choice(ui, frame, 'auth_mode', ui.variables['authMode'],
+               {'none': 'auth_none', 'accounts': 'auth_accounts'})
+        field(ui, frame, 'username', ui.auth_username)
+        field(ui, frame, 'password', ui.auth_password, secret=True)
+        field(ui, frame, 'session_hours', ui.variables['authSessionHours'], spin=(1, 168))
+        field(ui, frame, 'idle_minutes', ui.variables['authIdleMinutes'], spin=(1, 1440))
+        field(ui, frame, 'auth_engines', ui.variables['authMaxEngines'], spin=(1, 32))
+        ui.auth_create_button = button(ui, frame, 'create_admin', ui.create_administrator)
+        ui.auth_manage_button = button(ui, frame, 'manage_accounts', lambda: ui.task(ui.model.open_accounts))
+        label(ui, frame, 'auth_hint')
+        ui.auth_label = label(ui, frame, 'admin_ready' if ui.auth_configured else 'admin_missing')
+        ui.variables['authMode'].changed.connect(ui.update_auth_fields)
+        ui.update_auth_fields()
+
     @staticmethod
     def webui(ui, frame):
         checkbox(ui, frame, 'open_ui', ui.variables['openUi'])

@@ -199,10 +199,9 @@ async def test_extension_service_business_rules(tmp_path):
 def test_api_extensions_routes(client):
     """Teste les routes API du routeur extensions."""
     # 1. Page HTML /extensions
-    resp = client.get("/extensions")
-    assert resp.status_code == 200
-    assert "Magasins &amp; Extensions" in resp.text or "Extensions" in resp.text
-    assert "Ajouter un magasin d'extensions" in resp.text
+    resp = client.get('/extensions', follow_redirects=False)
+    assert resp.status_code == 303
+    assert resp.headers['location'] == '/app/extensions'
 
     # 2. Liste des extensions
     resp_list = client.get("/api/extensions/list")

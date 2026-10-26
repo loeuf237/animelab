@@ -102,6 +102,9 @@ async def rotate_proxy(body: StartVerification, request: Request):
 
 
 def is_local(request):
+    import os
+    if os.getenv("ANIMELAB_SHARED_WORKER") == "1":
+        return False
     return bool(request.client and request.client.host in ("127.0.0.1", "::1", "testclient"))
 
 

@@ -12,7 +12,7 @@ from urllib.request import ProxyHandler, Request, build_opener
 import webbrowser
 
 from .control import remote_call, running_record
-from .options import normalize_config, preferences, PAGES
+from .options import normalize_config, preferences, PAGES, shared_directory
 from .state import load_config, write_json
 from .supervisor import launcher_command, Supervisor
 
@@ -68,6 +68,8 @@ class LauncherModel:
 
     def launch(self, config, native=False):
         values = normalize_config(config)
+        if values['launcher']['authMode'] == 'accounts' and not self.authentication_status()['configured']:
+            raise ValueError('Create the first administrator in the Authentication tab before starting')
         if native:
             values['browser'] = False
             values['launcher']['openUi'] = True
@@ -102,7 +104,7 @@ class LauncherModel:
             return
         record = running_record(self.directory)
         remote_call(record, '/api/action', {'action': 'stop'})
-        deadline = time.monotonic() + 50
+        deadline = time.monotonic() + 80
         while time.monotonic() < deadline:
             try:
                 remote_call(record, timeout=2)
@@ -119,10 +121,35 @@ class LauncherModel:
             raise ValueError('Unsupported application page')
         webbrowser.open(f"http://127.0.0.1:{state['port']}/spa/{PAGES[page]}{query}")
 
+    def authentication_status(self):
+        root = shared_directory(self.directory)
+        path = root / 'accounts.sqlite3'
+        configured = False
+        if path.is_file():
+            with closing(sqlite3.connect(path.as_uri() + '?mode=ro', uri=True, timeout=1)) as db:
+                configured = db.execute('SELECT id FROM users WHERE admin=1 AND enabled=1 LIMIT 1').fetchone() is not None
+        return {'configured': configured, 'root': str(root)}
+
+    def create_administrator(self, username, password):
+        from animelab.diagnostics import remember_secret
+        remember_secret(password)
+        from animelab.shared.accounts import Accounts
+        store = Accounts(shared_directory(self.directory))
+        store.bootstrap(username, password)
+        return self.authentication_status()
+
+    def open_accounts(self):
+        state = self.status()
+        if not state.get('ready') or state.get('authMode', 'none') != 'accounts':
+            raise RuntimeError('Start AnimeLab with account authentication first')
+        webbrowser.open(f"http://127.0.0.1:{state['port']}/auth/account")
+
     def engine_api(self, path, data=None):
         if path not in ('/api/proxy/settings', '/api/proxy/test'):
             raise ValueError('Unsupported engine operation')
         state = self.status()
+        if state.get('authMode') == 'accounts' or preferences(self.config())['authMode'] == 'accounts':
+            raise ValueError('Configure private source/proxy settings in the signed-in web account')
         if path == '/api/proxy/settings' and not state.get('ready'):
             if state.get('instanceId'):
                 raise RuntimeError('Wait for the engine to finish starting or stopping.')

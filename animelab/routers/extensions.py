@@ -1,43 +1,13 @@
 from animelab.api_contracts import ContractRoute
 import logging
 from typing import Optional
-from fastapi import APIRouter, Request, HTTPException, Body, Query
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import APIRouter, HTTPException, Body, Query
+from fastapi.responses import JSONResponse
 
 from animelab.services.extension_service import extension_service
-from animelab.templates_config import templates
 
 logger = logging.getLogger("animelab.router.extensions")
 router = APIRouter(route_class=ContractRoute)
-
-
-@router.get("/extensions", response_class=HTMLResponse)
-async def extensions_page(
-    request: Request,
-    q: Optional[str] = Query(None, alias="q"),
-    lang: Optional[str] = Query(None, alias="lang")
-):
-    """Page de gestion des magasins d'extensions et des sources Aniyomi."""
-    active_repo = extension_service.get_active_repository()
-    extensions = extension_service.get_visible_extensions(query=q, lang=lang) if active_repo else []
-    
-    enabled_count = sum(1 for e in extensions if e.get("is_enabled"))
-    updates_count = sum(1 for e in extensions if e.get("has_update"))
-    total_count = len(extensions)
-
-    return templates.TemplateResponse(
-        request=request,
-        name="extensions.html",
-        context={
-            "active_repo": active_repo,
-            "extensions": extensions,
-            "enabled_count": enabled_count,
-            "updates_count": updates_count,
-            "total_count": total_count,
-            "query": q or "",
-            "selected_lang": lang or "all",
-        }
-    )
 
 
 @router.post("/api/extensions/import-repo")

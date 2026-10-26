@@ -19,7 +19,7 @@ def test_animelab_owns_the_runtime_resources():
     assert Path(animelab.__file__).resolve().parent == ROOT / 'animelab'
     assert importlib.util.find_spec('animan') is None
     assert settings.BASE_DIR == ROOT / 'animelab'
-    for resource in ('static/img/icon-192.png', 'templates/index.html', 'desktop/panel.html'):
+    for resource in ('static/img/icon-192.png', 'static/manifest.json', 'desktop/panel.html'):
         assert files('animelab').joinpath(resource).is_file()
 
 

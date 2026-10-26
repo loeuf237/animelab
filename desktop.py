@@ -19,6 +19,8 @@ from animelab import __version__
 
 # Windowed PyInstaller executables have no console streams on Windows.
 for _stream in ("stdin", "stdout", "stderr"):
+    if _stream == 'stdin' and '--account-worker' in sys.argv:
+        continue  # The windowed worker recovers its inherited lifetime pipe.
     if getattr(sys, _stream) is None:
         setattr(sys, _stream, open(os.devnull, "r" if _stream == "stdin" else "w", encoding="utf-8"))
 
@@ -43,12 +45,15 @@ def find_available_port(default_port=8080):
         return sock.getsockname()[1]
 
 
-def wait_for_server(port, max_retries=80, delay=.25):
+def wait_for_server(port, max_retries=80, delay=.25, shared=False):
     opener = build_opener(ProxyHandler({}))
     for _ in range(max_retries):
         try:
-            with opener.open(f"http://127.0.0.1:{port}/openapi.json", timeout=.5) as response:
-                if json.load(response)["info"]["version"] == __version__:
+            path = '/healthz' if shared else '/openapi.json'
+            with opener.open(f"http://127.0.0.1:{port}{path}", timeout=.5) as response:
+                payload = json.load(response)
+                valid = (payload.get('mode') == 'shared' and payload.get('version') == __version__) if shared else payload['info']['version'] == __version__
+                if valid:
                     return True
         except (OSError, ValueError, KeyError):
             pass
@@ -57,6 +62,13 @@ def wait_for_server(port, max_retries=80, delay=.25):
 
 
 def start_server(port):
+    shared_options = os.getenv('ANIMELAB_DESKTOP_AUTH')
+    if shared_options:
+        from animelab.shared.gateway import SharedConfig, create_app
+        values = json.loads(shared_options)
+        app = create_app(SharedConfig(Path(values['root']), f'http://127.0.0.1:{port}',
+            values['maxEngines'], values['sessionHours'], values['idleMinutes']))
+        return start_asgi_server(app, port, shared=True)
     os.environ.update(ANIMAN_PORT=str(port), ANIMAN_HOST="127.0.0.1", ANIMAN_RELOAD="false",
                       ANIMAN_ALLOWED_HOSTS='127.0.0.1,localhost')
     from animelab.config import settings
@@ -73,12 +85,17 @@ def start_server(port):
                 apply_download_preferences()
                 yield
         app.router.lifespan_context = desktop_lifespan
+    return start_asgi_server(app, port)
+
+
+def start_asgi_server(app, port, shared=False):
     import uvicorn
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port,
-        log_level="warning", log_config=None, access_log=False, timeout_graceful_shutdown=10))
+        log_level="warning", log_config=None, access_log=False, proxy_headers=False,
+        timeout_graceful_shutdown=10))
     worker = threading.Thread(target=server.run, daemon=True, name="AnimeLabServer")
     worker.start()
-    if not wait_for_server(port) or not worker.is_alive() or not server.started:
+    if not wait_for_server(port, shared=shared) or not worker.is_alive() or not server.started:
         server.should_exit = True
         worker.join(timeout=15)
         raise RuntimeError("AnimeLab server did not become ready")
@@ -140,6 +157,56 @@ def self_test():
             gc.collect()  # Release SQLite handles before Windows removes temporary storage.
 
 
+def authentication_self_test():
+    """Run the delivered gateway and its real account child in disposable storage."""
+    import secrets
+    import httpx
+    from animelab.shared.accounts import Accounts
+    from animelab.diagnostics import remember_secret, redact_text
+    previous = os.environ.get('ANIMELAB_DESKTOP_AUTH')
+    with tempfile.TemporaryDirectory(prefix='animelab-auth-check-') as temporary:
+        root = Path(temporary)
+        password = secrets.token_urlsafe(32)
+        remember_secret(password)
+        Accounts(root).bootstrap('package-check', password)
+        os.environ['ANIMELAB_DESKTOP_AUTH'] = json.dumps({
+            'root': str(root), 'sessionHours': 2, 'idleMinutes': 10, 'maxEngines': 1})
+        server = worker = None
+        processes = []
+        try:
+            port = find_available_port(0)
+            server, worker = start_server(port)
+            base = f'http://127.0.0.1:{port}'
+            with httpx.Client(base_url=base, trust_env=False, timeout=70) as client:
+                assert client.get('/api/favorites').status_code == 401
+                login = client.post('/api/auth/login', headers={'Origin': base},
+                    json={'username': 'package-check', 'password': password})
+                login.raise_for_status()
+                assert client.get('/api/auth/me').json()['user']['admin'] is True
+                assert client.get('/api/favorites').json() == []
+                for path in ('/app/', '/auth/account', '/auth/client.js', '/auth/style.css'):
+                    client.get(path).raise_for_status()
+                processes = [item.process for item in server.config.app.state.workers.running.values()]
+                assert len(processes) == 1
+        except Exception:
+            for logfile in root.glob('users/*/engine.log'):
+                logger.error('Private engine check failed: %s', redact_text(logfile.read_text(errors='replace')[-12000:]))
+            raise
+        finally:
+            if server:
+                server.should_exit = True
+                worker.join(timeout=60)
+                if worker.is_alive():
+                    raise RuntimeError('Authentication gateway failed to stop')
+            if previous is None:
+                os.environ.pop('ANIMELAB_DESKTOP_AUTH', None)
+            else:
+                os.environ['ANIMELAB_DESKTOP_AUTH'] = previous
+        assert all(process.poll() == 0 for process in processes)
+        assert not list(root.glob('users/*/ready.json'))
+        print(json.dumps({'authentication': True, 'private_account_engine': True, 'graceful_shutdown': True}))
+
+
 def configure_file_logging(path):
     from animelab.diagnostics import install_logging
     install_logging()
@@ -186,17 +253,19 @@ def run_engine(args, workdir):
     finally:
         # Lifespan shutdown pauses/persists transfers on the server event loop.
         server.should_exit = True
-        worker.join(timeout=20)
+        worker.join(timeout=60 if os.getenv('ANIMELAB_DESKTOP_AUTH') else 20)
         if worker.is_alive():
-            raise RuntimeError('Engine did not shut down within 20 seconds')
-        from animelab.database import engine
-        engine.dispose()
+            raise RuntimeError('Engine did not shut down in time')
+        if not os.getenv('ANIMELAB_DESKTOP_AUTH'):
+            from animelab.database import engine
+            engine.dispose()
 
 
 def main():
     parser = argparse.ArgumentParser(description="AnimeLab desktop")
     parser.add_argument("--version", action="version", version=__version__)
     parser.add_argument("--self-test", action="store_true", help="Offline packaged backend/frontend/media checks")
+    parser.add_argument('--auth-self-test', action='store_true', help='Check account authentication and private subprocesses in temporary storage')
     parser.add_argument("--headless", action="store_true", help="Run without opening a window")
     parser.add_argument('--admin', '--launcher', dest='admin', action='store_true', help='Open the native tabbed desktop launcher')
     parser.add_argument('--launch', action='store_true', help='Start the engine directly with saved settings')
@@ -211,9 +280,17 @@ def main():
     parser.add_argument('--gui-self-test', action='store_true', help='Create, render and close a real native window')
     parser.add_argument('--launcher-self-test', action='store_true', help='Render every native launcher tab and close')
     parser.add_argument('--worker', help=argparse.SUPPRESS)
+    parser.add_argument('--account-worker', action='store_true', help=argparse.SUPPRESS)
     parser.add_argument('--control-url', help=argparse.SUPPRESS)
     args = parser.parse_args()
     configure_bundled_tools()
+    if args.account_worker:
+        from animelab.shared.worker import main as account_worker
+        account_worker()
+        return
+    if args.auth_self_test:
+        authentication_self_test()
+        return
     if args.self_test:
         self_test()
         return
@@ -247,7 +324,7 @@ def main():
     if args.stop or args.status or args.diagnose:
         if args.stop:
             remote_call(record, '/api/action', {'action': 'stop'})
-            deadline = time.monotonic() + 45
+            deadline = time.monotonic() + 85
             while time.monotonic() < deadline:
                 try:
                     remote_call(record)

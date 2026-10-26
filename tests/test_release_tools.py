@@ -58,7 +58,7 @@ def test_desktop_publisher_generates_notes_before_uploading_assets():
     import yaml
     workflow = yaml.safe_load((desktop_release.ROOT / '.github/workflows/release-desktop.yml').read_text())
     publish = workflow['jobs']['publish']
-    assert publish['needs'] == 'build'
+    assert publish['needs'] == ['build', 'android']
     steps = publish['steps']
     notes = next(i for i, step in enumerate(steps) if step.get('id') == 'release')
     upload = next(i for i, step in enumerate(steps) if step.get('uses', '').startswith('softprops/action-gh-release@'))
@@ -103,3 +103,49 @@ def test_archives_ship_quoted_administration_shortcuts(tmp_path, windows, mac, b
         # these POSIX scripts, but cannot represent their Unix executable bits.
         if not windows and os.name == 'posix':
             assert shortcut.stat().st_mode & 0o111
+
+
+def test_unified_release_requires_signed_android_and_matching_manifests(tmp_path, monkeypatch):
+    from scripts.android_publish import SIGNING_CERTIFICATE
+    monkeypatch.setattr(desktop_release, '__version__', '0.1.4')
+    monkeypatch.setattr(desktop_release.subprocess, 'check_output', lambda *a, **kw: 'a' * 40)
+    monkeypatch.setattr(sys, 'argv', ['release', 'checksums', str(tmp_path), '--include-android'])
+    for platform, extension in [('Windows-x64', '.zip'), ('Linux-x64', '.tar.gz'),
+                                ('macOS-arm64-UNTESTED', '.zip'), ('macOS-x64-UNTESTED', '.zip')]:
+        (tmp_path / ('AnimeLab-v0.1.4-' + platform + extension)).write_bytes(b'archive')
+        manifest = 'AnimeLab-v0.1.4-' + platform.removesuffix('-UNTESTED') + '-build-info.json'
+        (tmp_path / manifest).write_text(json.dumps(dict(version='0.1.4', commit='a' * 40)))
+    with pytest.raises(RuntimeError, match='incomplete'):
+        desktop_release.checksums()
+    apk = tmp_path / 'AnimeLab-v0.1.4-Android-arm64.apk'
+    apk.write_bytes(b'signed apk')
+    info = dict(version='0.1.4', commit='a' * 40, release_tag='v0.1.4', validation_key_only=False,
+                signing_certificate_sha256=SIGNING_CERTIFICATE, emulator_api_levels_tested=[29, 30, 35])
+    manifest = tmp_path / 'Android-build-info.json'
+    manifest.write_text(json.dumps(info))
+    desktop_release.checksums()
+    assert len((tmp_path / 'SHA256SUMS.txt').read_text().splitlines()) == 10
+    info['commit'] = 'b' * 40
+    manifest.write_text(json.dumps(info))
+    with pytest.raises(RuntimeError, match='source version and commit'):
+        desktop_release.checksums()
+    info['commit'] = 'a' * 40
+    info['validation_key_only'] = True
+    manifest.write_text(json.dumps(info))
+    with pytest.raises(RuntimeError, match='production signing'):
+        desktop_release.checksums()
+    (tmp_path / 'AnimeLab-instrumentation.apk').write_bytes(b'never public')
+    with pytest.raises(RuntimeError, match='unexpected'):
+        desktop_release.checksums()
+
+
+def test_unified_workflow_keeps_android_tests_before_publication():
+    import yaml
+    workflow = yaml.safe_load((desktop_release.ROOT / '.github/workflows/release-android.yml').read_text())
+    jobs = workflow['jobs']
+    assert jobs['prepare-release']['needs'] == ['build', 'device-tests']
+    assert jobs['device-tests']['strategy']['matrix']['api'] == [29, 30, 35]
+    publisher = yaml.safe_load((desktop_release.ROOT / '.github/workflows/release-desktop.yml').read_text())['jobs']
+    assert publisher['android']['uses'] == './.github/workflows/release-android.yml'
+    assert publisher['android']['with']['publish'] is False
+    assert any('--include-android' in step.get('run', '') for step in publisher['publish']['steps'])

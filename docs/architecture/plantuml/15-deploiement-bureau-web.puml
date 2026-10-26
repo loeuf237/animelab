@@ -10,7 +10,7 @@ node "Poste utilisateur — Windows / Linux / macOS" as Desktop {
     artifact "desktop.py + Python embarqué\nPyInstaller" as Launcher
     component "Fenêtre pywebview\nou navigateur installé" as Window
     component "Uvicorn + FastAPI\nthread serveur, loopback" as LocalAPI
-    artifact "Vue compilée /frontend/dist\n+ statiques et pages Jinja" as Assets
+    artifact "Vue compilée /frontend/dist\n+ statiques PWA" as Assets
     component "Services Python\nfile, catalogue, réseau, bibliothèque" as Engine
   }
   node "Processus outils média" {

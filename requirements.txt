@@ -46,12 +46,8 @@ idna==3.20
     # via
     #   anyio
     #   httpx
-jinja2==3.1.6
-    # via animelab
 lxml==6.1.3
     # via animelab
-markupsafe==3.0.4
-    # via jinja2
 pycparser==3.12 ; implementation_name != 'PyPy'
     # via cffi
 pydantic==2.13.5

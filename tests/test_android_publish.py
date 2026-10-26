@@ -95,3 +95,9 @@ def test_release_checks_actual_apk_certificate(candidate, monkeypatch):
     monkeypatch.setattr(android_publish.subprocess, 'check_output', lambda *a, **kw: 'certificate SHA-256 digest: ' + 'b' * 64)
     with pytest.raises(ValueError, match='certificate differs'):
         prepare(candidate)
+
+
+def test_unified_release_accepts_matching_common_tag(candidate):
+    result = prepare(candidate, tag='v0.1.0', signing_method='github_actions')
+    assert result['tag'] == 'v0.1.0'
+    assert result['apk'] == 'AnimeLab-v0.1.0-Android-arm64.apk'

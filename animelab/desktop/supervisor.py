@@ -74,6 +74,7 @@ class Supervisor:
                     'configuredPort': self.config['port'], 'browser': self.config['browser'],
                     'portFallback': self.port_fallback,
                     'pendingRestart': self.config != self.launch_config,
+                    'authMode': preferences(self.launch_config)['authMode'],
                     'mode': self.mode, 'error': self.error, 'nativeError': self.native_error,
                     'uptimeSeconds': round(time.monotonic() - self.started_at)}
 
@@ -136,9 +137,12 @@ class Supervisor:
             status = self.status()
             if not status['ready']:
                 raise RuntimeError('Local engine is not ready')
+            shared = status['authMode'] == 'accounts'
+            path = '/healthz' if shared else '/openapi.json'
             with build_opener(ProxyHandler({})).open(
-                    f"http://127.0.0.1:{status['port']}/openapi.json", timeout=3) as response:
-                if json.load(response)['info']['version'] != __version__:
+                    f"http://127.0.0.1:{status['port']}{path}", timeout=3) as response:
+                payload = json.load(response)
+                if (payload.get('version') if shared else payload['info']['version']) != __version__:
                     raise RuntimeError('Unexpected engine version')
 
         from animelab.config import settings
@@ -176,7 +180,7 @@ class Supervisor:
                 args += ['--headless']
             self.process = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                             stderr=subprocess.STDOUT, bufsize=0,
-                                            env={**os.environ, **engine_environment(self.config)})
+                                            env={**os.environ, **engine_environment(self.config, self.directory)})
             self.console_thread = threading.Thread(target=self.capture_console, args=(self.process.stdout,), daemon=True)
             self.console_thread.start()
         deadline = time.monotonic() + 35
@@ -211,7 +215,7 @@ class Supervisor:
             if self.process.poll() is None:
                 (self.workdir / 'stop').touch()
                 try:
-                    self.process.wait(timeout=30)
+                    self.process.wait(timeout=65 if preferences(self.launch_config)['authMode'] == 'accounts' else 30)
                 except subprocess.TimeoutExpired:
                     # This Popen handle is our own child, never a user-supplied PID/port.
                     logger.error('Engine did not stop gracefully; terminating the owned child')

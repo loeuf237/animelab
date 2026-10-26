@@ -29,7 +29,7 @@ jobs:
           enable-cache: true
       - run: uv sync --locked --group desktop
       - name: Test desktop administration and launch regressions
-        run: uv run --locked --group desktop python -m pytest tests/test_desktop_admin.py tests/test_native_launcher.py tests/test_release_tools.py -q
+        run: uv run --locked --group desktop python -m pytest tests/test_desktop_admin.py tests/test_native_launcher.py tests/test_launcher_auth.py tests/test_release_tools.py -q
       - name: Render all native launcher tabs
         run: uv run --locked --group desktop python scripts/desktop_release.py launcher-check --source
       - name: Render and close a native Edge WebView2 window
@@ -80,6 +80,7 @@ jobs:
       - name: Validate Compose and test the actual server with temporary storage
         run: |
           docker compose config --quiet
+          ANIMELAB_PUBLIC_URL=https://anime.example.org docker compose -f compose.yaml -f compose.shared.yaml config --quiet
           python3 scripts/docker_smoke.py
 
   frontend:

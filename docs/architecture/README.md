@@ -27,8 +27,9 @@ pas l’APK bêta déjà publié et nécessitent une nouvelle compilation.
 AnimeLab comprend une interface Vue 3/TypeScript avec Pinia, une API FastAPI, un moteur
 Python de catalogue/extraction/téléchargement, une bibliothèque SQLite et des
 adaptations de plateforme. Le même moteur sert le bureau, le navigateur/PWA et
-l’application Android autonome. Les anciennes pages Jinja et leurs fichiers
-statiques restent montés à côté de la SPA.
+l’application Android autonome. Vue est l'unique frontend web ; les anciennes
+pages Jinja et leurs scripts/styles ont été supprimés. Les anciens liens
+redirigent vers `/app/`, en conservant les paramètres de fiche et de recherche.
 
 Trois familles de sources sont à distinguer : les services intégrés French-Manga,
 VoirAnime et AnimePahe ; les conteneurs d’extensions fondés sur une recette ; les
@@ -39,7 +40,8 @@ Kotlin/DEX** : AnimeLab en déduit une recette, complétée par des adaptateurs 
 Le moteur garde en mémoire sa file de tâches et ses sessions HTTP. SQLite conserve
 les tâches, favoris, progressions et paramètres ; certains services utilisent
 SQLAlchemy, d’autres `sqlite3` directement. Cette architecture correspond à **un
-worker applicatif** avec services partagés, sans comptes utilisateurs isolés.
+worker applicatif** en mode personnel. Le mode partagé optionnel A09 ajoute une
+passerelle authentifiée et un moteur privé par compte.
 
 Notation : le triangle vide représente un héritage réel ; le losange plein une
 composition ; une flèche pointillée une dépendance. Les rapprochements entre tables
@@ -335,7 +337,12 @@ actions réseau et toutes les fonctions Android ont des préconditions spécifiq
 ## 5. Axes d’amélioration priorisés
 
 Les changements A01 à A08 et A10 à A13 sont implémentés dans le code source ;
-A09 et A14 restent des propositions.
+A09 dispose désormais d'un mode serveur partagé optionnel : comptes et invitations
+gérés par l'administrateur, permissions, sessions révocables et moteurs isolés par
+compte. Voir [configuration et limites](../shared-server.md). Les fichiers sont
+stockés séparément par compte ; la déduplication physique reste à prévoir.
+A14 est partiellement réalisé : le frontend Jinja a été retiré ; l'unification
+des préférences locales et moteur reste à poursuivre.
 Le [bilan A11](a11-validation.md) décrit la réduction mesurée de l'APK,
 les contrôles natifs et la validation séparée du stockage installé.
 Le [bilan A10/A12/A13](a10-a12-a13-validation.md) décrit les diagnostics,
@@ -359,12 +366,12 @@ L = évolution transversale avec migration/validation. Ce ne sont pas des délai
 | A06 | Implémenté / P1 / M | Contrats Pydantic et TypeScript aux frontières API ; erreurs structurées, traduites et versionnées ; schéma OpenAPI | Entrées invalides refusées avant mise en file ; anciens champs conservés ; JSON variable des recettes explicitement borné au type JSON |
 | A07 | Implémenté / P1 / M | Interface de vérification avec mécanismes Chromium installé et WebView ; capacités par plateforme, client et proxy | Matrice bureau/Android/client distant/proxy testée ; changement de route détecté ; recherches actives conservées ; capture non promise pour un onglet manuel |
 | A08 | Implémenté / P1 / M | Tests à fautes et protections de reprise/publication : URL renouvelée, cache HLS altéré, arrêt durant assemblage/mux/export | Cache vérifié par empreinte ; assemblage temporaire ; destination concurrente préservée ; finalisation et export sans duplication dans les scénarios couverts |
-| A09 | P1 si accès réseau / L | Définir le mode serveur partagé : authentification, autorisation des médias/actions, périmètre des bibliothèques et sessions | Un utilisateur ne consulte pas les cookies, téléchargements ou médias d’un autre ; exposition explicite et testée |
+| A09 | Implémenté, mode optionnel | Comptes administrés, invitations/récupération, permissions et moteurs privés par compte | Tests de deux moteurs réels : bibliothèques/réglages séparés, médias et actions privés, sessions révocables ; voir [guide](../shared-server.md) |
 | A10 | Implémenté / P2 / M | Événements structurés bornés, transitions/durées, journaux expurgés et export JSON local dans les paramètres | Liste blanche des champs exportés ; cookies, secrets, URL signées et identifiants proxy exclus ; tests de confidentialité |
 | A11 | Implémenté / P2 / M | Symboles natifs retirés des copies générées, R8 et ressources réduits, assets dédupliqués, XML natif inutilisé supprimé | APK testé de 77,76 à 61,31 Mo (−21,16 %) ; stockage au premier affichage de 137,52 à 97,37 Mo (−29,20 %) ; moteur/JNI/HLS/sous-titres/export validés sur Android 10 ARM64 ; APK normal signé de 61,36 Mo |
 | A12 | Implémenté / P2 / M | Table de positions par source/série/épisode/version, session et séquence ; choix qualité/serveur/pistes ; lecteur Vue intégré | Reprise après métadonnées, local/distant unifiés, VF/VOSTFR séparées, écriture bornée et anciennes fenêtres exclues |
 | A13 | Implémenté / P2 / M | Santé par opération, codes distincts et durées, schéma de recette v1, 20 révisions/restauration et corpus HTML/JSON | Dérive de sélecteur distinguée de protection/réseau ; précontrôle des lots ; observations associées à une révision |
-| A14 | P2 / M | Réduire progressivement le double front Jinja/Vue et clarifier les préférences locales/moteur | Une source de vérité pour les libellés et parcours ; suppression des ressources seulement après audit des routes |
+| A14 | Partiellement implémenté / P2 / M | Vue seul frontend, redirections des anciens liens, retrait des templates, styles/scripts et dépendances Jinja ; préférences locales/moteur à unifier | Liens et recherches conservés, mise à jour du cache PWA, distributions et tests adaptés |
 
 **Prochaine étape recommandée :** valider A01–A08 et A10/A12/A13 sur appareil Android ;
 poursuivre le découplage des étapes vis-à-vis de la façade et revalider la distribution Android à chaque évolution du moteur.

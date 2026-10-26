@@ -3,7 +3,7 @@
   "name": "AnimeLab - Anime Downloader & Player",
   "short_name": "AnimeLab",
   "description": "Téléchargement et streaming haute performance d'animés en VF et VOSTFR",
-  "start_url": "/?source=pwa",
+  "start_url": "/app/?source=pwa",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
@@ -41,7 +41,7 @@
       "name": "Téléchargements",
       "short_name": "Downloads",
       "description": "Gérer la file de téléchargements",
-      "url": "/downloads?source=pwa_shortcut",
+      "url": "/app/downloads?source=pwa_shortcut",
       "icons": [
         {
           "src": "/img/icon-192.png?v=bd76195972ef",
@@ -53,7 +53,7 @@
       "name": "Bibliothèque",
       "short_name": "Library",
       "description": "Accéder à vos animés favoris",
-      "url": "/library?source=pwa_shortcut",
+      "url": "/app/library?source=pwa_shortcut",
       "icons": [
         {
           "src": "/img/icon-192.png?v=bd76195972ef",
@@ -65,7 +65,7 @@
       "name": "Historique",
       "short_name": "History",
       "description": "Historique des épisodes visionnés",
-      "url": "/history?source=pwa_shortcut",
+      "url": "/app/history?source=pwa_shortcut",
       "icons": [
         {
           "src": "/img/icon-192.png?v=bd76195972ef",

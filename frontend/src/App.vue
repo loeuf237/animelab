@@ -49,8 +49,10 @@ import CommandPaletteModal from '@/components/CommandPaletteModal.vue'
 import VideoPlayerModal from '@/components/VideoPlayerModal.vue'
 import { useDownloadStore } from '@/stores/downloads'
 import { useI18nStore } from '@/stores/i18n'
+import { useRoute } from 'vue-router'
 
 const searchContext = useSearchContext()
+const route = useRoute()
 watch(
   () => searchContext.restoreSequence,
   async () => {
@@ -81,6 +83,14 @@ function onKeyDown(e: KeyboardEvent) {
 onMounted(() => {
   // Initialize i18n
   i18nStore.init()
+
+  // Preserve searches opened through old /search bookmarks after their redirect.
+  if (route.query.search === '1' || typeof route.query.q === 'string') {
+    openPalette(
+      typeof route.query.q === 'string' ? route.query.q : '',
+      typeof route.query.source === 'string' ? route.query.source : undefined,
+    )
+  }
 
   // Listen for Ctrl+K
   window.addEventListener('keydown', onKeyDown)

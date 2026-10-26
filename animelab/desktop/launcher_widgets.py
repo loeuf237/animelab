@@ -58,19 +58,24 @@ def application():
         app.setOrganizationName('AnimeLab')
         # Widgets use the OS text rasterizer/Fontconfig, never Tk bitmap fonts.
         font = QFontDatabase.systemFont(QFontDatabase.SystemFont.GeneralFont)
+        if sys.platform.startswith('linux') and 'DejaVu Sans' in QFontDatabase.families():
+            font.setFamily('DejaVu Sans')
         font.setPointSizeF(10 if sys.platform == 'darwin' else 9)
+        font.setHintingPreference(QFont.HintingPreference.PreferFullHinting)
         font.setStyleStrategy(QFont.StyleStrategy.PreferAntialias)
         app.setFont(font)
         app.setStyle(LauncherStyle('Fusion'))
         palette = app.palette()
         for role, color in ((QPalette.ColorRole.Window, '#f4f4f4'),
-                            (QPalette.ColorRole.WindowText, '#202124'),
+                            (QPalette.ColorRole.WindowText, '#000000'),
                             (QPalette.ColorRole.Base, '#ffffff'),
-                            (QPalette.ColorRole.Text, '#202124'),
+                            (QPalette.ColorRole.Text, '#000000'),
                             (QPalette.ColorRole.Button, '#f7f7f7'),
-                            (QPalette.ColorRole.ButtonText, '#202124'),
+                            (QPalette.ColorRole.ButtonText, '#000000'),
                             (QPalette.ColorRole.Highlight, '#4389ce'),
                             (QPalette.ColorRole.HighlightedText, '#ffffff')):
             palette.setColor(role, QColor(color))
+        for role in (QPalette.ColorRole.WindowText, QPalette.ColorRole.Text, QPalette.ColorRole.ButtonText):
+            palette.setColor(QPalette.ColorGroup.Disabled, role, QColor('#888888'))
         app.setPalette(palette)
     return app

@@ -194,8 +194,6 @@ async def security_headers_and_csrf_middleware(request: Request, call_next):
 # Montage des fichiers statiques
 static_dir = settings.STATIC_DIR
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
-app.mount("/css", StaticFiles(directory=str(static_dir / "css")), name="css")
-app.mount("/js", StaticFiles(directory=str(static_dir / "js")), name="js")
 app.mount("/img", StaticFiles(directory=str(static_dir / "img")), name="img")
 
 @app.get("/favicon.ico", include_in_schema=False)
@@ -231,6 +229,8 @@ async def get_offline_page():
     )
 
 # Enregistrement des routeurs
+from animelab.routers.web import router as web_router
+app.include_router(web_router)
 from animelab.routers.playback import router as playback_router
 app.include_router(playback_router)
 from animelab.routers.diagnostics import router as diagnostics_router

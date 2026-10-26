@@ -115,6 +115,11 @@ def check():
                             env={**os.environ, 'ANIMAN_LOG_FILE':str(logfile)})
     if logfile.exists(): print(logfile.read_text())
     if result.returncode: raise RuntimeError('Packaged offline check failed')
+    auth_log = ROOT / 'build' / 'packaged-auth-check.log'
+    result = subprocess.run([str(binary), '--auth-self-test'], timeout=150,
+        env={**os.environ, 'ANIMAN_LOG_FILE': str(auth_log)})
+    if auth_log.exists(): print(auth_log.read_text(encoding='utf-8'))
+    if result.returncode: raise RuntimeError('Packaged account authentication check failed')
     # This checks subprocess collection, private administration assets and graceful exit.
     # The previous backend-only self-test could not detect the Windows GUI regression.
     from animelab.desktop.control import remote_call
@@ -225,6 +230,29 @@ def checksums():
     expected = {'Windows-x64','Linux-x64','macOS-arm64-UNTESTED','macOS-x64-UNTESTED'}
     if {p.name.removeprefix(f'AnimeLab-v{__version__}-').removesuffix('.tar.gz').removesuffix('.zip') for p in archives} != expected:
         raise RuntimeError('Release is incomplete or contains unexpected platform archives')
+    if '--include-android' in sys.argv[3:]:
+        apk = f'AnimeLab-v{__version__}-Android-arm64.apk'
+        manifests = {f'AnimeLab-v{__version__}-{label}-build-info.json' for label in
+                     ('Windows-x64', 'Linux-x64', 'macOS-arm64', 'macOS-x64')}
+        expected_files = {p.name for p in archives} | manifests | {apk, 'Android-build-info.json'}
+        actual_files = {p.name for p in root.iterdir() if p.name != 'SHA256SUMS.txt'}
+        if actual_files != expected_files:
+            raise RuntimeError('Unified release is incomplete or contains unexpected files')
+        commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+        for name in manifests | {'Android-build-info.json'}:
+            info = json.loads((root / name).read_text(encoding='utf-8'))
+            if info.get('version') != __version__ or info.get('commit') != commit:
+                raise RuntimeError('Release artifacts do not match the source version and commit')
+        try:
+            from scripts.android_publish import SIGNING_CERTIFICATE
+        except ModuleNotFoundError:
+            from android_publish import SIGNING_CERTIFICATE
+        android = json.loads((root / 'Android-build-info.json').read_text(encoding='utf-8'))
+        if (android.get('release_tag') != 'v' + __version__ or
+                android.get('validation_key_only') is not False or
+                android.get('signing_certificate_sha256') != SIGNING_CERTIFICATE or
+                android.get('emulator_api_levels_tested') != [29, 30, 35]):
+            raise RuntimeError('Android production signing and device validation are required')
     with (root / 'SHA256SUMS.txt').open('w') as handle:
         for path in sorted(p for p in root.iterdir() if p.name != 'SHA256SUMS.txt'):
             with path.open('rb') as source:

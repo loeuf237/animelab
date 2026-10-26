@@ -107,7 +107,6 @@ class Settings:
         BASE_DIR: Path = Path(sys._MEIPASS) / "animelab"
     else:
         BASE_DIR: Path = Path(__file__).resolve().parent
-    TEMPLATES_DIR: Path = BASE_DIR / "templates"
     STATIC_DIR: Path = BASE_DIR / "static"
     CACHE_DIR: Path = Path(os.getenv("ANIMAN_CACHE_DIR", str(DEFAULT_CACHE_DIR)))
 

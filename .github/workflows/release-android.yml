@@ -3,6 +3,23 @@ name: Release Android Python + Vue
 on:
   push:
     tags: ['android-v0.*']
+  workflow_call:
+    inputs:
+      tag_name:
+        type: string
+        required: true
+      publish:
+        type: boolean
+        default: false
+    secrets:
+      ANIMAN_ANDROID_KEYSTORE_BASE64:
+        required: true
+      ANIMAN_ANDROID_STORE_PASSWORD:
+        required: true
+      ANIMAN_ANDROID_KEY_PASSWORD:
+        required: true
+      ANIMAN_ANDROID_KEY_ALIAS:
+        required: true
   workflow_dispatch:
     inputs:
       publish:
@@ -26,6 +43,8 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
@@ -67,6 +86,8 @@ jobs:
       ANIMAN_ANDROID_KEYSTORE: ${{ secrets.ANIMAN_ANDROID_KEYSTORE_BASE64 != '' && '/tmp/animan-release.p12' || '' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -180,6 +201,8 @@ jobs:
         api: [29, 30, 35]
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -217,14 +240,13 @@ jobs:
           name: Android-API-${{ matrix.api }}-test-results
           path: android-test-results/**
 
-  publish:
-    if: github.event_name == 'push' || inputs.publish
+  prepare-release:
     needs: [build, device-tests]
     runs-on: ubuntu-24.04
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
@@ -239,15 +261,51 @@ jobs:
         with:
           name: Android-under-test
           path: android-validation
+      - name: Resolve the exact checked-out source commit
+        run: echo "SOURCE_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
       - name: Require a production-signed, validated package
         run: |
           python scripts/android_publish.py android-validation release-assets \
             --build-tools "$ANDROID_HOME/build-tools/35.0.0" --tag "$RELEASE_TAG" \
-            --source-commit "$GITHUB_SHA" --candidate-run-id "$GITHUB_RUN_ID" \
+            --source-commit "$SOURCE_COMMIT" --candidate-run-id "$GITHUB_RUN_ID" \
             --signing-method github_actions
-      - name: Publish Android beta
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Android-release
+          path: |
+            release-assets/*.apk
+            release-assets/Android-build-info.json
+          if-no-files-found: error
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/android-v') || inputs.publish
+    needs: prepare-release
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v4
+        with:
+          name: Android-release
+          path: release-assets
+      - name: Calculate standalone Android checksums
+        run: |
+          python - <<'PYTHON'
+          import hashlib
+          from pathlib import Path
+          root = Path('release-assets')
+          files = sorted(root.iterdir())
+          (root / 'SHA256SUMS.txt').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest() + '  ' + p.name + '\n' for p in files))
+          PYTHON
+      - name: Publish standalone Android beta
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$RELEASE_TAG" release-assets/* --target "$GITHUB_SHA" \
+          gh release create "$RELEASE_TAG" release-assets/* \
             --title "AnimeLab ${RELEASE_TAG#android-v} Android" --prerelease --notes-file "docs/releases/$RELEASE_TAG.md"

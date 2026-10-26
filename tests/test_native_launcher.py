@@ -266,7 +266,7 @@ def test_native_tabs_fields_and_save_without_starting_engine(model, monkeypatch,
             for tab in ui.tabs:
                 rows.setdefault(tab.geometry().top(), []).append(tab)
                 assert tab.fontMetrics().horizontalAdvance(tab.text()) <= tab.width() - 4
-            assert [len(row) for row in rows.values()] == [5, 5]
+            assert [len(row) for row in rows.values()] == [4, 4, 3]
         for tab in TABS:
             ui.select_tab(tab)
             qt_app.processEvents()

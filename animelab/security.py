@@ -203,6 +203,11 @@ def is_safe_path(
             Path(settings.DOWNLOAD_DIR).resolve(),
             Path(tempfile.gettempdir()).resolve()
         ]
+        # Shared engines receive their own TMPDIR. Never fall back to the
+        # machine-wide temporary directory when serving another user's media.
+        import os
+        if os.getenv("ANIMELAB_SHARED_WORKER") == "1":
+            allowed_base_dirs = [Path(settings.DOWNLOAD_DIR).resolve()]
     else:
         allowed_base_dirs = [Path(d).resolve() for d in allowed_base_dirs]
 

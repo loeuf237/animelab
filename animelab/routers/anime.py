@@ -2,21 +2,13 @@ from animelab.services.source_registry import source_registry
 from animelab.api_contracts import ContractRoute
 from animelab.services.source_http import VerificationRequired
 import asyncio
-from animelab.services.i18n_service import current_lang
 import logging
-from typing import List, Optional, Dict, Any
+from typing import Optional, Dict, Any
 from urllib.parse import urlparse
-from fastapi import APIRouter, Request, Query, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse
-from animelab.models.anime import AnimeResult, AnimeDetail
+from fastapi import APIRouter, Query, HTTPException
 from animelab.security import is_safe_url
 from animelab.services.library_service import library_service
-from animelab.services.scraping_service import scraping_service
-from animelab.services.voiranime_service import voiranime_service
-from animelab.services.animepahe_service import animepahe_service
-from animelab.services.extension_service import extension_service
 from animelab.services.tmdb_service import tmdb_service
-from animelab.templates_config import templates
 
 logger = logging.getLogger("animelab.router.anime")
 router = APIRouter(route_class=ContractRoute)
@@ -24,28 +16,6 @@ router = APIRouter(route_class=ContractRoute)
 def detect_source_from_url(url: str, fallback: str = "french-manga") -> str:
     return source_registry.detect(url, fallback)
 
-@router.get("/", response_class=HTMLResponse)
-async def home(request: Request):
-    favorites = library_service.get_all_favorites()
-    latest_fm = await scraping_service.get_latest_releases()
-    latest_va = await voiranime_service.get_latest_releases()
-    latest_ap = await animepahe_service.get_latest_releases()
-    enabled_extensions = extension_service.get_enabled_container_sources()
-
-    return templates.TemplateResponse(
-        request=request,
-        name="index.html",
-        context={
-            "favorites": favorites,
-            "latestFrenchManga": latest_fm,
-            "latestVoirAnime": latest_va,
-            "latestAnimePahe": latest_ap,
-            "enabledExtensions": enabled_extensions,
-            "results": None,
-            "query": "",
-            "source": "animepahe" if current_lang() == "en" else "french-manga",
-        }
-    )
 
 @router.get("/api/releases/latest")
 async def api_latest_releases(source: Optional[str] = None):
@@ -58,37 +28,6 @@ async def api_latest_releases(source: Optional[str] = None):
     responses = await asyncio.gather(*(provider.get_latest_releases() for provider in providers))
     return {provider.id: releases for provider, releases in zip(providers, responses)}
 
-
-@router.get("/search", response_class=HTMLResponse)
-async def search(
-    request: Request,
-    q: str = Query(..., alias="q"),
-    source: str = Query("french-manga", alias="source")
-):
-    norm_source = (source or "french-manga").lower().strip()
-    logger.info("Search [%s]: %s", norm_source, q)
-
-    enabled_exts = extension_service.get_enabled_container_sources()
-    selected = source_registry.all() if norm_source == "all" else [source_registry.get(norm_source)]
-    responses = await asyncio.gather(*(provider.search_anime(q) for provider in selected
-                                     if provider.capabilities.search), return_exceptions=norm_source == "all")
-    results = [item for response in responses if not isinstance(response, BaseException) for item in response]
-
-    favorites = library_service.get_all_favorites()
-    return templates.TemplateResponse(
-        request=request,
-        name="index.html",
-        context={
-            "results": results,
-            "query": q,
-            "source": norm_source,
-            "favorites": favorites,
-            "enabledExtensions": enabled_exts,
-            "latestFrenchManga": [],
-            "latestVoirAnime": [],
-            "latestAnimePahe": [],
-        }
-    )
 
 @router.get("/api/search")
 async def search_api(
@@ -196,57 +135,6 @@ async def fetch_enriched_anime_detail(url: str, source: str = "french-manga") ->
         "watchedCount": sum(1 for e in episodes_data if e["isWatched"]),
     }
 
-@router.get("/anime", response_class=HTMLResponse)
-async def anime_detail(
-    request: Request,
-    url: str = Query(..., alias="url"),
-    source: str = Query("french-manga", alias="source")
-):
-    logger.info("Anime detail requested [%s]: %s", source, url)
-    if not is_safe_url(url):
-        logger.warning("[anime_detail] SSRF blocked for URL: %s", url)
-        favorites = library_service.get_all_favorites()
-        return templates.TemplateResponse(
-            request=request,
-            name="index.html",
-            context={
-                "error": "URL d'animé invalide ou non sécurisée",
-                "favorites": favorites,
-                "results": None,
-                "latestFrenchManga": [],
-                "latestVoirAnime": [],
-                "latestAnimePahe": [],
-            }
-        )
-
-    res = await fetch_enriched_anime_detail(url, source)
-    if not res:
-        favorites = library_service.get_all_favorites()
-        return templates.TemplateResponse(
-            request=request,
-            name="index.html",
-            context={
-                "error": "Impossible de charger cet anime ou source non supportée.",
-                "favorites": favorites,
-                "results": None,
-                "latestFrenchManga": [],
-                "latestVoirAnime": [],
-                "latestAnimePahe": [],
-            }
-        )
-
-    return templates.TemplateResponse(
-        request=request,
-        name="anime-detail.html",
-        context={
-            "anime": res["detail_obj"],
-            "source": res["source"],
-            "isFavorite": res["isFavorite"],
-            "autoDownload": res["autoDownload"],
-            "downloadedEpisodes": set(res["downloadedEpisodes"]),
-            "watchedEpisodes": set(res["watchedEpisodes"]),
-        }
-    )
 
 @router.get("/api/anime/detail")
 @router.get("/api/anime")

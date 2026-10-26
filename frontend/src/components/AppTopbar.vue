@@ -20,6 +20,18 @@
     </button>
 
     <div class="top-actions">
+      <a
+        v-if="sharedUser"
+        href="/auth/account"
+        class="icon-button"
+        :title="i18nStore.currentLang === 'fr' ? 'Mon compte' : 'My account'"
+        :aria-label="i18nStore.currentLang === 'fr' ? 'Mon compte' : 'My account'"
+      >
+        <svg viewBox="0 0 24 24">
+          <circle cx="12" cy="8" r="4" />
+          <path d="M4 21v-2a8 8 0 0 1 16 0v2" />
+        </svg>
+      </a>
       <!-- Language toggle -->
       <button
         class="icon-button lang-toggle-btn"
@@ -68,6 +80,7 @@ import brandIcon from '@/assets/brand-icon.png'
 import { tx } from '@/utils/locale'
 import { ref, onMounted } from 'vue'
 import { useI18nStore } from '@/stores/i18n'
+import { sharedUser } from '@/stores/sharedSession'
 
 const emit = defineEmits<{
   (e: 'open-palette'): void

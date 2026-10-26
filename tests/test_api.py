@@ -1,3 +1,6 @@
+from animelab.services.animepahe_service import animepahe_service
+from animelab.services.scraping_service import scraping_service
+from animelab.services.voiranime_service import voiranime_service
 import pytest
 from fastapi.testclient import TestClient
 from run import app
@@ -10,31 +13,17 @@ def client():
     from animelab.routers import anime
     # Page rendering tests should not depend on a live source challenge.
     with pytest.MonkeyPatch.context() as patch:
-        for source in (anime.scraping_service, anime.voiranime_service, anime.animepahe_service):
+        for source in (scraping_service, voiranime_service, animepahe_service):
             patch.setattr(source, "get_latest_releases", AsyncMock(return_value=[]))
         with TestClient(app, headers={"Accept-Language": "fr"}) as c:
             yield c
 
 def test_html_pages(client):
-    # Home
-    resp = client.get("/")
-    assert resp.status_code == 200
-    assert "AnimeLab" in resp.text
-
-    # Downloads
-    resp = client.get("/downloads")
-    assert resp.status_code == 200
-    assert "téléchargements" in resp.text.lower()
-
-    # Library
-    resp = client.get("/library")
-    assert resp.status_code == 200
-    assert "bibliothèque" in resp.text.lower()
-
-    # History
-    resp = client.get("/history")
-    assert resp.status_code == 200
-    assert "historique" in resp.text.lower()
+    for path, target in [('/', '/app/'), ('/downloads', '/app/downloads'),
+                         ('/library', '/app/library'), ('/history', '/app/history')]:
+        response = client.get(path, follow_redirects=False)
+        assert response.status_code == 303
+        assert response.headers['location'] == target
 
 def test_download_settings(client):
     # GET settings
@@ -143,32 +132,15 @@ def test_watchdog_check_api(client):
     assert data.get("success") is True
     assert "newEpisodes" in data
 
-def test_downloads_page_and_storage_card_removal(client):
-    resp = client.get("/downloads")
-    assert resp.status_code == 200
-    html = resp.text
-
-    # Verify storage card was removed
-    assert "sidebar-storage-card" not in html
-    assert "storage-percent" not in html
-
-    # Verify download tabs and badges
-    assert 'id="tab-badge-queue"' in html
-    assert 'id="tab-badge-done"' in html
-    assert 'id="tab-badge-all"' in html
-
-    # Verify empty notes exist
-    assert 'id="active-empty-note"' in html
-    assert 'id="queue-empty-note"' in html
-    assert 'id="done-empty-note"' in html
-    assert 'id="dl-empty"' in html
+def test_downloads_bookmark_preserves_query(client):
+    response = client.get('/downloads?lang=en', follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers['location'] == '/app/downloads?lang=en'
 
 def test_settings_page(client):
-    resp = client.get("/settings")
-    assert resp.status_code == 200
-    assert "Paramètres" in resp.text
-    assert "settings-page-layout" in resp.text
-    assert "save-settings-btn" in resp.text
+    response = client.get('/settings', follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers['location'] == '/app/settings'
 
 def test_system_storage_real_stats(client):
     resp = client.get("/api/system/storage")
@@ -275,40 +247,16 @@ def test_tachiyomi_detail_page_and_source_correction(client, monkeypatch):
         )
 
     from animelab.routers import anime as anime_router
-    monkeypatch.setattr(anime_router.voiranime_service, "get_anime_detail", mock_va_detail)
+    monkeypatch.setattr(voiranime_service, "get_anime_detail", mock_va_detail)
 
-    # User gave a VoirAnime URL with wrong source=french-manga
-    wrong_url = "/anime?url=https%3A%2F%2Fvoir-anime.to%2Fanime%2Ftoradora%2F&source=french-manga"
-    resp = client.get(wrong_url)
-    assert resp.status_code == 200
-    html = resp.text
-
-    # Verify content loaded completely (not empty!)
-    assert "Toradora!" in html
-    assert "Tigre et Dragon" in html
-    assert "tigre de poche" in html
-
-    # Verify Tachiyomi layout components are present
-    assert "tachiyomi-container" in html
-    assert "tachiyomi-topbar" in html
-    assert "tach-dl-menu-btn" in html
-    assert "tach-filter-btn" in html
-    assert "tachiyomi-actions-grid" in html
-    assert "tachiyomi-synopsis" in html
-    assert "tachiyomi-genres-row" in html
-    assert "tachiyomi-fab" in html
-    assert "tachiyomi-download-menu" in html
-    assert "tachiyomi-filter-sheet" in html
-
-    # Verify restored batch and episode-level features
-    assert "tachiyomi-select-bar" in html
-    assert "batch-server-select" in html
-    assert "batch-quality-select" in html
-    assert "batch-subtitles-toggle" in html
-    assert "episode-range-bar" in html
-    assert "episode-search-input" in html
-    assert "episode-check" in html
-    assert "btn-play-ep" in html
-    assert "btn-download-ep" in html
-    assert "subtitle-check" in html
+    # Vue obtains detail through the same API; source correction stays server-side.
+    response = client.get('/api/anime', params={
+        'url': 'https://voir-anime.to/anime/toradora/', 'source': 'french-manga'})
+    assert response.status_code == 200
+    data = response.json()
+    assert data['source'] == 'voir-anime'
+    assert data['anime']['title'] == 'Toradora!'
+    assert 'tigre de poche' in data['anime']['synopsis']
+    assert len(data['anime']['episodes']) == 2
+    assert data['anime']['episodes'][0]['title'] == 'Tigre et Dragon'
 

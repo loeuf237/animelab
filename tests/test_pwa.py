@@ -1,3 +1,6 @@
+from animelab.services.animepahe_service import animepahe_service
+from animelab.services.scraping_service import scraping_service
+from animelab.services.voiranime_service import voiranime_service
 import pytest
 import hashlib
 from urllib.parse import parse_qs, urlparse
@@ -11,7 +14,7 @@ def client():
     init_db()
     from animelab.routers import anime
     with pytest.MonkeyPatch.context() as patch:
-        for source in (anime.scraping_service, anime.voiranime_service, anime.animepahe_service):
+        for source in (scraping_service, voiranime_service, animepahe_service):
             patch.setattr(source, "get_latest_releases", AsyncMock(return_value=[]))
         with TestClient(app) as c:
             yield c
@@ -24,7 +27,7 @@ def test_pwa_manifest(client):
     manifest = resp.json()
     assert manifest["name"] == "AnimeLab - Anime Downloader & Player"
     assert manifest["short_name"] == "AnimeLab"
-    assert manifest["start_url"] == "/?source=pwa"
+    assert manifest["start_url"] == "/app/?source=pwa"
     assert manifest["display"] == "standalone"
     assert manifest["theme_color"] == "#0e121d"
     assert manifest["background_color"] == "#0e121d"
@@ -53,7 +56,7 @@ def test_pwa_service_worker(client):
     content = resp.text
     # Ensure cache engine and safety exclusions are present
     assert "animelab-cache" in content
-    assert "/api/media/stream" in content
+    assert 'url.pathname.startsWith("/api/")' in content
     assert "m3u8" in content
     assert "/offline.html" in content
 
@@ -64,11 +67,9 @@ def test_pwa_offline_page(client):
     assert "hors connexion" in resp.text.lower() or "offline" in resp.text.lower()
 
 def test_pwa_static_assets(client):
-    # pwa.js
-    resp_pwa_js = client.get("/js/pwa.js")
-    assert resp_pwa_js.status_code == 200
-    assert "serviceWorker" in resp_pwa_js.text
-    assert "beforeinstallprompt" in resp_pwa_js.text
+    # Legacy assets must not survive removal of the Jinja frontend.
+    for path in ('/js/pwa.js', '/js/app.js', '/css/style.css'):
+        assert client.get(path).status_code == 404
 
     # Icons
     for icon_name in ["icon-192.png", "icon-512.png", "icon-maskable.png", "apple-touch-icon.png"]:
@@ -91,4 +92,6 @@ def test_pwa_integration_in_html_pages(client):
         assert 'href="/manifest.json?v=' in html
         assert 'name="theme-color"' in html
         assert 'name="apple-mobile-web-app-capable"' in html
-        assert '/js/pwa.js' in html
+        assert 'id="app"' in html
+        assert '/assets/' in html
+        assert '/js/app.js' not in html

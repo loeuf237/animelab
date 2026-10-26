@@ -6,15 +6,14 @@ from pathlib import Path
 from typing import Optional
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Request, Query, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import JSONResponse
 
 from animelab.config import settings
 from animelab.services.download_manager import download_manager
 from animelab.services.library_service import library_service
 from animelab.services.voiranime_service import voiranime_service
 from animelab.services.watchdog_service import watchdog_service
-from animelab.security import anonymize_path, is_safe_url
-from animelab.templates_config import templates
+from animelab.security import anonymize_path
 from animelab import platform_events
 from animelab.models.download_task import DownloadStatus
 
@@ -36,78 +35,6 @@ class FavoriteRequest(AutoDownloadRequest):
     imageUrl: str = ""
     source: str = "french-manga"
 
-# -------------------------------------------------------------------------
-# Pages HTML
-# -------------------------------------------------------------------------
-
-@router.get("/library", response_class=HTMLResponse)
-async def library_page(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="library.html",
-        context={
-            "favorites": library_service.get_all_favorites(),
-            "history": library_service.get_history(),
-            "source": "all",
-        }
-    )
-
-@router.get("/history", response_class=HTMLResponse)
-async def history_page(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="history.html",
-        context={
-            "tasks": library_service.get_history(),
-            "source": "all",
-        }
-    )
-
-@router.get("/voiranime", response_class=HTMLResponse)
-async def voiranime_detail_page(request: Request, url: str = Query(...)):
-    if not is_safe_url(url):
-        logger.warning("[voiranime] SSRF blocked for URL: %s", url)
-        return templates.TemplateResponse(
-            request=request,
-            name="index.html",
-            context={
-                "error": "URL d'animé invalide ou non sécurisée",
-                "favorites": library_service.get_all_favorites(),
-                "results": None,
-                "latestFrenchManga": [],
-                "latestVoirAnime": [],
-            }
-        )
-    logger.info("VoirAnime page detail: %s", url)
-    detail = await voiranime_service.get_anime_detail(url)
-    if not detail:
-        return templates.TemplateResponse(
-            request=request,
-            name="index.html",
-            context={
-                "error": "Impossible de charger cet animé depuis voir-anime.to",
-                "favorites": library_service.get_all_favorites(),
-                "results": None,
-                "latestFrenchManga": [],
-                "latestVoirAnime": [],
-            }
-        )
-
-    downloaded = library_service.get_downloaded_episodes_set(url)
-    watched = library_service.get_watched_episodes_set(url)
-    is_fav = library_service.is_favorite(url)
-
-    return templates.TemplateResponse(
-        request=request,
-        name="anime-detail.html",
-        context={
-            "anime": detail,
-            "source": "voir-anime",
-            "isFavorite": is_fav,
-            "downloadedEpisodes": downloaded,
-            "watchedEpisodes": watched,
-        }
-    )
 
 # -------------------------------------------------------------------------
 # Favoris API

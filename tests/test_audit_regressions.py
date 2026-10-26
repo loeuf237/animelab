@@ -1,3 +1,5 @@
+from animelab.services.extension_service import extension_service
+from animelab.services.scraping_service import scraping_service
 """Regressions for progress, episode identity, byte ranges and proxy redirects."""
 import importlib
 import socket
@@ -58,9 +60,9 @@ async def test_detail_restores_progress_flags(isolated_db, version):
     detail = AnimeDetail(title="Test", url=url, version=version,
                          episodes=[Episode(number=1, title="One", version=version)])
     with patch.object(anime, "is_safe_url", return_value=True), \
-         patch.object(anime.scraping_service, "get_anime_detail", AsyncMock(return_value=detail)), \
+         patch.object(scraping_service, "get_anime_detail", AsyncMock(return_value=detail)), \
          patch.object(anime.tmdb_service, "enrich_anime_detail", AsyncMock(return_value=detail)), \
-         patch.object(anime.extension_service, "get_container_source_by_id", return_value=None):
+         patch.object(extension_service, "get_container_source_by_id", return_value=None):
         result = await anime.fetch_enriched_anime_detail(url)
     assert result["anime"]["episodes"][0]["isDownloaded"] is True
     assert result["anime"]["episodes"][0]["isWatched"] is True
@@ -94,9 +96,9 @@ async def test_specific_unwatch_overrides_legacy_progress(isolated_db):
         Episode(number=1, title="One VOSTFR", version="VOSTFR"),
     ])
     with patch.object(anime, "is_safe_url", return_value=True), \
-         patch.object(anime.scraping_service, "get_anime_detail", AsyncMock(return_value=detail)), \
+         patch.object(scraping_service, "get_anime_detail", AsyncMock(return_value=detail)), \
          patch.object(anime.tmdb_service, "enrich_anime_detail", AsyncMock(return_value=detail)), \
-         patch.object(anime.extension_service, "get_container_source_by_id", return_value=None):
+         patch.object(extension_service, "get_container_source_by_id", return_value=None):
         result = await anime.fetch_enriched_anime_detail(url)
     assert result["anime"]["episodes"][0]["isWatched"] is True
     assert result["anime"]["episodes"][1]["isWatched"] is False
