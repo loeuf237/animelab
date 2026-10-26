@@ -42,6 +42,7 @@ class Workers:
             'PATH', 'SYSTEMROOT', 'WINDIR', 'COMSPEC', 'LANG', 'LC_ALL',
             'SSL_CERT_FILE', 'SSL_CERT_DIR', 'LD_LIBRARY_PATH',
             'ANIMELAB_CHROMIUM_PATH', 'ANIMELAB_CHROMIUM_HEADLESS',
+            'ANIMELAB_MEDIA_DOMAINS',
         ) if key in os.environ}
         for folder in (home, home / 'tmp', home / '.animan' / 'db', home / 'downloads'):
             folder.mkdir(parents=True, exist_ok=True, mode=0o700)

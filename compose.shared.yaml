@@ -1,6 +1,9 @@
 # Add to compose.yaml explicitly; never changes the personal server by default.
 services:
   animelab:
+    environment:
+      ANIMELAB_TRUSTED_PROXIES: ${ANIMELAB_TRUSTED_PROXIES:-}
+      ANIMELAB_MEDIA_DOMAINS: ${ANIMELAB_MEDIA_DOMAINS:-}
     command:
       - python
       - -m

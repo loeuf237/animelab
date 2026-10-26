@@ -79,8 +79,12 @@ const frenchErrors = {
   "Account not found": "Compte introuvable.",
   "Unknown permission": "Permission inconnue.",
   "Session was revoked": "La session a été révoquée. Reconnectez-vous.",
-  "Too many authentication attempts; try later":
-    "Trop de tentatives. Réessayez dans quinze minutes.",
+  "Too many authentication failures; try later":
+    "Trop de tentatives échouées pour ce compte. Réessayez plus tard.",
+  "Password verification is busy; try shortly":
+    "Une vérification de mot de passe est en cours. Réessayez dans un instant.",
+  "Password verification is busy; try again shortly":
+    "Une vérification de mot de passe est en cours. Réessayez dans un instant.",
   "Account limit reached (100)": "La limite de 100 comptes est atteinte.",
   "Code limit reached (100)": "La limite de 100 codes est atteinte.",
 };

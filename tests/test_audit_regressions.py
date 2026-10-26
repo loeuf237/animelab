@@ -141,11 +141,16 @@ async def test_local_video_ranges(tmp_path, header, status, expected):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("method", ["GET", "HEAD"])
+@pytest.mark.parametrize('shared', [False, True])
 @pytest.mark.parametrize("destination, blocked", [
     ("http://127.0.0.1/private", True), ("http://169.254.169.254/metadata", True),
     ("http://10.0.0.1/private", True), ("https://cdn.example/video.mp4", False),
 ])
-async def test_proxy_validates_redirects(method, destination, blocked):
+async def test_proxy_validates_redirects(method, destination, blocked, shared, monkeypatch):
+    if shared:
+        monkeypatch.setenv('ANIMELAB_SHARED_WORKER', '1')
+        monkeypatch.setenv('ANIMELAB_SHARED_DOWNLOAD', '0')
+        monkeypatch.setenv('ANIMELAB_MEDIA_DOMAINS', 'public.example,cdn.example')
     visited = []
     clients = []
     real_client = httpx.AsyncClient
@@ -157,6 +162,9 @@ async def test_proxy_validates_redirects(method, destination, blocked):
         return httpx.Response(200, content=b"video")
 
     def factory(**kwargs):
+        # The source facade enforces this sync policy itself. HTTPX uses the
+        # request hook below for the same per-redirect destination validation.
+        kwargs.pop('url_validator', None)
         client = real_client(**kwargs, transport=httpx.MockTransport(upstream), trust_env=False)
         clients.append(client)
         return client

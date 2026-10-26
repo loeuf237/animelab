@@ -3,6 +3,7 @@ from animelab.services.scraping_service import scraping_service
 from animelab.services.voiranime_service import voiranime_service
 import pytest
 import hashlib
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from fastapi.testclient import TestClient
 from run import app
@@ -82,6 +83,10 @@ def test_pwa_static_assets(client):
     assert favicon.headers["content-type"] == "image/x-icon"
     assert favicon.content.startswith(b"\x00\x00\x01\x00")
 
+@pytest.mark.skipif(
+    not (Path(__file__).resolve().parents[1] / 'frontend/dist/index.html').is_file(),
+    reason='SPA not built: cd frontend && npm ci && npm run build',
+)
 def test_pwa_integration_in_html_pages(client):
     pages = ["/", "/downloads", "/library", "/history", "/settings"]
     for path in pages:

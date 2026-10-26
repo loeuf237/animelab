@@ -51,12 +51,22 @@ Users without download permission can still browse, watch and save ordinary favo
 Proxy connection configuration remains restricted to administrators.
 
 Only hashes of passwords, sessions and invitation/recovery codes are stored.
-Passwords use salted scrypt with N=2^17, r=8, p=1. Sessions use random opaque
+Passwords use salted scrypt with N=2^17, r=8, p=1. New hashes store their algorithm
+and work factors (`scrypt$n$r$p$salt$key`). Historical `salt:key` records remain
+readable with their original parameters and are upgraded after a successful login;
+passwords do not need to be reset. A concurrent administrator reset takes precedence
+over a login or hash upgrade. Sessions use random opaque
 identifiers in HttpOnly, SameSite=Strict cookies (Secure for HTTPS). Sessions have
 an absolute lifetime of 12 hours and a 30-minute idle timeout by default, with at most ten
 sessions per account. Active media delivery refreshes activity; an idle SSE stream
-does not. Authentication attempts are limited by peer address and globally. Behind
-a reverse proxy, peers share its address because forwarding headers are not trusted.
+does not. Only failed authentications count toward the ten-failure, fifteen-minute
+budget per (username, peer address). Success clears that pair's failures. Invitations
+and recovery have a separate budget per peer and chosen username or code digest,
+so a bad code cannot block existing accounts or unrelated recovery codes. The map
+is bounded to 10,000 active identities. No server-wide authentication quota is used.
+Password computations run one at a time without an unbounded waiting queue; a busy
+server returns HTTP 503 with `Retry-After: 1`, without recording a password failure.
+An exhausted failure budget returns HTTP 429 with its remaining retry delay.
 See the [OWASP password storage](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)
 and [session management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
 guidance used for these choices.
@@ -72,11 +82,42 @@ Use a dedicated origin and an HTTPS reverse proxy for network access. The public
 URL must contain the exact scheme, host and optional port, with no subpath. HTTP
 is accepted only for loopback development. Unsafe requests must send JSON and an
 `Origin` header matching that URL. The gateway does not trust client-supplied
-identity or forwarding headers. Keep the backend port reachable only by your proxy.
+identity headers. Forwarding headers are ignored unless their immediate sender is
+explicitly trusted. Keep the backend port reachable only by your proxy.
 Configure its streaming timeouts for long media requests and disable buffering on
 `/api/download/stream` (SSE). Seek requests, `HEAD`, `Range` and `Content-Range`
 are preserved by the gateway. No WebSocket tunnel is exposed; download updates
 currently use SSE.
+
+Declare each actual proxy IP or CIDR explicitly (repeat `--trusted-proxy` as needed):
+
+```bash
+uv run --locked python -m animelab.shared --data-dir ./shared-data serve \
+  --public-url https://anime.example.org --trusted-proxy 127.0.0.1
+```
+
+This enables `X-Forwarded-For`/`X-Forwarded-Proto` handling only for connections
+from the declared proxies. Wildcards and hostnames are rejected. Use the proxy's
+actual address as seen by the gateway, especially across a Docker network; avoid
+trusting a broad network containing untrusted clients. Configure the edge proxy
+to overwrite client-supplied forwarding headers. For example, for a single Nginx
+proxy terminating HTTPS:
+
+```nginx
+proxy_set_header Host $host;
+proxy_set_header X-Forwarded-For $remote_addr;
+proxy_set_header X-Forwarded-Proto $scheme;
+```
+
+`ANIMELAB_TRUSTED_PROXIES` is the comma-separated equivalent for source/Docker
+deployment. It is empty by default. The shared Compose override passes it through.
+Without this setting users behind a proxy still have separate per-username failure
+budgets, but attempts at the same username share the proxy address.
+
+The gateway adds a Content-Security-Policy to Vue pages and assets as well as auth
+pages. Vue scripts must come from the same origin; inline scripts, plugins and
+framing are blocked. HLS blob workers/media, remote HTTPS images/media and Google
+font stylesheets remain supported. Auth pages keep their more restrictive policy.
 
 Example using the existing image and volumes:
 
@@ -121,6 +162,19 @@ storage dialogs) are unavailable in shared mode. Users may open the website link
 on their own device; doing so does not transfer cookies automatically. A shared
 engine only serves media inside its own download root, including resolved symlink
 checks, rather than accepting files from the machine-wide temporary directory.
+
+Remote image, subtitle, stream and HLS proxies enforce a domain allowlist in shared
+mode for every account, including administrators. The list includes known source
+domains, complete domains from the built-in extractors and enabled extensions.
+Each destination must also pass public-IP/DNS checks. Redirect targets, HLS
+segments and AES keys are checked too; cached data cannot bypass the domain policy.
+Watching and cover display remain available without the `download` permission.
+An operator may explicitly approve additional CDN domains using the comma-separated
+`ANIMELAB_MEDIA_DOMAINS` environment variable (for example `cdn.example.org`).
+Subdomains of approved domains are accepted; wildcard/URL entries are not. The
+shared Compose override passes this setting to isolated engines. Restart active
+engines after changing it. Only approve domains you intend to relay; new extension
+CDNs may need approval. Personal desktop/Android mode keeps its existing URL policy.
 
 This provides application-level separation, not an OS sandbox against arbitrary
 code execution. Operators and server administrators are trusted. Do not grant

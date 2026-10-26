@@ -330,6 +330,12 @@ class SourceHTTPService:
     def request(self, method, url, *, headers=None, timeout=30.0, follow_redirects=True,
                 bypass_cache=False, verify_challenge=False, retry_safe=False, **kwargs):
         method = method.upper()
+        validator = kwargs.get('_url_validator')
+        if validator:
+            validator(str(url))
+            # A response cached via a less restrictive client must not bypass
+            # this client's redirect policy, even when it shares source state.
+            bypass_cache = True
         state = self.state(url)
         headers = dict(httpx.Headers(headers or {}))
         headers["user-agent"] = USER_AGENT
@@ -385,7 +391,10 @@ class SourceHTTPService:
                     self._inflight.pop(key, None)
 
     def _request(self, method, url, headers, timeout, follow, verifying, kwargs):
+        validator = kwargs.pop('_url_validator', None)
         for redirect in range(7):
+            if validator:
+                validator(url)
             if not is_safe_url(url):
                 raise ValueError("URL source non autorisée")
             state = self.state(url)
@@ -521,13 +530,14 @@ class SourceClient:
         self.timeout = timeout
         self.follow_redirects = follow_redirects
         self.event_hooks = options.get("event_hooks") or {}
+        self.url_validator = options.get('url_validator')
 
     def request(self, method, url, **kwargs):
         headers = {**self.headers, **dict(kwargs.pop("headers", {}) or {})}
         follow = kwargs.pop("follow_redirects", kwargs.pop("allow_redirects", self.follow_redirects))
         return self.service.request(method, url, headers=headers, cookies=kwargs.pop("cookies", self.cookies),
                                     timeout=kwargs.pop("timeout", self.timeout),
-                                    follow_redirects=follow, **kwargs)
+                                    follow_redirects=follow, _url_validator=self.url_validator, **kwargs)
 
     def get(self, url, **kwargs):
         return self.request("GET", url, **kwargs)
@@ -607,6 +617,8 @@ class SourceStream:
         kwargs = dict(self.kwargs)
         verifying = kwargs.pop("verify_challenge", False)
         for _ in range(7):
+            if self.client.url_validator:
+                self.client.url_validator(url)
             if not is_safe_url(url):
                 raise ValueError("URL source non autorisée")
             state = service.state(url)
