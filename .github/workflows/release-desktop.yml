@@ -117,6 +117,9 @@ jobs:
   android:
     name: Build and validate signed Android APK
     uses: ./.github/workflows/release-android.yml
+    # The reusable workflow also contains an opt-in standalone publisher.
+    permissions:
+      contents: write
     with:
       tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}
       publish: false
