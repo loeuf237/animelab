@@ -633,6 +633,7 @@ onUnmounted(() => {
 }
 .palette-close-button {
   padding: 0 10px;
+  border-radius: var(--radius-pill);
   font-size: 12px;
   color: var(--text);
 }

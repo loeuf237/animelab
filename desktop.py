@@ -5,6 +5,7 @@ import json
 import logging
 from logging.handlers import RotatingFileHandler
 import os
+from animelab.environment import getenv, update_environment
 from pathlib import Path
 import shutil
 import socket
@@ -26,8 +27,8 @@ for _stream in ("stdin", "stdout", "stderr"):
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("animelab.desktop")
-if os.getenv("ANIMAN_LOG_FILE"):
-    logging.getLogger().addHandler(logging.FileHandler(os.environ["ANIMAN_LOG_FILE"], encoding="utf-8"))
+if getenv("ANIMAN_LOG_FILE"):
+    logging.getLogger().addHandler(logging.FileHandler(getenv("ANIMAN_LOG_FILE"), encoding="utf-8"))
 
 
 def configure_bundled_tools():
@@ -69,13 +70,13 @@ def start_server(port):
         app = create_app(SharedConfig(Path(values['root']), f'http://127.0.0.1:{port}',
             values['maxEngines'], values['sessionHours'], values['idleMinutes']))
         return start_asgi_server(app, port, shared=True)
-    os.environ.update(ANIMAN_PORT=str(port), ANIMAN_HOST="127.0.0.1", ANIMAN_RELOAD="false",
+    update_environment(ANIMAN_PORT=str(port), ANIMAN_HOST="127.0.0.1", ANIMAN_RELOAD="false",
                       ANIMAN_ALLOWED_HOSTS='127.0.0.1,localhost')
     from animelab.config import settings
     settings.PORT, settings.HOST = port, "127.0.0.1"
     settings.ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
     from run import app
-    if os.getenv('ANIMAN_DESKTOP_PREFERENCES'):
+    if getenv('ANIMAN_DESKTOP_PREFERENCES'):
         from contextlib import asynccontextmanager
         from animelab.desktop.options import apply_download_preferences
         original_lifespan = app.router.lifespan_context
@@ -104,7 +105,7 @@ def start_asgi_server(app, port, shared=False):
 
 def self_test():
     with tempfile.TemporaryDirectory(prefix="animan-package-check-") as directory:
-        os.environ.update(ANIMAN_DB_PATH=str(Path(directory) / "test.sqlite3"),
+        update_environment(ANIMAN_DB_PATH=str(Path(directory) / "test.sqlite3"),
             ANIMAN_CACHE_DIR=str(Path(directory) / "cache"), ANIMAN_DOWNLOAD_DIR=directory,
             ANIMAN_STARTUP_REFRESH="false")
         server, worker = start_server(find_available_port(0))
@@ -282,7 +283,10 @@ def main():
     parser.add_argument('--worker', help=argparse.SUPPRESS)
     parser.add_argument('--account-worker', action='store_true', help=argparse.SUPPRESS)
     parser.add_argument('--control-url', help=argparse.SUPPRESS)
+    from animelab.browser_settings import add_browser_arguments, apply_browser_arguments
+    add_browser_arguments(parser)
     args = parser.parse_args()
+    apply_browser_arguments(args)
     configure_bundled_tools()
     if args.account_worker:
         from animelab.shared.worker import main as account_worker
@@ -304,7 +308,7 @@ def main():
         with tempfile.TemporaryDirectory(prefix='animelab-launcher-check-') as temporary:
             directory = Path(temporary) / 'desktop'
             directory.mkdir()
-            os.environ.update(ANIMAN_DB_PATH=str(Path(temporary) / 'library.sqlite3'),
+            update_environment(ANIMAN_DB_PATH=str(Path(temporary) / 'library.sqlite3'),
                               ANIMAN_CACHE_DIR=str(Path(temporary) / 'cache'),
                               ANIMAN_DOWNLOAD_DIR=str(Path(temporary) / 'downloads'))
             open_launcher(directory, probe=True)
@@ -313,6 +317,13 @@ def main():
     from animelab.desktop.control import remote_call, running_record
     from animelab.desktop.supervisor import Supervisor
     directory = state_directory()
+    if args.chromium_path is not None or args.chromium_headless is not None:
+        from animelab.desktop.options import preferences, normalize_config
+        config = load_config(directory)
+        options = preferences(config)
+        if args.chromium_path is not None: options['chromiumPath'] = args.chromium_path
+        if args.chromium_headless is not None: options['chromiumHeadless'] = args.chromium_headless
+        write_json(directory / 'config.json', normalize_config({**config, 'launcher': options}))
     if args.worker:
         if args.port is None:
             parser.error('A worker requires --port')
@@ -371,6 +382,9 @@ def main():
             try:
                 record = running_record(directory)
                 status = remote_call(record)
+                if args.chromium_path is not None or args.chromium_headless is not None:
+                    remote_call(record, '/api/launcher-config', load_config(directory))
+                    logger.info('Verification browser settings saved; restart the running engine to apply them')
                 if args.port is not None or args.browser:
                     remote_call(record, '/api/config', {
                         'port': valid_port(args.port) if args.port is not None else status['configuredPort'],
@@ -393,8 +407,8 @@ def main():
         if args.port is not None:
             config['port'] = valid_port(args.port)
             write_json(directory / 'config.json', config)
-        elif os.getenv('ANIMAN_PORT'):
-            config['port'] = valid_port(int(os.environ['ANIMAN_PORT']))
+        elif getenv('ANIMAN_PORT'):
+            config['port'] = valid_port(int(getenv('ANIMAN_PORT')))
         if args.browser:
             config['browser'] = True
         Supervisor(directory, config, headless=args.headless, admin=args.web_admin).run()

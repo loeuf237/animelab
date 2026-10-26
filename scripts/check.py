@@ -20,7 +20,7 @@ def run(command: Sequence[str], *, frontend: bool = False, env: dict[str, str] |
 
 def test_environment(directory: Path) -> dict[str, str]:
     # Remove personal source/proxy/settings overrides before importing the engine.
-    env = {key: value for key, value in os.environ.items() if not key.startswith("ANIMAN_")}
+    env = {key: value for key, value in os.environ.items() if not key.startswith(("ANIMAN_", "ANIMELAB_"))}
     home = directory / "home"
     home.mkdir()
     scratch = directory / "tmp"

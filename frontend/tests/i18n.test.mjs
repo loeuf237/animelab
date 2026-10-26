@@ -105,3 +105,44 @@ test('English covers labels, parameterized notifications and genuine decoder fai
   locale.language.value = 'fr'
   assert.equal(locale.tx('Ouvrir la recherche'), 'Ouvrir la recherche')
 })
+
+test('legacy browser preferences migrate once without replacing modern choices', (t) => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
+  const values = new Map([
+    ['animan_theme', 'dark'],
+    ['animan_pinned_sources', '["voir-anime"]'],
+    ['animan_default_source', 'voir-anime'],
+  ])
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: (key) => values.get(key) ?? null,
+      setItem: (key, value) => values.set(key, value),
+    },
+  })
+  t.after(() => {
+    if (original) Object.defineProperty(globalThis, 'localStorage', original)
+    else delete globalThis.localStorage
+  })
+  assert.equal(locale.readPreference('theme'), 'dark')
+  assert.equal(values.get('animelab_theme'), 'dark')
+  values.set('animelab_theme', 'light')
+  assert.equal(locale.readPreference('theme'), 'light')
+  setActivePinia(createPinia())
+  const prefs = useSourcePreferences()
+  assert.deepEqual(prefs.pinned, ['voir-anime'])
+  assert.equal(prefs.defaultSource, 'voir-anime')
+  prefs.setDefault('animepahe')
+  assert.equal(values.get('animelab_default_source'), 'animepahe')
+  assert.equal(values.get('animan_default_source'), 'voir-anime')
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: (key) => (key === 'animan_theme' ? 'dark' : null),
+      setItem: () => {
+        throw new Error('Read only')
+      },
+    },
+  })
+  assert.equal(locale.readPreference('theme'), 'dark')
+})

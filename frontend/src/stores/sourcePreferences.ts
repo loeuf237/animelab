@@ -1,11 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { language } from '@/utils/locale'
-const storageKey = 'animan_pinned_sources'
+import { language, readPreference, writePreference } from '@/utils/locale'
 const defaults = ['french-manga', 'voir-anime', 'animepahe']
 function readPinned(): string[] {
   try {
-    const saved = JSON.parse(localStorage.getItem(storageKey) || 'null')
+    const saved = JSON.parse(readPreference('pinned_sources') || 'null')
     return Array.isArray(saved) ? saved.filter((id) => typeof id === 'string') : defaults
   } catch {
     return defaults
@@ -15,7 +14,7 @@ export const useSourcePreferences = defineStore('source-preferences', () => {
   const pinned = ref(readPinned())
   let saved: string | null = null
   try {
-    saved = localStorage.getItem('animan_default_source')
+    saved = readPreference('default_source')
   } catch {
     /* Storage is optional. */
   }
@@ -26,7 +25,7 @@ export const useSourcePreferences = defineStore('source-preferences', () => {
   function setDefault(id: string) {
     preferred.value = id
     try {
-      localStorage.setItem('animan_default_source', id)
+      writePreference('default_source', id)
     } catch {
       /* Keep the session choice. */
     }
@@ -36,7 +35,7 @@ export const useSourcePreferences = defineStore('source-preferences', () => {
       ? pinned.value.filter((item) => item !== id)
       : [...pinned.value, id]
     try {
-      localStorage.setItem(storageKey, JSON.stringify(pinned.value))
+      writePreference('pinned_sources', JSON.stringify(pinned.value))
     } catch {
       /* Preferences remain usable in memory. */
     }

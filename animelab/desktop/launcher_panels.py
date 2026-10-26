@@ -158,6 +158,10 @@ class Pages:
         field(ui, frame, 'connect', ui.variables['connectTimeout'], spin=(1, 600, .5))
         field(ui, frame, 'read', ui.variables['readTimeout'], spin=(1, 600, .5))
         label(ui, frame, 'request_hint')
+        field(ui, frame, 'chromium_path', ui.variables['chromiumPath'])
+        button(ui, frame, 'browse', ui.choose_chromium)
+        checkbox(ui, frame, 'chromium_headless', ui.variables['chromiumHeadless'])
+        label(ui, frame, 'chromium_hint')
 
     @staticmethod
     def proxy(ui, frame):

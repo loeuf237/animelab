@@ -16,3 +16,7 @@ def save_file(parent, title, filename, pattern):
     if result and not Path(result).suffix:
         result += Path(filename).suffix
     return result
+
+
+def choose_executable(parent, title, initial):
+    return QFileDialog.getOpenFileName(parent, title, str(Path(initial).expanduser()) if initial else str(Path.home()))[0]

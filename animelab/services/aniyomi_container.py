@@ -87,6 +87,22 @@ def _safe_select_one(parent: Any, selector: str) -> Optional[Any]:
     return results[0] if results else None
 
 
+def _item_title(card, link, selector, image=None):
+    # A union CSS selector returns DOM order: badges/images may precede h3.
+    # Prefer a real text title, rather than flattening an entire card's labels.
+    nodes = _safe_select(card, selector)
+    for node in nodes:
+        if node.name != 'img':
+            title = node.get_text(' ', strip=True)
+            if title:
+                return title
+    owner = card if card.get('data-nom') else card.parent
+    if owner and owner.get('data-nom'):
+        return owner['data-nom'].strip()
+    return (link.get('title') or link.get('aria-label') or
+            (image.get('alt') if image else '') or link.get_text(' ', strip=True)).strip()
+
+
 class AniyomiContainerSource:
     """Conteneur d'exécution dynamique qui exécute une SourceRecipe extraite d'une extension Aniyomi."""
 
@@ -239,18 +255,8 @@ class AniyomiContainerSource:
                 if raw_img:
                     img_url = urljoin(self.base_url, raw_img)
 
-            title = ""
-            title_el = _safe_select_one(it, self.recipe.item_title_selector or "h2, h3, .title, .movie-title, .card-title")
-            if title_el:
-                title = title_el.get_text().strip() or title_el.get("alt", "")
-            if not title and link_el.get("title"):
-                title = link_el.get("title").strip()
-            if not title and link_el.get("aria-label"):
-                title = link_el.get("aria-label").strip()
-            if not title and img_el and img_el.get("alt"):
-                title = img_el.get("alt").strip()
-            if not title:
-                title = link_el.get_text().strip()
+            title = _item_title(it, link_el, self.recipe.item_title_selector or
+                                'h2, h3, .title, .movie-title, .card-title', img_el)
 
             if title:
                 results.append(
@@ -267,7 +273,7 @@ class AniyomiContainerSource:
                 )
 
         logger.info("[container:%s] Trouvé %d résultat(s)", self.name, len(results))
-        return results
+        return await self.data_runtime.expand_listing(results)
 
     # -------------------------------------------------------------------------
     # Dernières sorties
@@ -296,13 +302,9 @@ class AniyomiContainerSource:
             if href in seen_hrefs:
                 continue
             seen_hrefs.add(href)
-            title_el = _safe_select_one(it, self.recipe.item_title_selector or "h2, h3, .title, .movie-title") or link_el
-            title = (title_el.get_text().strip() or title_el.get("alt", "")) if title_el else ""
             img_el = _safe_select_one(it, self.recipe.item_thumb_selector or "img[src], img[data-src]")
-            if not title and img_el and img_el.get("alt"):
-                title = img_el.get("alt", "").strip()
-            if not title and link_el.get("title"):
-                title = link_el.get("title", "").strip()
+            title = _item_title(it, link_el, self.recipe.item_title_selector or
+                                'h2, h3, .title, .movie-title', img_el)
             img_url = urljoin(self.base_url, img_el.get("data-src") or img_el.get("data-lazy-src") or img_el.get("src", "")) if img_el else ""
 
             if title:
@@ -333,7 +335,7 @@ class AniyomiContainerSource:
         if not items and html.strip() and not re.search(r'(?i)no (?:results|anime)|aucun (?:résultat|anime)', soup.get_text(' ', strip=True)):
             raise SelectorMismatch('Expected catalogue elements were not found')
 
-        return self._parse_list_items(items, info_label="Récents", limit=18)
+        return await self.data_runtime.expand_listing(self._parse_list_items(items, info_label="Récents", limit=18))
 
     # -------------------------------------------------------------------------
     # Séries populaires & Recettes spécifiques à la source
@@ -363,7 +365,7 @@ class AniyomiContainerSource:
         if not items and html.strip() and not re.search(r'(?i)no (?:results|anime)|aucun (?:résultat|anime)', soup.get_text(' ', strip=True)):
             raise SelectorMismatch('Expected popular catalogue elements were not found')
 
-        return self._parse_list_items(items, info_label="Populaires", limit=24)
+        return await self.data_runtime.expand_listing(self._parse_list_items(items, info_label="Populaires", limit=24))
 
     async def get_custom_feed(self, feed_id: str, page: int = 1) -> List[AnimeResult]:
         if not self.base_url:
@@ -383,7 +385,7 @@ class AniyomiContainerSource:
         soup = BeautifulSoup(html, "html.parser")
         selector = feed.get("selector") or self.recipe.popular_selector or self.recipe.latest_selector or "article"
         items = _safe_select(soup, selector)
-        return self._parse_list_items(items, info_label=feed.get("label") or feed_id, limit=24)
+        return await self.data_runtime.expand_listing(self._parse_list_items(items, info_label=feed.get("label") or feed_id, limit=24))
 
     # -------------------------------------------------------------------------
     # Détails & Épisodes
@@ -395,6 +397,10 @@ class AniyomiContainerSource:
 
         if self.recipe.runtime.get('catalogue'):
             return await self.data_runtime.detail(anime_url)
+        if self.recipe.runtime.get('listing_expansion'):
+            section = await self.data_runtime.section_detail(anime_url)
+            if section is not None:
+                return section
 
         html = await self._fetch_html(anime_url)
         if not html:

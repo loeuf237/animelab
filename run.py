@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import os
+from animelab.environment import getenv, update_environment
 from animelab.diagnostics import install_logging
 install_logging()
 logging.basicConfig(
@@ -46,6 +47,7 @@ logger = logging.getLogger("animelab")
 async def lifespan(app: FastAPI):
     logger.info("Starting AnimeLab Python v%s...", __version__)
     source_http.start()
+    browser_verification.verified_callback = download_manager.resume_verified_domain
     # 1. Initialize SQLite database
     init_db()
     # 2. Restore unfinished download tasks
@@ -60,7 +62,7 @@ async def lifespan(app: FastAPI):
     ]
     from animelab.services.proxy_pool import proxy_pool
     bg_tasks.append(asyncio.create_task(proxy_pool.watch()))
-    if os.getenv("ANIMAN_STARTUP_REFRESH", "true").lower() not in ("false", "0", "no"):
+    if getenv("ANIMAN_STARTUP_REFRESH", "true").lower() not in ("false", "0", "no"):
         bg_tasks.append(asyncio.create_task(proxy_pool.refresh()))
         for service in (scraping_service, voiranime_service, animepahe_service):
             service._refresh_task = asyncio.create_task(service._safe_refresh_cache())
@@ -79,6 +81,7 @@ async def lifespan(app: FastAPI):
 
     logger.info("Stopping AnimeLab...")
     source_http.rotation_callback = None
+    browser_verification.verified_callback = None
     watchdog_service.stop()
     await download_manager.shutdown()
     for t in bg_tasks:
@@ -97,7 +100,7 @@ app = FastAPI(
 )
 
 # Configuration CORS pour autoriser les clients frontend découplés (SPA Vite, mobile, LAN)
-_cors_origins_env = os.getenv("ANIMAN_CORS_ORIGINS", "")
+_cors_origins_env = getenv("ANIMAN_CORS_ORIGINS", "")
 _allowed_origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
@@ -278,7 +281,7 @@ def start_embedded_server(host: str = "0.0.0.0", port: int = 8080, data_dir: str
     import os
     from pathlib import Path
     if data_dir:
-        os.environ["ANIMAN_DATA_DIR"] = str(data_dir)
+        update_environment(ANIMAN_DATA_DIR=str(data_dir))
         try:
             Path(data_dir, "db").mkdir(parents=True, exist_ok=True)
             Path(data_dir, "cache").mkdir(parents=True, exist_ok=True)
@@ -306,8 +309,13 @@ def stop_embedded_server():
 
 if __name__ == "__main__":
     import os
-    reload_enabled = os.getenv("ANIMAN_RELOAD", "true").lower() in ("1", "true", "yes")
-    bind_host = os.getenv("ANIMAN_HOST", settings.HOST)
+    import argparse
+    from animelab.browser_settings import add_browser_arguments, apply_browser_arguments
+    parser = argparse.ArgumentParser(description='AnimeLab web server')
+    add_browser_arguments(parser)
+    apply_browser_arguments(parser.parse_args())
+    reload_enabled = getenv("ANIMAN_RELOAD", "true").lower() in ("1", "true", "yes")
+    bind_host = getenv("ANIMAN_HOST", settings.HOST)
     uvicorn.run(
         "run:app" if reload_enabled else app,
         host=bind_host,

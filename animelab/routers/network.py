@@ -113,6 +113,13 @@ def local_only(request):
         raise HTTPException(403, "La vérification dans le navigateur doit être ouverte depuis cette machine")
 
 
+def verification_only(request):
+    # A configured headless executable may run inside an authenticated account's
+    # isolated engine. Remote users never choose executables or open host windows.
+    if not is_local(request) and not browser_verification.remote_headless():
+        raise HTTPException(403, 'Verification requires a local client or an administrator-configured headless account engine')
+
+
 @router.get("/sessions")
 async def sessions(request: Request):
     await browser_verification.expire()
@@ -121,7 +128,7 @@ async def sessions(request: Request):
 
 @router.post("/verification")
 async def start(body: StartVerification, request: Request):
-    local_only(request)
+    verification_only(request)
     try:
         return await browser_verification.start(body.domain, body.browser, body.mode)
     except ValueError as exc:
@@ -130,18 +137,49 @@ async def start(body: StartVerification, request: Request):
 
 @router.post("/verification/{job_id}/complete")
 async def complete(job_id: str, request: Request):
-    local_only(request)
+    verification_only(request)
     try:
         result = await browser_verification.complete(job_id)
-        result["resumed"] = download_manager.resume_verified_domain(result["domain"])
+        if "resumed" not in result:
+            result["resumed"] = download_manager.resume_verified_domain(result["domain"])
         return result
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.get('/verification/{job_id}/status')
+async def verification_status(job_id: str, request: Request):
+    verification_only(request)
+    try:
+        return browser_verification.status(job_id)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
+@router.get('/browser-settings')
+async def browser_settings(request: Request):
+    local_only(request)
+    if browser_verification.platform == 'android':
+        raise HTTPException(409, 'Android uses the system WebView for verification')
+    return browser_verification.configuration.snapshot()
+
+
+@router.post('/browser-settings')
+async def save_browser_settings(request: Request):
+    local_only(request)
+    if browser_verification.platform == 'android':
+        raise HTTPException(409, 'Android uses the system WebView for verification')
+    if browser_verification.jobs:
+        raise HTTPException(409, 'Close verification windows before changing browser settings')
+    try:
+        return browser_verification.configuration.save(await request.json())
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 
 
 @router.delete("/verification/{job_id}")
 async def cancel(job_id: str, request: Request):
-    local_only(request)
+    verification_only(request)
     await browser_verification.cancel(job_id)
     return {"success": True}
 
@@ -150,7 +188,7 @@ async def cancel(job_id: str, request: Request):
 async def recheck(body: StartVerification, request: Request):
     """Probe only a known blocked URL; a manual visit does not imply clearance."""
     from animelab.services.source_http import source_http
-    local_only(request)
+    verification_only(request)
     state = source_http.state("https://" + body.domain)
     with state.condition:
         url = state.blocked_url

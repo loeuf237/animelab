@@ -101,21 +101,27 @@ Settings controls language, downloads, sources and proxies. For a source checkou
 
 | Variable | Purpose | Default |
 | --- | --- | --- |
-| `ANIMAN_HOST` | Server bind address | `127.0.0.1` |
-| `ANIMAN_ALLOWED_HOSTS` | Accepted HTTP hosts, comma-separated, without schemes or ports | `127.0.0.1,localhost` |
-| `ANIMAN_PORT` | HTTP port | `8080` |
-| `ANIMAN_RELOAD` | Reload the development server after code changes | `true` |
-| `ANIMAN_DOWNLOAD_DIR` | Download destination | `~/Downloads/Animan` on desktop |
+| `ANIMELAB_HOST` | Server bind address | `127.0.0.1` |
+| `ANIMELAB_CHROMIUM_PATH` | Installed Chromium-family executable for source verification | Automatic detection |
+| `ANIMELAB_CHROMIUM_HEADLESS` | Run verification Chromium without a display | `false` |
+| `ANIMELAB_ALLOWED_HOSTS` | Accepted HTTP hosts, comma-separated, without schemes or ports | `127.0.0.1,localhost` |
+| `ANIMELAB_PORT` | HTTP port | `8080` |
+| `ANIMELAB_RELOAD` | Reload the development server after code changes | `true` |
+| `ANIMELAB_DOWNLOAD_DIR` | Download destination | `~/Downloads/AnimeLab` on desktop |
 
-Only local HTTP hosts are accepted by default; other hosts receive HTTP 400. For LAN access or a reverse proxy, explicitly list the IP addresses or domain names used to reach AnimeLab, for example `ANIMAN_ALLOWED_HOSTS=127.0.0.1,localhost,192.168.1.50,anime.example.org`. This also works with Docker Compose. Setting `ANIMAN_HOST=0.0.0.0` alone does not authorize other hosts. Subdomains can be allowed with `*.example.org`; `*` disables host validation and should be avoided. These are incoming application hosts, not anime source domains.
+Only local HTTP hosts are accepted by default; other hosts receive HTTP 400. For LAN access or a reverse proxy, explicitly list the IP addresses or domain names used to reach AnimeLab, for example `ANIMELAB_ALLOWED_HOSTS=127.0.0.1,localhost,192.168.1.50,anime.example.org`. This also works with Docker Compose. Setting `ANIMELAB_HOST=0.0.0.0` alone does not authorize other hosts. Subdomains can be allowed with `*.example.org`; `*` disables host validation and should be avoided. These are incoming application hosts, not anime source domains.
 
 For local-only use without automatic reload, on Linux/macOS:
 
 ```bash
-ANIMAN_HOST=127.0.0.1 ANIMAN_RELOAD=false uv run --locked python run.py
+ANIMELAB_HOST=127.0.0.1 ANIMELAB_RELOAD=false uv run --locked python run.py
 ```
 
-AnimeLab was previously named **Animan**. The Python package is now `animelab`. Legacy `ANIMAN_*` variables, `.animan` data folders and Android ID `com.animan.app` are retained for compatibility. Desktop settings and the library live under `~/.animan`; Android uses private app storage and exports completed media separately.
+AnimeLab was previously named **Animan**. The Python package is now `animelab`. The runtime prefers `ANIMELAB_*` variables and accepts legacy `ANIMAN_*` aliases. `.animan` data folders and Android ID `com.animan.app` are retained for compatibility. Desktop settings and the library live under `~/.animan`; Android uses private app storage and exports completed media separately.
+
+New downloads and Android shared exports default to `Downloads/AnimeLab`.
+Existing files, saved task paths and custom destinations are preserved.
+See [remaining legacy identifiers and migration options](docs/legacy-identifiers.md).
 
 ## Docker
 
@@ -175,3 +181,5 @@ Python dependencies, including development tools, are pinned in `uv.lock`; `requ
 AnimeLab is free software licensed under the **GNU General Public License, version 3 only** (`GPL-3.0-only`). You may use, modify and redistribute it under those terms. Redistributed versions based on AnimeLab must comply with GPLv3, including its corresponding-source requirements. The software is provided without warranty.
 
 See [LICENSE](LICENSE) for the full terms and [NOTICE](NOTICE) for the project notice and source location. Third-party components retain their own licenses; see the [Android third-party notices](android/app/src/main/assets/THIRD-PARTY-NOTICES.txt) and the notices included in release packages.
+
+For browser session sharing, Chromium paths and headless server setup, see [Browser verification](docs/browser-verification.md).

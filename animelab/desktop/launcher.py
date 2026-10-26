@@ -15,7 +15,7 @@ from .launcher_i18n import language, TEXT
 from .launcher_model import LauncherModel
 from .launcher_panels import build_page, TABS
 from .launcher_widgets import Value, application
-from .launcher_dialogs import save_file, choose_directory
+from .launcher_dialogs import save_file, choose_directory, choose_executable
 from .options import normalize_config
 from .state import write_json
 
@@ -288,6 +288,10 @@ class NativeLauncher(QWidget):
     def stop(self):
         if self.confirm('stop', 'stop_confirm'):
             self.task(self.model.stop, lambda _: self.note('stopped'))
+
+    def choose_chromium(self):
+        selected = choose_executable(self, self.t('chromium_path'), self.variables['chromiumPath'].get())
+        if selected: self.variables['chromiumPath'].set(selected)
 
     def choose_download_directory(self):
         initial = self.variables['downloadDir'].get() or self.model.paths()['downloads']

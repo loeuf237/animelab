@@ -567,6 +567,7 @@
       class="settings-tab-pane"
       :class="{ active: currentTab === 'proxy' }"
     >
+      <BrowserVerificationSettings :active="currentTab === 'proxy'" />
       <ProxyPoolSettings :active="currentTab === 'proxy'" />
       <section class="settings-card-pro">
         <div class="settings-card-header-pro">
@@ -851,12 +852,13 @@
 
 <script setup lang="ts">
 import DiagnosticsExport from '@/components/DiagnosticsExport.vue'
-import { tx } from '@/utils/locale'
+import { tx, readPreference, writePreference } from '@/utils/locale'
 import { useNotifications } from '@/stores/notifications'
 import { ref, computed, onMounted } from 'vue'
 import { api } from '@/api/client'
 import { useI18nStore } from '@/stores/i18n'
 import ProxyPoolSettings from '@/components/ProxyPoolSettings.vue'
+import BrowserVerificationSettings from '@/components/BrowserVerificationSettings.vue'
 import AndroidStorageSettings from '@/components/AndroidStorageSettings.vue'
 import { useRoute } from 'vue-router'
 
@@ -928,7 +930,7 @@ const effectiveProxyUrl = computed(() => {
 })
 
 function onThemeChange() {
-  localStorage.setItem('animan_theme', theme.value)
+  writePreference('theme', theme.value)
   document.documentElement.setAttribute('data-theme', theme.value)
 }
 
@@ -1039,7 +1041,7 @@ async function saveAll() {
 }
 
 onMounted(() => {
-  theme.value = (localStorage.getItem('animan_theme') as string) || 'dark'
+  theme.value = (readPreference('theme') as string) || 'dark'
   loadSettings()
 })
 </script>

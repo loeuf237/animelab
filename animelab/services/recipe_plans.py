@@ -19,10 +19,38 @@ def source_key(pkg, base_url=''):
     }.get(host, '')
 
 
+def section_listing_plan():
+    return {'kind': 'script_sections', 'function': 'panneauAnime', 'root_depth': 2,
+            'entry_path': r'^/catalogue/[^/]+/', 'ttl': 180,
+            'title_selector': '#titreOeuvre, #titreAnime, h1',
+            'image_selector': '#coverOeuvre, #coverAnime, meta[property="og:image"]',
+            'synopsis_selector': '#synopsisText, #synopsis, .synopsis',
+            'genre_selector': '.genre-pill', 'season_pattern': r'^saison(\d+)$'}
+
+
+def upgrade_section_recipe(recipe):
+    """Add the missing expansion operation to the old, identifiable imported plan."""
+    if source_key(recipe.pkg, recipe.base_url) != 'animesama':
+        return False
+    if recipe.runtime.get('episodes', {}).get('kind') != 'js_arrays':
+        return False
+    changed = False
+    if 'listing_expansion' not in recipe.runtime:
+        recipe.runtime['listing_expansion'] = section_listing_plan()
+        changed = True
+    # A DEX literal incorrectly joined the catalogue and pagination selectors.
+    if '#list_pagination' in recipe.search_selector:
+        recipe.search_selector = ', '.join(part.strip() for part in recipe.search_selector.split(',')
+                                           if '#list_pagination' not in part)
+        changed = True
+    return changed
+
+
 def compile_operations(recipe):
     """Store all runtime decisions in the serializable recipe itself."""
     key = source_key(recipe.pkg, recipe.base_url)
     if recipe.runtime:
+        upgrade_section_recipe(recipe)
         return
     if key == 'franime':
         recipe.runtime = {
@@ -64,7 +92,8 @@ def compile_operations(recipe):
         recipe.details_thumb_selector = recipe.details_thumb_selector or '.seriesCoverBox img'
         recipe.details_synopsis_selector = recipe.details_synopsis_selector or 'p.seri_des'
     elif key == 'animesama':
-        recipe.runtime = {'exclude_urls': ['/scan/'], 'episodes': {'kind': 'js_arrays',
+        recipe.runtime = {'exclude_urls': ['/scan/'], 'listing_expansion': section_listing_plan(),
+            'episodes': {'kind': 'js_arrays',
             'array_pattern': r'(?:var|let|const)\s+(eps\w*)\s*=\s*\[([^\]]*)\]',
             'pages_pattern': r'panneauAnime\([^,]+,\s*["\x27]([^"\x27]+)["\x27]\)',
             'script_path': 'episodes.js'}}

@@ -3,6 +3,8 @@ import locale
 
 TEXT = {
     'fr': {
+        'chromium_path': 'Exécutable Chromium', 'chromium_headless': 'Vérification sans fenêtre',
+        'chromium_hint': 'Chemin vide : détection automatique. Le mode sans fenêtre exécute JavaScript, mais un CAPTCHA interactif nécessite un navigateur visible.',
         'authentication': 'Authentification', 'auth_mode': 'Mode d’authentification',
         'auth_none': 'Aucun (usage personnel)', 'auth_accounts': 'Comptes utilisateurs',
         'session_hours': 'Durée de session (heures)', 'idle_minutes': 'Inactivité (minutes)',
@@ -56,6 +58,8 @@ TEXT = {
         'version': 'Version', 'private_settings': 'Les réglages exportés excluent les cookies et les identifiants de proxy.',
     },
     'en': {
+        'chromium_path': 'Chromium executable', 'chromium_headless': 'Headless verification',
+        'chromium_hint': 'Empty path: automatic detection. Headless mode runs JavaScript; an interactive CAPTCHA still needs a visible browser.',
         'authentication': 'Authentication', 'auth_mode': 'Authentication mode',
         'auth_none': 'None (personal use)', 'auth_accounts': 'User accounts',
         'session_hours': 'Session lifetime (hours)', 'idle_minutes': 'Idle timeout (minutes)',

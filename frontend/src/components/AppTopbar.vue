@@ -77,7 +77,7 @@
 
 <script setup lang="ts">
 import brandIcon from '@/assets/brand-icon.png'
-import { tx } from '@/utils/locale'
+import { tx, readPreference, writePreference } from '@/utils/locale'
 import { ref, onMounted } from 'vue'
 import { useI18nStore } from '@/stores/i18n'
 import { sharedUser } from '@/stores/sharedSession'
@@ -90,7 +90,7 @@ const i18nStore = useI18nStore()
 const theme = ref<'dark' | 'light'>('dark')
 
 onMounted(() => {
-  const savedTheme = (localStorage.getItem('animan_theme') as 'dark' | 'light') || 'dark'
+  const savedTheme = (readPreference('theme') as 'dark' | 'light') || 'dark'
   theme.value = savedTheme
   document.documentElement.setAttribute('data-theme', savedTheme)
 })
@@ -102,7 +102,7 @@ function emitOpenPalette() {
 function toggleTheme() {
   const newTheme = theme.value === 'dark' ? 'light' : 'dark'
   theme.value = newTheme
-  localStorage.setItem('animan_theme', newTheme)
+  writePreference('theme', newTheme)
   document.documentElement.setAttribute('data-theme', newTheme)
 }
 

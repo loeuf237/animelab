@@ -1,9 +1,11 @@
 """Authenticated same-origin gateway. User identity never comes from a request path."""
 import asyncio
-from collections import defaultdict, deque
+from collections import OrderedDict, deque
 from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
+import ipaddress
+import math
 import time
 from urllib.parse import urlsplit
 
@@ -11,9 +13,10 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 import httpx
 
-from animelab.shared.accounts import Accounts
+from animelab.shared.accounts import Accounts, PasswordBusy, digest
 from animelab.shared.workers import Workers
 from animelab.desktop.state import InstanceLock
 from animelab import __version__
@@ -24,6 +27,13 @@ ASSETS = Path(__file__).with_name('web')
 HOP = {'connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization',
        'te', 'trailer', 'transfer-encoding', 'upgrade', 'set-cookie', 'content-length'}
 
+# The built Vue UI uses local scripts and HLS blob workers, Google fonts and
+# external covers/media. No remote or inline scripts may execute in the UI.
+SPA_CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+           "font-src 'self' https://fonts.gstatic.com; img-src 'self' https: data: blob:; "
+           "media-src 'self' https: blob:; connect-src 'self' https:; worker-src 'self' blob:; "
+           "object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
+
 
 @dataclass
 class SharedConfig:
@@ -32,6 +42,7 @@ class SharedConfig:
     max_workers: int = 4
     session_hours: int = 12
     idle_minutes: int = 30
+    trusted_proxies: tuple[str, ...] = ()
 
     def __post_init__(self):
         url = urlsplit(self.public_url)
@@ -48,6 +59,9 @@ class SharedConfig:
             raise ValueError('Invalid session lifetime or idle timeout')
         self.public_url = self.public_url.rstrip('/')
         self.root = Path(self.root).resolve()
+        # Never accept '*' or names resolving to a different machine later.
+        for peer in self.trusted_proxies:
+            ipaddress.ip_network(peer, strict=False)
 
     @property
     def secure(self):
@@ -92,25 +106,39 @@ class Redeem(Input):
 
 
 class Attempts:
-    """Bound password attempts by peer and globally, without an unbounded map."""
+    """Only failures consume a bounded, expiring (identity, peer) budget."""
     def __init__(self):
-        self.peers = defaultdict(deque)
-        self.global_times = deque()
+        self.peers = OrderedDict()
 
-    def check(self, peer):
+    def _prune(self):
         now = time.monotonic()
-        while self.global_times and self.global_times[0] < now - 60:
-            self.global_times.popleft()
         for key in list(self.peers):
             attempts = self.peers[key]
-            while attempts and attempts[0] < now - 900:
+            while attempts and attempts[0] <= now - 900:
                 attempts.popleft()
             if not attempts:
                 del self.peers[key]
-        if len(self.global_times) >= 30 or len(self.peers.get(peer, ())) >= 10 or len(self.peers) >= 10000:
-            raise HTTPException(429, 'Too many authentication attempts; try later', headers={'Retry-After': '900'})
-        self.global_times.append(now)
-        self.peers[peer].append(now)
+        return now
+
+    def check(self, peer, identity):
+        now = self._prune()
+        failures = self.peers.get((identity.lower(), peer), ())
+        if len(failures) >= 10:
+            raise HTTPException(429, 'Too many authentication failures; try later',
+                headers={'Retry-After': str(max(1, math.ceil(failures[0] + 900 - now)))})
+
+    def failed(self, peer, identity):
+        now = self._prune()
+        key = (identity.lower(), peer)
+        if key not in self.peers:
+            if len(self.peers) >= 10000:
+                self.peers.popitem(last=False)
+            self.peers[key] = deque(maxlen=10)
+        self.peers[key].append(now)
+        self.peers.move_to_end(key)
+
+    def succeeded(self, peer, identity):
+        self.peers.pop((identity.lower(), peer), None)
 
 
 class BodyLimit:
@@ -163,6 +191,16 @@ def create_app(config: SharedConfig, *, accounts=None, workers=None, transport=N
     store.lifetime, store.idle = config.session_hours * 3600, config.idle_minutes * 60
     pool = workers or Workers(config.root, max_workers=config.max_workers)
     attempts = Attempts()
+    password_work = asyncio.Lock()
+
+    @asynccontextmanager
+    async def hashing():
+        # Fail fast rather than queue threads/128 MiB computations. No global
+        # minute quota can lock unrelated users out after the work has finished.
+        if password_work.locked():
+            raise HTTPException(503, 'Password verification is busy; try shortly', headers={'Retry-After': '1'})
+        async with password_work:
+            yield
 
     @asynccontextmanager
     async def lifespan(app):
@@ -190,6 +228,10 @@ def create_app(config: SharedConfig, *, accounts=None, workers=None, transport=N
     async def invalid(request, exc):
         return JSONResponse({'error': str(exc)}, status_code=400)
 
+    @app.exception_handler(PasswordBusy)
+    async def busy(request, exc):
+        return JSONResponse({'error': str(exc)}, status_code=503, headers={'Retry-After': '1'})
+
     @app.middleware('http')
     async def boundaries(request, call_next):
         if request.method not in SAFE:
@@ -210,6 +252,8 @@ def create_app(config: SharedConfig, *, accounts=None, workers=None, transport=N
         response.headers['Referrer-Policy'] = 'no-referrer'
         if request.url.path.startswith('/auth/'):
             response.headers['Content-Security-Policy'] = "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
+        else:
+            response.headers['Content-Security-Policy'] = SPA_CSP
         return response
 
     async def current(request):
@@ -224,8 +268,8 @@ def create_app(config: SharedConfig, *, accounts=None, workers=None, transport=N
             raise HTTPException(403, 'Administrator required')
         return user
 
-    def limit(request):
-        attempts.check(request.client.host if request.client else 'unknown')
+    def peer(request):
+        return request.client.host if request.client else 'unknown'
 
     def session_response(token):
         response = JSONResponse({'success': True})
@@ -258,10 +302,14 @@ def create_app(config: SharedConfig, *, accounts=None, workers=None, transport=N
 
     @app.post('/api/auth/login')
     async def login(body: Login, request: Request):
-        limit(request)
-        token = await asyncio.to_thread(store.login, body.username, body.password)
+        address = peer(request)
+        attempts.check(address, body.username)
+        async with hashing():
+            token = await asyncio.to_thread(store.login, body.username, body.password)
         if not token:
+            attempts.failed(address, body.username)
             raise HTTPException(401, 'Invalid username or password')
+        attempts.succeeded(address, body.username)
         # Rotate the current session; never reuse a client-selected identifier.
         await asyncio.to_thread(store.revoke, request.cookies.get(COOKIE, ''))
         return session_response(token)
@@ -277,15 +325,32 @@ def create_app(config: SharedConfig, *, accounts=None, workers=None, transport=N
 
     @app.post('/api/auth/password')
     async def password(body: Password, request: Request):
-        await current(request)
-        limit(request)
-        await asyncio.to_thread(store.change_password, request.cookies.get(COOKIE, ''), body.old_password, body.password)
+        user = await current(request)
+        address, identity = peer(request), user['username']
+        attempts.check(address, identity)
+        try:
+            async with hashing():
+                await asyncio.to_thread(store.change_password, request.cookies.get(COOKIE, ''), body.old_password, body.password)
+        except ValueError:
+            attempts.failed(address, identity)
+            raise
+        attempts.succeeded(address, identity)
         return {'success': True, 'login_required': True}
 
     @app.post('/api/auth/redeem')
     async def redeem(body: Redeem, request: Request):
-        limit(request)
-        token = await asyncio.to_thread(store.redeem, body.code, body.password, body.username, issue_session=True)
+        # Recovery has no username. Scope its failures to a digest of the code,
+        # never a shared anonymous bucket and never a plaintext invitation token.
+        identity = '@redeem:' + (body.username.lower() if body.username else digest(body.code))
+        address = peer(request)
+        attempts.check(address, identity)
+        try:
+            async with hashing():
+                token = await asyncio.to_thread(store.redeem, body.code, body.password, body.username, issue_session=True)
+        except ValueError:
+            attempts.failed(address, identity)
+            raise
+        attempts.succeeded(address, identity)
         return session_response(token)
 
     @app.get('/api/auth/users')
@@ -296,17 +361,21 @@ def create_app(config: SharedConfig, *, accounts=None, workers=None, transport=N
     @app.post('/api/auth/users')
     async def create_user(body: NewUser, request: Request):
         await admin(request)
-        limit(request)
-        identity = await asyncio.to_thread(store.create, **body.model_dump())
+        async with hashing():
+            identity = await asyncio.to_thread(store.create, **body.model_dump())
         return {'id': identity}
 
     @app.patch('/api/auth/users/{user_id}')
     async def update_user(user_id: str, body: UpdateUser, request: Request):
         await admin(request)
-        if body.password is not None:
-            limit(request)
         # Permission revocation stops scheduled/watchdog jobs as well as requests.
-        await pool.change(user_id, lambda: asyncio.to_thread(store.update, user_id, **body.model_dump(exclude_none=True)))
+        async def change():
+            await pool.change(user_id, lambda: asyncio.to_thread(store.update, user_id, **body.model_dump(exclude_none=True)))
+        if body.password is not None:
+            async with hashing():
+                await change()
+        else:
+            await change()
         return {'success': True}
 
     @app.post('/api/auth/users/{user_id}/stop')
@@ -433,4 +502,6 @@ def create_app(config: SharedConfig, *, accounts=None, workers=None, transport=N
     app.add_middleware(BodyLimit)
     app.add_middleware(TrustedHostMiddleware,
         allowed_hosts=[urlsplit(config.public_url).hostname, '127.0.0.1', 'localhost'], www_redirect=False)
+    if config.trusted_proxies:
+        app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=list(config.trusted_proxies))
     return app

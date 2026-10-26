@@ -13,22 +13,57 @@ import json
 
 PERMISSIONS = {'download', 'extensions'}
 SCRYPT_N = 2 ** 17
-_HASH_LOCK = threading.Lock()  # Bound concurrent 128 MiB password computations.
+_HASH_LOCK = threading.BoundedSemaphore(1)  # One 128 MiB computation; no waiting queue.
+LEGACY_SCRYPT = (2 ** 17, 8, 1)
+
+
+class PasswordBusy(Exception):
+    """Password work is temporarily at capacity, without recording a failure."""
+
+
+def _derive(password, salt, n, r, p):
+    if not isinstance(password, str) or not 12 <= len(password) <= 256:
+        raise ValueError('Use a password of 12 to 256 characters')
+    # Reject malformed/corrupt stored parameters before allocating memory.
+    if (n < 1024 or n > 2 ** 20 or n & (n - 1) or not 1 <= r <= 32
+            or not 1 <= p <= 16 or n * r > 2 ** 20 or n * r * p > 2 ** 22):
+        raise ValueError('Invalid scrypt parameters')
+    salt_bytes = bytes.fromhex(salt)
+    if len(salt_bytes) != 16:
+        raise ValueError('Invalid password salt')
+    if not _HASH_LOCK.acquire(blocking=False):
+        raise PasswordBusy('Password verification is busy; try again shortly')
+    try:
+        return hashlib.scrypt(password.encode(), salt=salt_bytes, n=n, r=r, p=p,
+                              maxmem=256 * 1024 * 1024).hex()
+    finally:
+        _HASH_LOCK.release()
+
+
+def _parameters(encoded):
+    if not isinstance(encoded, str) or len(encoded) > 256:
+        raise ValueError('Invalid password hash')
+    if encoded.startswith('scrypt$'):
+        algorithm, n, r, p, salt, key = encoded.split('$')
+        params = (int(n), int(r), int(p))
+    else:
+        salt, key = encoded.split(':')
+        params = LEGACY_SCRYPT
+    if len(bytes.fromhex(key)) != 64:
+        raise ValueError('Invalid password key')
+    return (*params, salt, key)
 
 
 def password_hash(password, salt=None):
-    if not isinstance(password, str) or not 12 <= len(password) <= 256:
-        raise ValueError('Use a password of 12 to 256 characters')
     salt = salt or secrets.token_hex(16)
-    with _HASH_LOCK:
-        key = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=SCRYPT_N,
-                             r=8, p=1, maxmem=256 * 1024 * 1024)
-    return salt + ':' + key.hex()
+    key = _derive(password, salt, SCRYPT_N, 8, 1)
+    return f'scrypt${SCRYPT_N}$8$1${salt}${key}'
 
 
 def password_matches(password, encoded):
     try:
-        return hmac.compare_digest(password_hash(password, encoded.split(':')[0]), encoded)
+        n, r, p, salt, key = _parameters(encoded)
+        return hmac.compare_digest(_derive(password, salt, n, r, p), key)
     except (ValueError, TypeError, AttributeError):
         return False
 
@@ -143,12 +178,19 @@ class Accounts:
         row = self._verified_record(username, password)
         if not row:
             return None
+        # Rehash only after successful verification, without holding SQLite
+        # during scrypt. The comparison below lets an administrator reset win.
+        n, r, p, _, _ = _parameters(row['password'])
+        replacement = None
+        if not row['password'].startswith('scrypt$') or (n, r, p) != (SCRYPT_N, 8, 1):
+            replacement = password_hash(password)
         with self.connect() as db:
             db.execute('BEGIN IMMEDIATE')
             current = db.execute('SELECT * FROM users WHERE id=? AND enabled=1', (row['id'],)).fetchone()
-            # Password reset/deactivation during hashing must win over login.
             if not current or current['password'] != row['password']:
                 return None
+            if replacement:
+                db.execute('UPDATE users SET password=? WHERE id=?', (replacement, row['id']))
             return self._new_session(db, row['id'])
 
     def new_session(self, user_id):

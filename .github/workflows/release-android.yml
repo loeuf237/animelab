@@ -8,6 +8,9 @@ on:
       tag_name:
         type: string
         required: true
+      source_ref:
+        type: string
+        default: ''
       publish:
         type: boolean
         default: false
@@ -30,21 +33,31 @@ on:
         description: Android release tag
         default: android-v0.1.2-beta.1
         required: true
+      source_ref:
+        description: Optional branch or SHA for a non-publishing test build
+        default: ''
+        required: false
 
 permissions:
   contents: read
 
 env:
   RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag_name }}
+  SOURCE_REF: ${{ inputs.source_ref || (github.event_name == 'push' && github.ref_name || inputs.tag_name) }}
 
 jobs:
   native-wheels:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
+      - name: Refuse publication from a test source override
+        if: inputs.source_ref != '' && (inputs.publish || startsWith(github.ref, 'refs/tags/'))
+        run: |
+          echo 'source_ref is only allowed for non-publishing test builds' >&2
+          exit 1
       - uses: actions/checkout@v4
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ env.SOURCE_REF }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
@@ -87,7 +100,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ env.SOURCE_REF }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -202,7 +215,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ env.SOURCE_REF }}
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -246,7 +259,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ env.SOURCE_REF }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
@@ -286,7 +299,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ env.SOURCE_REF }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'

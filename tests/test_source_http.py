@@ -337,3 +337,41 @@ def test_normal_page_with_captcha_widget_is_not_blocked(transport):
     service = transport(lambda s,m,u,k: response(u,200,'<h1>Catalogue</h1><div class="g-recaptcha"></div>', {'content-type': 'text/html'}))
     assert service.client().get('https://source.example/').status_code == 200
     assert not service.diagnostics()[0]['verificationRequired']
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('streaming', [False, True])
+async def test_media_policy_checks_every_redirect_even_when_source_cache_is_warm(transport, streaming):
+    from fastapi import HTTPException
+    from animelab.media_policy import validate_media_url
+    from unittest.mock import patch
+    class Raw:
+        def __init__(self, url, code, headers):
+            self.url, self.status_code, self.headers = url, code, httpx.Headers(headers)
+        def close(self): pass
+        def iter_content(self, chunk_size=65536): yield b'video'
+    visited = []
+    def handle(session, method, url, kwargs):
+        visited.append(url)
+        assert '_url_validator' not in kwargs
+        if url.endswith('/start'):
+            if streaming:
+                return Raw(url, 302, {'location': 'https://outside.example/file', 'content-type': 'video/mp4'})
+            return response(url, 302, headers={'location': 'https://outside.example/file'})
+        if streaming:
+            return Raw(url, 200, {'content-type': 'video/mp4'})
+        return response(url)
+    service = transport(handle)
+    if not streaming:
+        service.client().get('https://voir-anime.to/start')  # Shared cache populated without media policy.
+        visited.clear()
+    with patch.dict('os.environ', {'ANIMELAB_SHARED_WORKER': '1'}):
+        client = service.async_client(url_validator=validate_media_url)
+        with pytest.raises(HTTPException) as error:
+            if streaming:
+                async with client.stream('GET', 'https://voir-anime.to/start'):
+                    pytest.fail('A forbidden destination must not be opened')
+            else:
+                await client.get('https://voir-anime.to/start')
+        assert error.value.status_code == 400
+    assert visited == ['https://voir-anime.to/start']
+    assert all(state.leased == 0 for state in service._domains.values())

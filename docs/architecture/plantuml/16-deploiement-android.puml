@@ -39,7 +39,7 @@ node "Appareil Android 10+ / ARM64\nAPK com.animan.app ; target SDK 35" as Devic
     component "MediaStore / fournisseur de documents" as Provider
   }
   folder "Stockage partagé" {
-    artifact "Downloads/Animan\nou dossier / carte SD choisi via SAF" as Shared
+    artifact "Downloads/AnimeLab\nou dossier / carte SD choisi via SAF" as Shared
     artifact "Movies/AnimeLab\nrepli sous-titres selon MediaProvider" as Sidecars
   }
   Engine --> DB

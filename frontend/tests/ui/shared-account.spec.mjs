@@ -97,6 +97,33 @@ test('ordinary accounts do not see administrator controls or invitation codes', 
   await expect(page.locator('#generated')).toBeHidden()
 })
 
+test('authentication capacity and failure limits explain retrying in French', async ({ page }) => {
+  await accountPage(page, { signedIn: false })
+  await page.getByRole('button', { name: 'Français', exact: true }).click()
+  await page.locator('#login input[name=username]').fill('alice')
+  await page.locator('#login input[name=password]').fill('Test-only password 42!')
+  let busy = true
+  await page.route(`${origin}/api/auth/login`, (route) =>
+    route.fulfill({
+      status: busy ? 503 : 429,
+      json: {
+        detail: busy
+          ? 'Password verification is busy; try shortly'
+          : 'Too many authentication failures; try later',
+      },
+    }),
+  )
+  await page.getByRole('button', { name: 'Se connecter', exact: true }).click()
+  await expect(page.locator('#message')).toHaveText(
+    'Une vérification de mot de passe est en cours. Réessayez dans un instant.',
+  )
+  busy = false
+  await page.getByRole('button', { name: 'Se connecter', exact: true }).click()
+  await expect(page.locator('#message')).toHaveText(
+    'Trop de tentatives échouées pour ce compte. Réessayez plus tard.',
+  )
+})
+
 test('administrators create accounts with explicit permissions', async ({ page }) => {
   const calls = await accountPage(page, { admin: true })
   await page.getByText('Create an account', { exact: true }).first().click()

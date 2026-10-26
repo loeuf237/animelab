@@ -2,6 +2,7 @@
 import argparse
 import getpass
 import os
+from animelab.environment import getenv
 from pathlib import Path
 import sys
 
@@ -17,12 +18,18 @@ def main():
     reset.add_argument('username')
     serve = commands.add_parser('serve', help='Serve isolated account workspaces')
     serve.add_argument('--public-url', default=os.getenv('ANIMELAB_PUBLIC_URL', 'http://127.0.0.1:8080'))
-    serve.add_argument('--host', default=os.getenv('ANIMAN_HOST', '127.0.0.1'))
-    serve.add_argument('--port', type=int, default=int(os.getenv('ANIMAN_PORT', '8080')))
+    serve.add_argument('--host', default=getenv('ANIMAN_HOST', '127.0.0.1'))
+    serve.add_argument('--port', type=int, default=int(getenv('ANIMAN_PORT', '8080')))
     serve.add_argument('--max-engines', type=int, default=int(os.getenv('ANIMELAB_MAX_ENGINES', '4')))
     serve.add_argument('--session-hours', type=int, default=12)
     serve.add_argument('--idle-minutes', type=int, default=30)
+    serve.add_argument('--trusted-proxy', action='append',
+        default=[value.strip() for value in os.getenv('ANIMELAB_TRUSTED_PROXIES', '').split(',') if value.strip()], metavar='IP_OR_CIDR',
+        help='Trust forwarding headers only from this proxy address/network; repeat for multiple proxies')
+    from animelab.browser_settings import add_browser_arguments, apply_browser_arguments
+    add_browser_arguments(serve)
     args = parser.parse_args()
+    if args.command == 'serve': apply_browser_arguments(args)
     if getattr(sys, 'frozen', False):
         parser.error('Shared server is available from the Python source installation or Docker image')
     os.umask(0o077)
@@ -32,7 +39,8 @@ def main():
         if args.command == 'serve':
             import uvicorn
             from animelab.shared.gateway import SharedConfig, create_app
-            config = SharedConfig(args.data_dir, args.public_url, args.max_engines, args.session_hours, args.idle_minutes)
+            config = SharedConfig(args.data_dir, args.public_url, args.max_engines, args.session_hours,
+                                  args.idle_minutes, tuple(args.trusted_proxy))
             uvicorn.run(create_app(config, accounts=store), host=args.host, port=args.port,
                 proxy_headers=False, access_log=False, timeout_graceful_shutdown=25)
             return

@@ -90,7 +90,7 @@ object NativeHooks {
         val values = ContentValues().apply {
             put(MediaStore.Downloads.DISPLAY_NAME, source.name)
             put(MediaStore.Downloads.MIME_TYPE, mime)
-            put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Animan")
+            put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/" + StorageAccess.MEDIA_DIRECTORY)
             put(MediaStore.Downloads.IS_PENDING, 1)
         }
         val resolver = context.contentResolver
@@ -101,9 +101,9 @@ object NativeHooks {
                 // Android 11's original MediaProvider forces subtitle MIME
                 // types into Movies/Music, even through the Downloads table.
                 // Keep their real extension and use its supported collection.
-                values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/Animan")
+                values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/" + StorageAccess.MEDIA_DIRECTORY)
                 resolver.insert(MediaStore.Files.getContentUri("external"), values).also {
-                    if (it != null) StorageAccess.subtitleDestination(Environment.DIRECTORY_MOVIES + "/Animan")
+                    if (it != null) StorageAccess.subtitleDestination(Environment.DIRECTORY_MOVIES + "/" + StorageAccess.MEDIA_DIRECTORY)
                 }
             }
         } else DocumentsContract.createDocument(resolver, StorageAccess.directory(tree), mime, source.name)) { "The storage provider refused to create the file" }

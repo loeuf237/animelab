@@ -1,4 +1,5 @@
 import os
+from animelab.environment import getenv
 import sys
 from pathlib import Path
 
@@ -8,7 +9,7 @@ HOME_DIR = Path.home()
 IS_ANDROID = hasattr(sys, "getandroidapilevel") or "ANDROID_ROOT" in os.environ or "chaquopy" in sys.modules
 
 if IS_ANDROID:
-    _data_dir = os.getenv("ANIMAN_DATA_DIR")
+    _data_dir = getenv("ANIMAN_DATA_DIR")
     if not _data_dir:
         try:
             from com.chaquo.python import Python
@@ -26,7 +27,7 @@ if IS_ANDROID:
     DEFAULT_DB_PATH = str(DEFAULT_DB_DIR / "animan.sqlite3")
     DEFAULT_CACHE_DIR = APP_STORAGE_DIR / "cache"
 else:
-    DEFAULT_DOWNLOAD_DIR = str(HOME_DIR / "Downloads" / "Animan")
+    DEFAULT_DOWNLOAD_DIR = str(HOME_DIR / "Downloads" / "AnimeLab")
     DEFAULT_DB_DIR = HOME_DIR / ".animan" / "db"
     DEFAULT_DB_PATH = str(DEFAULT_DB_DIR / "animan.sqlite3")
     DEFAULT_CACHE_DIR = HOME_DIR / ".animan" / "cache"
@@ -48,23 +49,23 @@ def parse_allowed_hosts(value: str | None) -> list[str]:
 
 
 class Settings:
-    MAX_MEDIA_WORKERS: int = max(1, int(os.getenv("ANIMAN_MEDIA_WORKERS", "1")))
-    MAX_EXPORT_WORKERS: int = max(1, int(os.getenv("ANIMAN_EXPORT_WORKERS", "1")))
-    PORT: int = int(os.getenv("ANIMAN_PORT", "8080"))
-    HOST: str = os.getenv("ANIMAN_HOST", "127.0.0.1")
-    ALLOWED_HOSTS: list[str] = parse_allowed_hosts(os.getenv("ANIMAN_ALLOWED_HOSTS"))
-    SSL_VERIFY: bool = os.getenv("ANIMAN_SSL_VERIFY", "true").lower() in ("1", "true", "yes")
+    MAX_MEDIA_WORKERS: int = max(1, int(getenv("ANIMAN_MEDIA_WORKERS", "1")))
+    MAX_EXPORT_WORKERS: int = max(1, int(getenv("ANIMAN_EXPORT_WORKERS", "1")))
+    PORT: int = int(getenv("ANIMAN_PORT", "8080"))
+    HOST: str = getenv("ANIMAN_HOST", "127.0.0.1")
+    ALLOWED_HOSTS: list[str] = parse_allowed_hosts(getenv("ANIMAN_ALLOWED_HOSTS"))
+    SSL_VERIFY: bool = getenv("ANIMAN_SSL_VERIFY", "true").lower() in ("1", "true", "yes")
 
     # Sources anime
-    BASE_URL: str = os.getenv("ANIMAN_BASE_URL", "https://w16.french-manga.net")
-    VOIR_ANIME_URL: str = os.getenv("ANIMAN_VOIR_ANIME_URL", "https://voir-anime.to")
-    ANIMEPAHE_URL: str = os.getenv("ANIMAN_ANIMEPAHE_URL", "https://animepahe.pw")
+    BASE_URL: str = getenv("ANIMAN_BASE_URL", "https://w16.french-manga.net")
+    VOIR_ANIME_URL: str = getenv("ANIMAN_VOIR_ANIME_URL", "https://voir-anime.to")
+    ANIMEPAHE_URL: str = getenv("ANIMAN_ANIMEPAHE_URL", "https://animepahe.pw")
     ANIMEPAHE_BACKUP_URLS: list = [
         "https://animepahe.pw",
         "https://animepahe.com",
         "https://animepahe.org",
     ]
-    ANIMEPAHE_COOKIE: str = os.getenv("ANIMAN_ANIMEPAHE_COOKIE", "")
+    ANIMEPAHE_COOKIE: str = getenv("ANIMAN_ANIMEPAHE_COOKIE", "")
     ANIMEPAHE_USER_AGENT: str = os.getenv(
         "ANIMAN_ANIMEPAHE_USER_AGENT",
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36 Edg/153.0.0.0"
@@ -75,32 +76,32 @@ class Settings:
     )
 
     # Téléchargement
-    DOWNLOAD_DIR: str = os.getenv("ANIMAN_DOWNLOAD_DIR", DEFAULT_DOWNLOAD_DIR)
-    MAX_CONCURRENT_DOWNLOADS: int = int(os.getenv("ANIMAN_MAX_CONCURRENT", "3"))
-    CONNECTION_TIMEOUT: float = float(os.getenv("ANIMAN_CONNECT_TIMEOUT", "15.0"))
-    READ_TIMEOUT: float = float(os.getenv("ANIMAN_READ_TIMEOUT", "30.0"))
-    VOIRANIME_DEFAULT_SERVER: str = os.getenv("ANIMAN_VOIRANIME_DEFAULT_SERVER", "auto")
+    DOWNLOAD_DIR: str = getenv("ANIMAN_DOWNLOAD_DIR", DEFAULT_DOWNLOAD_DIR)
+    MAX_CONCURRENT_DOWNLOADS: int = int(getenv("ANIMAN_MAX_CONCURRENT", "3"))
+    CONNECTION_TIMEOUT: float = float(getenv("ANIMAN_CONNECT_TIMEOUT", "15.0"))
+    READ_TIMEOUT: float = float(getenv("ANIMAN_READ_TIMEOUT", "30.0"))
+    VOIRANIME_DEFAULT_SERVER: str = getenv("ANIMAN_VOIRANIME_DEFAULT_SERVER", "auto")
 
     # TMDB (The Movie Database)
     TMDB_API_KEY: str = os.getenv("TMDB_API_KEY", "")
-    TMDB_ENABLED: bool = os.getenv("ANIMAN_TMDB_ENABLED", "true").lower() in ("1", "true", "yes")
+    TMDB_ENABLED: bool = getenv("ANIMAN_TMDB_ENABLED", "true").lower() in ("1", "true", "yes")
 
     # Miroirs VoirAnime
     VOIRANIME_BACKUP_URLS: list = ["https://voiranime.io", "https://voiranime.homes"]
 
     # Watchdog
-    WATCHDOG_INTERVAL_SECONDS: int = int(os.getenv("ANIMAN_WATCHDOG_INTERVAL", "3600"))
+    WATCHDOG_INTERVAL_SECONDS: int = int(getenv("ANIMAN_WATCHDOG_INTERVAL", "3600"))
 
     # Database
-    DATABASE_PATH: str = os.getenv("ANIMAN_DB_PATH", DEFAULT_DB_PATH)
+    DATABASE_PATH: str = getenv("ANIMAN_DB_PATH", DEFAULT_DB_PATH)
     DATABASE_URL: str = f"sqlite:///{DATABASE_PATH}"
 
     # Proxies
-    PROXIES_CONFIG: str = os.getenv("ANIMAN_PROXIES", "")
+    PROXIES_CONFIG: str = getenv("ANIMAN_PROXIES", "")
 
     # Internationalization (i18n)
-    DEFAULT_LANGUAGE: str = os.getenv("ANIMAN_LANGUAGE", "fr")
-    LOG_LANGUAGE: str = os.getenv("ANIMAN_LOG_LANGUAGE", "en")
+    DEFAULT_LANGUAGE: str = getenv("ANIMAN_LANGUAGE", "fr")
+    LOG_LANGUAGE: str = getenv("ANIMAN_LOG_LANGUAGE", "en")
 
     # Project directories
     if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
@@ -108,7 +109,7 @@ class Settings:
     else:
         BASE_DIR: Path = Path(__file__).resolve().parent
     STATIC_DIR: Path = BASE_DIR / "static"
-    CACHE_DIR: Path = Path(os.getenv("ANIMAN_CACHE_DIR", str(DEFAULT_CACHE_DIR)))
+    CACHE_DIR: Path = Path(getenv("ANIMAN_CACHE_DIR", str(DEFAULT_CACHE_DIR)))
 
 settings = Settings()
 

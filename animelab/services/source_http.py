@@ -8,6 +8,7 @@ import copy
 import hashlib
 import json
 import os
+from animelab.environment import getenv
 import threading
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -329,6 +330,12 @@ class SourceHTTPService:
     def request(self, method, url, *, headers=None, timeout=30.0, follow_redirects=True,
                 bypass_cache=False, verify_challenge=False, retry_safe=False, **kwargs):
         method = method.upper()
+        validator = kwargs.get('_url_validator')
+        if validator:
+            validator(str(url))
+            # A response cached via a less restrictive client must not bypass
+            # this client's redirect policy, even when it shares source state.
+            bypass_cache = True
         state = self.state(url)
         headers = dict(httpx.Headers(headers or {}))
         headers["user-agent"] = USER_AGENT
@@ -384,7 +391,10 @@ class SourceHTTPService:
                     self._inflight.pop(key, None)
 
     def _request(self, method, url, headers, timeout, follow, verifying, kwargs):
+        validator = kwargs.pop('_url_validator', None)
         for redirect in range(7):
+            if validator:
+                validator(url)
             if not is_safe_url(url):
                 raise ValueError("URL source non autorisée")
             state = self.state(url)
@@ -437,7 +447,7 @@ class SourceHTTPService:
     def timeout(value):
         if isinstance(value, httpx.Timeout):
             return (value.connect or 15.0, value.read or 300.0)
-        if os.getenv('ANIMAN_DESKTOP_PREFERENCES') and isinstance(value, (int, float)):
+        if getenv('ANIMAN_DESKTOP_PREFERENCES') and isinstance(value, (int, float)):
             from animelab.config import settings
             return (settings.CONNECTION_TIMEOUT, value)
         return value
@@ -460,9 +470,13 @@ class SourceHTTPService:
                 expires = item.get("expires")
                 if expires and expires > 0 and expires <= time.time():
                     continue
-                state.cookies.set_cookie(self.cookie(domain, item["name"], item["value"],
-                                                     item.get("path", "/"), item.get("secure", True),
-                                                     int(expires) if expires and expires > 0 else None))
+                cookie = self.cookie(domain, item["name"], item["value"],
+                                     item.get("path", "/"), item.get("secure", True),
+                                     int(expires) if expires and expires > 0 else None)
+                if item.get('httpOnly'): cookie.set_nonstandard_attr('HttpOnly', None)
+                if item.get('sameSite') in ('Strict', 'Lax', 'None'):
+                    cookie.set_nonstandard_attr('SameSite', item['sameSite'])
+                state.cookies.set_cookie(cookie)
             state.generation += 1
             self._save(state)
             return state.generation
@@ -516,13 +530,14 @@ class SourceClient:
         self.timeout = timeout
         self.follow_redirects = follow_redirects
         self.event_hooks = options.get("event_hooks") or {}
+        self.url_validator = options.get('url_validator')
 
     def request(self, method, url, **kwargs):
         headers = {**self.headers, **dict(kwargs.pop("headers", {}) or {})}
         follow = kwargs.pop("follow_redirects", kwargs.pop("allow_redirects", self.follow_redirects))
         return self.service.request(method, url, headers=headers, cookies=kwargs.pop("cookies", self.cookies),
                                     timeout=kwargs.pop("timeout", self.timeout),
-                                    follow_redirects=follow, **kwargs)
+                                    follow_redirects=follow, _url_validator=self.url_validator, **kwargs)
 
     def get(self, url, **kwargs):
         return self.request("GET", url, **kwargs)
@@ -602,6 +617,8 @@ class SourceStream:
         kwargs = dict(self.kwargs)
         verifying = kwargs.pop("verify_challenge", False)
         for _ in range(7):
+            if self.client.url_validator:
+                self.client.url_validator(url)
             if not is_safe_url(url):
                 raise ValueError("URL source non autorisée")
             state = service.state(url)

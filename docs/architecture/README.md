@@ -250,7 +250,7 @@ actions réseau et toutes les fonctions Android ont des préconditions spécifiq
 
 - **Acteurs / déclencheur :** utilisateur et DocumentsUI, depuis Paramètres → Stockage.
 - **Préconditions :** exécution dans l’application Android native.
-- **Parcours :** afficher le mode courant ; conserver Downloads/Animan ou ouvrir le
+- **Parcours :** afficher le mode courant ; conserver Downloads/AnimeLab ou ouvrir le
   sélecteur de dossier ; obtenir une URI avec droits persistants ; vérifier et
   mémoriser l’autorisation ; permettre l’ouverture du dossier et des paramètres système.
 - **Exceptions :** sélection annulée, droit révoqué, fournisseur indisponible ; garder

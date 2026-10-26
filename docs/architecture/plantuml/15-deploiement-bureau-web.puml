@@ -17,7 +17,7 @@ node "Poste utilisateur — Windows / Linux / macOS" as Desktop {
     component "FFmpeg / FFprobe embarqués" as FF
   }
   database "SQLite ~/.animan/db\nfavoris, tâches, progression, paramètres" as LocalDB
-  folder "Fichiers et état privé\nDownloads/Animan ; cache ; cookies ; extensions" as LocalFiles
+  folder "Fichiers et état privé\nDownloads/AnimeLab ; cache ; cookies ; extensions" as LocalFiles
   Window --> LocalAPI : HTTP / SSE\n127.0.0.1:port
   Launcher --> LocalAPI : démarre et surveille
   LocalAPI --> Assets : sert la même interface

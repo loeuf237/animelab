@@ -1,6 +1,31 @@
 import { ref } from 'vue'
 import english from '@/locales/en.json'
 export type Language = 'fr' | 'en'
+export function readPreference(name: string): string | null {
+  try {
+    if (typeof localStorage === 'undefined') return null
+    const current = localStorage.getItem(`animelab_${name}`)
+    if (current !== null) return current
+    const legacy = localStorage.getItem(`animan_${name}`)
+    if (legacy !== null) {
+      try {
+        localStorage.setItem(`animelab_${name}`, legacy)
+      } catch {
+        /* A read-only profile still retains its existing preference. */
+      }
+    }
+    return legacy
+  } catch {
+    return null
+  }
+}
+export function writePreference(name: string, value: string) {
+  try {
+    localStorage.setItem(`animelab_${name}`, value)
+  } catch {
+    /* Browser preferences remain optional. */
+  }
+}
 export function resolveClientLanguage(): Language {
   let saved: string | null = null
   try {
@@ -8,11 +33,12 @@ export function resolveClientLanguage(): Language {
       typeof location !== 'undefined' ? new URLSearchParams(location.search).get('lang') : null
     const cookie =
       typeof document !== 'undefined'
-        ? document.cookie.match(/(?:^|;\s*)animan_lang=(fr|en)(?:;|$)/)?.[1]
+        ? document.cookie.match(/(?:^|;\s*)animelab_lang=(fr|en)(?:;|$)/)?.[1] ||
+          document.cookie.match(/(?:^|;\s*)animan_lang=(fr|en)(?:;|$)/)?.[1]
         : null
     let local: string | null = null
     try {
-      local = typeof localStorage !== 'undefined' ? localStorage.getItem('animan_lang') : null
+      local = readPreference('lang')
     } catch {
       /* Cookies and detection still work. */
     }
@@ -68,7 +94,7 @@ export function applyLanguage(lang: Language, persist = false) {
   }
   if (persist)
     try {
-      localStorage.setItem('animan_lang', lang)
+      writePreference('lang', lang)
     } catch {
       /* Session preference still applies. */
     }

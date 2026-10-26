@@ -207,14 +207,182 @@ def test_worker_environment_never_inherits_operator_sessions_or_proxy(tmp_path, 
 
 def test_rate_limit_and_public_tls_policy(tmp_path):
     attempts = Attempts()
-    for _ in range(10): attempts.check('one-client')
+    for _ in range(10): attempts.failed('one-client', 'alice')
     with pytest.raises(Exception) as error:
-        attempts.check('one-client')
+        attempts.check('one-client', 'alice')
     assert error.value.status_code == 429
     with pytest.raises(ValueError, match='HTTPS'):
         SharedConfig(tmp_path, 'http://192.168.1.5:8080')
     with pytest.raises(ValueError):
         SharedConfig(tmp_path, 'https://example.org/app/')
+
+
+def test_failure_budget_is_per_account_and_peer_expires_and_stays_bounded(monkeypatch):
+    from animelab.shared import gateway
+    now = [1000.0]
+    monkeypatch.setattr(gateway.time, 'monotonic', lambda: now[0])
+    attempts = Attempts()
+    for _ in range(10):
+        attempts.failed('proxy', 'alice')
+    with pytest.raises(Exception) as error:
+        attempts.check('proxy', 'ALICE')
+    assert error.value.status_code == 429 and error.value.headers['Retry-After'] == '900'
+    attempts.check('proxy', 'bob')
+    attempts.check('other-client', 'alice')
+    now[0] += 901
+    attempts.check('proxy', 'alice')
+    assert not attempts.peers
+    for index in range(10000):
+        # Avoid quadratic test work; expiration is checked separately above.
+        attempts.peers[(str(index), 'peer')] = gateway.deque([now[0]])
+    attempts.failed('peer', 'new')
+    attempts.check('proxy', 'unrelated')
+    assert len(attempts.peers) == 10000
+
+
+def test_successful_logins_do_not_consume_budget_or_inherit_other_users_failures(accounts):
+    accounts.create('alice', PASSWORD)
+    app = create_app(SharedConfig(accounts.root, ORIGIN), accounts=accounts, workers=FakeWorkers())
+    with TestClient(app, base_url=ORIGIN) as client:
+        for _ in range(35):
+            login(client)
+        for _ in range(10):
+            assert client.post('/api/auth/login', json={'username': 'alice', 'password': 'wrong password 42'},
+                               headers={'Origin': ORIGIN}).status_code == 401
+        assert client.post('/api/auth/login', json={'username': 'alice', 'password': PASSWORD},
+                           headers={'Origin': ORIGIN}).status_code == 429
+        login(client)  # Same reverse proxy, another account remains usable.
+
+
+@pytest.mark.parametrize('trusted', [False, True])
+def test_forwarded_addresses_are_only_used_from_explicitly_trusted_proxy(accounts, trusted):
+    proxies = ('127.0.0.1/32',) if trusted else ()
+    app = create_app(SharedConfig(accounts.root, ORIGIN, trusted_proxies=proxies),
+                     accounts=accounts, workers=FakeWorkers())
+    with TestClient(app, base_url=ORIGIN, client=('127.0.0.1', 12345)) as client:
+        def attempt(address, password):
+            return client.post('/api/auth/login', json={'username': 'admin', 'password': password},
+                headers={'Origin': ORIGIN, 'X-Forwarded-For': address})
+        for _ in range(10):
+            assert attempt('203.0.113.1', 'wrong password 42').status_code == 401
+        assert attempt('203.0.113.2', PASSWORD).status_code == (200 if trusted else 429)
+
+
+def test_untrusted_peer_cannot_spoof_forwarded_headers(accounts):
+    app = create_app(SharedConfig(accounts.root, ORIGIN, trusted_proxies=('10.0.0.0/24',)),
+                     accounts=accounts, workers=FakeWorkers())
+    with TestClient(app, base_url=ORIGIN, client=('203.0.113.9', 1234)) as client:
+        for index in range(11):
+            result = client.post('/api/auth/login', json={'username': 'admin', 'password': 'wrong password 42'},
+                headers={'Origin': ORIGIN, 'X-Forwarded-For': f'198.51.100.{index}'})
+            assert result.status_code == (401 if index < 10 else 429)
+
+
+@pytest.mark.parametrize('proxy', ['*', 'localhost', 'https://proxy.example', '10.0.0.0/99'])
+def test_proxy_configuration_rejects_implicit_or_invalid_trust(tmp_path, proxy):
+    with pytest.raises(ValueError):
+        SharedConfig(tmp_path, ORIGIN, trusted_proxies=(proxy,))
+
+
+@pytest.mark.asyncio
+async def test_hash_capacity_is_bounded_and_does_not_lock_out_later_logins(accounts, monkeypatch):
+    import threading
+    started, release = threading.Event(), threading.Event()
+    original = accounts.login
+    def slow_login(*args):
+        started.set()
+        assert release.wait(5)
+        return original(*args)
+    monkeypatch.setattr(accounts, 'login', slow_login)
+    app = create_app(SharedConfig(accounts.root, ORIGIN), accounts=accounts, workers=FakeWorkers())
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url=ORIGIN) as client:
+            async def login_request():
+                return await client.post('/api/auth/login', json={'username': 'admin', 'password': PASSWORD},
+                                         headers={'Origin': ORIGIN})
+            first = asyncio.create_task(login_request())
+            try:
+                assert await asyncio.to_thread(started.wait, 3)
+                for _ in range(12):
+                    busy = await login_request()
+                    assert busy.status_code == 503 and busy.headers['Retry-After'] == '1'
+            finally:
+                release.set()
+            assert (await first).status_code == 200
+            assert (await login_request()).status_code == 200
+
+
+def test_versioned_hash_retains_old_work_factor_and_legacy_hashes_upgrade_on_login(accounts, monkeypatch):
+    import hashlib
+    salt = 'ab' * 16
+    # Real historical production parameters, independent from today's default.
+    legacy = salt + ':' + hashlib.scrypt(PASSWORD.encode(), salt=bytes.fromhex(salt),
+        n=2 ** 17, r=8, p=1, maxmem=256 * 1024 * 1024).hex()
+    assert password_matches(PASSWORD, legacy)
+    identity = accounts.users()[0]['id']
+    with accounts.connect() as db:
+        db.execute('UPDATE users SET password=? WHERE id=?', (legacy, identity))
+    assert accounts.login('admin', 'incorrect password') is None
+    with accounts.connect() as db:
+        assert db.execute('SELECT password FROM users WHERE id=?', (identity,)).fetchone()[0] == legacy
+    assert accounts.login('admin', PASSWORD)
+    with accounts.connect() as db:
+        upgraded = db.execute('SELECT password FROM users WHERE id=?', (identity,)).fetchone()[0]
+    assert upgraded.startswith('scrypt$1024$8$1$')
+    monkeypatch.setattr(account_module, 'SCRYPT_N', 2048)
+    assert password_matches(PASSWORD, upgraded)  # Reads stored cost, not new default.
+    assert accounts.login('admin', PASSWORD)
+    with accounts.connect() as db:
+        assert db.execute('SELECT password FROM users WHERE id=?', (identity,)).fetchone()[0].startswith('scrypt$2048$')
+
+
+@pytest.mark.parametrize('encoded', ['scrypt$999999999$8$1$ab$ab', 'scrypt$131072$8$1$ab$' + 'ab' * 64,
+                                     'scrypt$131072$8$0$' + 'ab' * 16 + '$' + 'ab' * 64, 'bad:hex'])
+def test_malformed_hashes_do_not_allocate_scrypt_work(encoded, monkeypatch):
+    def unexpected(*args, **kwargs):
+        pytest.fail('Malformed parameters must not reach scrypt')
+    monkeypatch.setattr(account_module.hashlib, 'scrypt', unexpected)
+    assert not password_matches(PASSWORD, encoded)
+
+
+def test_vue_and_auth_pages_have_appropriate_csp(accounts):
+    def upstream(request):
+        return httpx.Response(200, stream=Bytes(), headers={'content-type': 'text/html'})
+    app = create_app(SharedConfig(accounts.root, ORIGIN), accounts=accounts, workers=FakeWorkers(),
+                     transport=httpx.MockTransport(upstream))
+    with TestClient(app, base_url=ORIGIN) as client:
+        login(client)
+        for path in ('/app/', '/app/settings', '/assets/index.js'):
+            csp = client.get(path).headers['content-security-policy']
+            assert "script-src 'self';" in csp and "worker-src 'self' blob:" in csp
+            assert "object-src 'none'" in csp and "frame-ancestors 'none'" in csp
+        assert "default-src 'none'" in client.get('/auth/login').headers['content-security-policy']
+
+
+def test_redemption_and_password_changes_only_charge_failures(accounts):
+    app = create_app(SharedConfig(accounts.root, ORIGIN), accounts=accounts, workers=FakeWorkers())
+    identity = accounts.users()[0]['id']
+    with TestClient(app, base_url=ORIGIN) as client:
+        for _ in range(12):
+            code = accounts.code(user_id=identity)
+            assert client.post('/api/auth/redeem', json={'code': code, 'password': PASSWORD},
+                               headers={'Origin': ORIGIN}).status_code == 200
+            assert client.post('/api/auth/password', json={'old_password': PASSWORD, 'password': PASSWORD},
+                               headers={'Origin': ORIGIN}).status_code == 200
+        for _ in range(10):
+            assert client.post('/api/auth/redeem', json={'code': 'invalid', 'password': PASSWORD},
+                               headers={'Origin': ORIGIN}).status_code == 400
+        assert client.post('/api/auth/redeem', json={'code': 'invalid', 'password': PASSWORD},
+                           headers={'Origin': ORIGIN}).status_code == 429
+        code = accounts.code(user_id=identity)
+        assert client.post('/api/auth/redeem', json={'code': code, 'password': PASSWORD},
+                           headers={'Origin': ORIGIN}).status_code == 200
+        login(client)  # A bad invitation cannot lock out an existing account.
+        for _ in range(10):
+            assert client.post('/api/auth/password', json={'old_password': 'wrong password 42', 'password': PASSWORD},
+                               headers={'Origin': ORIGIN}).status_code == 400
+        assert client.post('/api/auth/password', json={'old_password': PASSWORD, 'password': PASSWORD},
+                           headers={'Origin': ORIGIN}).status_code == 429
 
 
 def test_actual_engines_isolate_libraries_settings_media_and_restart(accounts):
@@ -359,3 +527,36 @@ async def test_worker_readiness_accepts_redirector_pid_but_rejects_other_launch(
     worker = await pool.get(identity)
     assert worker.port == 12345 and worker.process.pid != 9999
     await pool.close()
+
+
+def test_password_reset_during_rehash_cannot_be_overwritten(accounts, monkeypatch):
+    identity = accounts.users()[0]['id']
+    monkeypatch.setattr(account_module, 'SCRYPT_N', 2048)  # Force a stored-parameter upgrade.
+    original = account_module.password_hash
+    resetting = [False]
+    def reset_while_hashing(password, salt=None):
+        if not resetting[0]:
+            resetting[0] = True
+            accounts.update(identity, password='Administrator replacement password 42!')
+        return original(password, salt)
+    monkeypatch.setattr(account_module, 'password_hash', reset_while_hashing)
+    assert accounts.login('admin', PASSWORD) is None
+    assert accounts.login('admin', 'Administrator replacement password 42!')
+    assert not accounts.authenticate('admin', PASSWORD)
+
+
+def test_scrypt_capacity_fails_fast_and_releases_after_error(monkeypatch):
+    from animelab.shared.accounts import PasswordBusy
+    assert account_module._HASH_LOCK.acquire(blocking=False)
+    try:
+        with pytest.raises(PasswordBusy):
+            password_hash(PASSWORD)
+    finally:
+        account_module._HASH_LOCK.release()
+    def failed_hash(*args, **kwargs):
+        raise ValueError('Simulated hash failure')
+    monkeypatch.setattr(account_module.hashlib, 'scrypt', failed_hash)
+    with pytest.raises(ValueError, match='Simulated'):
+        password_hash(PASSWORD)
+    assert account_module._HASH_LOCK.acquire(blocking=False)
+    account_module._HASH_LOCK.release()

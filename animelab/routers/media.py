@@ -14,6 +14,7 @@ from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
 import httpx
 from animelab.config import settings
 from animelab.security import is_safe_url, is_safe_url_async, is_safe_path
+from animelab.media_policy import validate_media_url
 from animelab.services.download_manager import download_manager
 from animelab.services.proxy_service import proxy_service
 from animelab.services.library_service import library_service
@@ -90,18 +91,21 @@ def _save_disk_cached_image(url: str, content: bytes, ctype: str):
 
 async def _validate_media_request(request: httpx.Request):
     # HTTPX runs request hooks for every redirect, before sending it.
+    await asyncio.to_thread(validate_media_url, str(request.url))
     if not await is_safe_url_async(str(request.url)):
         raise HTTPException(status_code=400, detail="URL non autorisée ou non sécurisée")
 
 
 def _get_media_async_client(timeout: float = 10.0) -> httpx.AsyncClient:
     return source_http.async_client(timeout=timeout, follow_redirects=True,
+                                    url_validator=validate_media_url,
                                     event_hooks={"request": [_validate_media_request]})
 
 @router.get("/api/media/image-proxy")
 async def proxy_image(url: str):
     if not url or not url.startswith("http"):
         raise HTTPException(status_code=400, detail="URL d'image invalide")
+    await asyncio.to_thread(validate_media_url, url)
 
     # Protection SSRF
     if not await is_safe_url_async(url):
@@ -149,7 +153,7 @@ async def proxy_image(url: str):
                     except Exception:
                         pass
 
-        if is_animepahe:
+        if is_animepahe and os.getenv('ANIMELAB_SHARED_WORKER') != '1':
             media_data = await animepahe_service.fetch_media_bytes(url, referer=referer)
             if media_data:
                 final_bytes, ctype = media_data
@@ -639,6 +643,7 @@ async def proxy_subtitle(url: str = Query(...)):
     """
     if not url or not url.startswith("http"):
         raise HTTPException(status_code=400, detail="URL de sous-titre invalide")
+    await asyncio.to_thread(validate_media_url, url)
     if not await is_safe_url_async(url):
         logger.warning("SSRF blocked on subtitle-proxy: %s", url)
         raise HTTPException(status_code=400, detail="URL de sous-titre non autorisée")
@@ -683,6 +688,7 @@ async def hls_proxy_playlist(request: Request, url: str = Query(...)):
     - Retire la directive #EXT-X-KEY (le déchiffrement sera fait par segment.ts)
     - Réécrit les segments vers /api/media/hls-proxy/segment.ts
     """
+    await asyncio.to_thread(validate_media_url, url)
     if request.method == "HEAD":
         return Response(content=b"", media_type="application/vnd.apple.mpegurl", headers={"Access-Control-Allow-Origin": "*"})
 
@@ -698,7 +704,7 @@ async def hls_proxy_playlist(request: Request, url: str = Query(...)):
     }
 
     try:
-        async with source_http.async_client() as session:
+        async with _get_media_async_client(timeout=20.0) as session:
             resp = await session.get(url, headers=headers, timeout=20.0)
             if resp.status_code != 200:
                 raise HTTPException(status_code=resp.status_code, detail="Échec récupération playlist HLS")
@@ -708,6 +714,7 @@ async def hls_proxy_playlist(request: Request, url: str = Query(...)):
             m_key = re.search(r'#EXT-X-KEY:METHOD=AES-128,URI="([^"]+)"', m3u8_text)
             if m_key:
                 key_url = urllib.parse.urljoin(url, m_key.group(1))
+                await asyncio.to_thread(validate_media_url, key_url)
                 if key_url not in HLS_KEY_CACHE:
                     r_k = await session.get(key_url, headers=headers, timeout=15.0)
                     if r_k.status_code == 200 and len(r_k.content) == 16:
@@ -732,6 +739,7 @@ async def hls_proxy_playlist(request: Request, url: str = Query(...)):
                     continue
                 elif not s.startswith("#"):
                     seg_abs = urllib.parse.urljoin(url, s)
+                    await asyncio.to_thread(validate_media_url, seg_abs)
                     key_param = f"&key={urllib.parse.quote(key_url)}" if key_url else ""
                     seg_proxy = f"/api/media/hls-proxy/segment.ts?url={urllib.parse.quote(seg_abs)}{key_param}&seq={seq}"
                     lines.append(seg_proxy)
@@ -772,6 +780,9 @@ async def hls_proxy_segment(
     - Déchiffre en AES-128-CBC
     - Retourne les octets propres MPEG-TS (video/MP2T)
     """
+    await asyncio.to_thread(validate_media_url, url)
+    if key:
+        await asyncio.to_thread(validate_media_url, key)
     if request.method == "HEAD":
         return Response(
             content=b"",
@@ -796,7 +807,7 @@ async def hls_proxy_segment(
 
     try:
         # Session rapide sans surcoût d'impersonation (téléchargement 2x plus rapide sur les CDN)
-        async with source_http.async_client() as session:
+        async with _get_media_async_client(timeout=120.0) as session:
             resp = await session.get(url, headers=headers, timeout=120.0)
 
             if resp.status_code != 200:
@@ -849,6 +860,7 @@ async def stream_proxy(
     - Gère les requêtes HTTP Range pour le scrubbing / seeking fluide dans le lecteur
     - Évite les blocages CORS et 403 Forbidden des hébergeurs vidéo (Sibnet, Sendvid, Vidmoly, etc.)
     """
+    await asyncio.to_thread(validate_media_url, url)
     if request.method == "OPTIONS":
         return Response(
             status_code=200,
@@ -879,6 +891,7 @@ async def stream_proxy(
         follow_redirects=True,
         verify=settings.SSL_VERIFY,
         proxy=proxy,
+        url_validator=validate_media_url,
         event_hooks={"request": [_validate_media_request]},
     )
 

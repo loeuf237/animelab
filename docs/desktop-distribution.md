@@ -17,8 +17,9 @@ Extract the entire archive: the executable requires its adjacent resources.
 
 The engine opens `/spa/` on an IPv4 loopback server and pauses/persists active
 transfers when closing normally. Paused transfers can be resumed from Downloads.
-Data stays in the user's existing `.animan` data directory and `Downloads/Animan`,
-outside the archive. These are portable archives, not system installers.
+Private data stays in the user's existing `.animan` data directory, outside the
+archive. New downloads default to `Downloads/AnimeLab`; saved task paths and
+custom destinations are preserved. These are portable archives, not system installers.
 
 ## Desktop administration
 
@@ -176,3 +177,5 @@ be stopped through the new administration panel.
 
 `release-metadata` contains the build commit, dependency versions, media versions
 and license notices. The GitHub release supplies `SHA256SUMS.txt` for all assets.
+
+The **Requests** tab also accepts a Chromium executable path and a headless verification preference. See [browser verification and sessions](browser-verification.md) for startup flags and limitations.

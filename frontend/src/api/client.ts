@@ -192,6 +192,28 @@ export const api = {
       { method: 'POST', body: JSON.stringify({ domain }) },
     )
   },
+  getVerificationBrowserSettings() {
+    return request<{ chromiumPath: string; headless: boolean; managed: boolean }>(
+      '/api/network/browser-settings',
+    )
+  },
+  saveVerificationBrowserSettings(values: { chromiumPath: string; headless: boolean }) {
+    return request<{ chromiumPath: string; headless: boolean; managed: boolean }>(
+      '/api/network/browser-settings',
+      {
+        method: 'POST',
+        body: JSON.stringify(values),
+      },
+    )
+  },
+  getVerificationStatus(id: string) {
+    return request<{
+      status: 'pending' | 'completed'
+      domain: string
+      resumed?: number
+      error?: string
+    }>(`/api/network/verification/${encodeURIComponent(id)}/status`)
+  },
   getNetworkSessions() {
     return request<NetworkOptions>('/api/network/sessions')
   },

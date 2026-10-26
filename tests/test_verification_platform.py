@@ -74,7 +74,7 @@ async def test_route_change_never_imports_cookies_or_clears_challenge(service, m
 
 
 @pytest.mark.asyncio
-async def test_webview_captures_then_rechecks_and_duplicate_complete_is_rejected(service, monkeypatch):
+async def test_webview_captures_then_rechecks_and_duplicate_complete_is_idempotent(service, monkeypatch):
     browser, state = service
     monkeypatch.setattr('animelab.services.browser_verification.is_safe_url', lambda url: True)
     monkeypatch.setattr(browser.transport, 'request', lambda method, url, **kwargs: httpx.Response(200, request=httpx.Request(method, url)))
@@ -82,8 +82,8 @@ async def test_webview_captures_then_rechecks_and_duplicate_complete_is_rejected
     assert (await browser.complete(job['id']))['success']
     assert state.blocked_url is None
     assert [cookie.name for cookie in state.cookies] == ['cf_clearance']
-    with pytest.raises(ValueError):
-        await browser.complete(job['id'])
+    assert (await browser.complete(job['id']))['success']
+    assert browser.status(job['id'])['status'] == 'completed'
 
 
 @pytest.mark.asyncio

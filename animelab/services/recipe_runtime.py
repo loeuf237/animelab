@@ -44,7 +44,119 @@ class RecipeRuntime:
         self.source = container
         self.plan = container.recipe.runtime
         self._cached = None
+        self._sections = {}
         self._lock = asyncio.Lock()
+
+    @staticmethod
+    def uncomment(text):
+        # Preserve quoted URLs and escaped punctuation while dropping JS comments.
+        tokens = r'''("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`)|/\*.*?\*/|//[^\r\n]*'''
+        return re.sub(tokens, lambda match: match.group(1) or '', text, flags=re.S)
+
+    def section_root(self, url):
+        config = self.plan.get('listing_expansion', {})
+        parsed, base = urlparse(url), urlparse(self.source.base_url)
+        parts = [part for part in parsed.path.split('/') if part]
+        depth = config.get('root_depth', 2)
+        if ((parsed.scheme, parsed.netloc) != (base.scheme, base.netloc) or
+                not re.search(config.get('entry_path', r'^/[^/]+/'), parsed.path.rstrip('/') + '/') or
+                not isinstance(depth, int) or not 1 <= depth <= 8 or len(parts) < depth):
+            return None
+        return parsed._replace(path='/' + '/'.join(parts[:depth]) + '/', query='', fragment='').geturl()
+
+    async def section_data(self, root):
+        config = self.plan['listing_expansion']
+        cached = self._sections.get(root)
+        if cached and cached[0] > time.monotonic():
+            return cached[1:]
+        html = await self.source._fetch_html(root)
+        soup = BeautifulSoup(html, 'html.parser')
+        title = soup.select_one(config['title_selector'])
+        title = title.get_text(' ', strip=True) if title else ''
+        image = soup.select_one(config['image_selector'])
+        image = urljoin(root, image.get('content') or image.get('data-src') or image.get('src') or '') if image else ''
+        synopsis = soup.select_one(config['synopsis_selector'])
+        metadata = dict(title=title, imageUrl=image,
+            synopsis=synopsis.get_text(' ', strip=True) if synopsis else '',
+            genres=[node.get_text(' ', strip=True) for node in soup.select(config['genre_selector'])])
+        scripts = '\n'.join(self.uncomment(node.get_text()) for node in soup.select('script:not([src])'))
+        literal = r'''("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')'''
+        pattern = r'\b' + re.escape(config['function']) + r'\s*\(\s*' + literal + r'\s*,\s*' + literal + r'\s*\)'
+        import ast
+        seen, results = set(), []
+        for name, path in re.findall(pattern, scripts):
+            try:
+                label, path = ast.literal_eval(name), ast.literal_eval(path).replace(r'\/', '/')
+            except (ValueError, SyntaxError):
+                continue
+            if path.strip('/') in ('', 'url', 'undefined'):
+                continue
+            href = urljoin(root, path)
+            # The section operation can only navigate below this catalogue entry.
+            if not href.startswith(root) or href == root or href in seen:
+                continue
+            seen.add(href)
+            stem = urlparse(href).path[len(urlparse(root).path):].split('/')[0]
+            season = re.fullmatch(config.get('season_pattern', r'(?!)'), stem)
+            display = f'Saison {season.group(1)}' if season else label.strip()
+            version = self.section_version(href)
+            results.append(AnimeResult(id=hashlib.sha256(href.encode()).hexdigest()[:16],
+                title=f'{title} — {display}' if title else display, url=href,
+                imageUrl=image, genres=metadata['genres'], version=version,
+                type='Film' if 'film' in stem.lower() else 'Anime', episodeInfo=label.strip(), source=self.source.pkg))
+        if len(self._sections) >= 128:
+            self._sections.pop(next(iter(self._sections)))
+        self._sections[root] = (time.monotonic() + config.get('ttl', 180), metadata, results)
+        return metadata, results
+
+    @staticmethod
+    def section_version(url):
+        voice = urlparse(url).path.rstrip('/').split('/')[-1].lower()
+        return 'VOSTFR' if voice == 'vostfr' else 'VF' if re.fullmatch(r'vf\d*', voice) else voice.upper()
+
+    async def expand_listing(self, items):
+        if self.plan.get('listing_expansion', {}).get('kind') != 'script_sections':
+            return items
+        # Release feeds already point to a season/language. Keep that exact entry;
+        # expanding it would lose the selected voice and repeat unrelated seasons.
+        def work_root(item):
+            root = self.section_root(item.url)
+            return root if root and urlparse(item.url).path.rstrip('/') == urlparse(root).path.rstrip('/') else None
+        roots = list(dict.fromkeys(root for item in items if (root := work_root(item))))
+        semaphore = asyncio.Semaphore(3)
+        async def expand(root):
+            async with semaphore:
+                _, sections = await self.section_data(root)
+                return [item.model_copy(deep=True) for item in sections]
+        expanded = dict(zip(roots, await asyncio.gather(*(expand(root) for root in roots))))
+        results, seen = [], set()
+        for item in items:
+            for entry in expanded.get(work_root(item), [item]):
+                if entry.url not in seen:
+                    results.append(entry)
+                    seen.add(entry.url)
+        return results
+
+    async def section_detail(self, url):
+        root = self.section_root(url)
+        if not root or root.rstrip('/') == url.rstrip('/'):
+            return None
+        metadata, sections = await self.section_data(root)
+        path = urlparse(url).path.rstrip('/')
+        section = next((item for item in sections if urlparse(item.url).path.rstrip('/') == path), None)
+        if section is None:
+            # A language variant uses the same season metadata without opening another season.
+            parent = path.rsplit('/', 1)[0]
+            section = next((item for item in sections if urlparse(item.url).path.rstrip('/').rsplit('/', 1)[0] == parent), None)
+        if section is None:
+            return None
+        html = await self.source._fetch_html(url)
+        version = self.section_version(url)
+        episodes = await self.episodes(url, BeautifulSoup(html, 'html.parser'), version)
+        return AnimeDetail(title=section.title, url=url, source=self.source.pkg,
+            imageUrl=metadata['imageUrl'], synopsis=metadata['synopsis'], genres=metadata['genres'],
+            version=version, episodes=episodes or [])
+
 
     def url(self, template, **values):
         base = self.source.base_url

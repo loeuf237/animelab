@@ -43,6 +43,9 @@ class ExtractorRegistry:
     def register(self, extractor: BaseVideoExtractor):
         self._extractors.append(extractor)
 
+    def domains(self):
+        return {domain for extractor in self._extractors for domain in extractor.domains}
+
     def find_extractor(self, url: str) -> Optional[BaseVideoExtractor]:
         if not url:
             return None

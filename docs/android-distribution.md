@@ -149,7 +149,7 @@ commands until the application restarts.
 ## Storage permissions and recovery
 
 Use **Settings → Storage → Android permissions** to check access, authorize a
-folder through the system picker, return to `Downloads/Animan`, or change
+folder through the system picker, return to `Downloads/AnimeLab`, or change
 notification permissions. Downloads remain in private app storage while they
 are transferring, merging or being verified. Shared files appear after export.
 The MediaStore default requires no broad storage permission on Android 10+.
