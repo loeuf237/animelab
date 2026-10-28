@@ -44,16 +44,19 @@ android {
     }
     buildTypes {
         release {
+            buildConfigField("boolean", "EXTENSION_RUNTIME_ENABLED", "false")
             isMinifyEnabled = optimizeApk
             isShrinkResources = optimizeApk
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("release")
         }
         debug {
+            buildConfigField("boolean", "EXTENSION_RUNTIME_ENABLED", "true")
             isMinifyEnabled = false
         }
         create("validation") {
             initWith(getByName("release"))
+            buildConfigField("boolean", "EXTENSION_RUNTIME_ENABLED", "true")
             // AGP's initWith does not copy every resource-shrinker property.
             isMinifyEnabled = optimizeApk
             isShrinkResources = optimizeApk

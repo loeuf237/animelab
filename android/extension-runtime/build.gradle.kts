@@ -27,6 +27,7 @@ kotlin {
 }
 
 dependencies {
+    implementation("org.jspecify:jspecify:1.0.0")
     api("com.squareup.okhttp3:okhttp:5.4.0")
     api("org.jsoup:jsoup:1.22.2")
     api("io.reactivex:rxjava:1.3.8")

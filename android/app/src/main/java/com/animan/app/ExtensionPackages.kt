@@ -54,7 +54,16 @@ internal object ExtensionPackages {
     }
 
     private fun save(context: Context, value: JSONObject) {
-        store(context).edit().putString(value.getString("id"), value.toString()).commit()
+        val now=System.currentTimeMillis()
+        if (!value.has("createdAt")) value.put("createdAt",now)
+        value.put("updatedAt",now)
+        val preferences=store(context)
+        val editor=preferences.edit().putString(value.getString("id"),value.toString())
+        val completed=preferences.all.values.filterIsInstance<String>().map(::JSONObject)
+            .filter { it.optString("state") in setOf("installed","uninstalled","failed","cancelled") }
+            .sortedByDescending { it.optLong("updatedAt") }
+        completed.drop(99).forEach { editor.remove(it.getString("id")) }
+        editor.commit()
     }
 
     private fun callback(context: Context, id: String, session: Int): android.content.IntentSender {
@@ -67,6 +76,13 @@ internal object ExtensionPackages {
         val value = file(context, path)
         val inspected = inspect(context, path)
         require(expectedPackage.isEmpty() || inspected.getString("pkg") == expectedPackage) { "APK package differs from repository" }
+        val active=store(context).all.values.filterIsInstance<String>().map(::JSONObject)
+            .filter { it.optString("state") in setOf("preparing","permission_required","waiting_user","installing") }
+        active.firstOrNull { it.getString("pkg")==inspected.getString("pkg") }?.let {
+            require(it.optString("sha256")==inspected.getString("sha256")) { "Another installation is already pending for this package" }
+            return publicOperation(it)
+        }
+        require(active.size<8) { "Complete or cancel pending installations first" }
         val operation = JSONObject().put("id", UUID.randomUUID().toString()).put("action", "install")
             .put("pkg", inspected.getString("pkg")).put("versionCode", inspected.getString("versionCode"))
             .put("signer", inspected.getString("signer")).put("sha256", inspected.getString("sha256"))
@@ -128,7 +144,18 @@ internal object ExtensionPackages {
     }
 
     private fun publicOperation(value: JSONObject): JSONObject = JSONObject(value.toString()).apply { remove("path") }
-    fun operations(context: Context): JSONArray = JSONArray(store(context).all.values.filterIsInstance<String>().map { publicOperation(JSONObject(it)) })
+    fun operations(context: Context): JSONArray = JSONArray(store(context).all.values.filterIsInstance<String>().map { publicOperation(JSONObject(it)) }.sortedBy { it.optLong("createdAt") })
+
+    fun cancel(context: Context,id: String): JSONObject {
+        val operation=JSONObject(requireNotNull(store(context).getString(id,null)))
+        require(operation.optString("action")=="install" && operation.optString("state") in setOf("preparing","permission_required","waiting_user","installing"))
+        if (operation.has("sessionId")) {
+            try { context.packageManager.packageInstaller.abandonSession(operation.getInt("sessionId")) }
+            catch (_: IllegalStateException) { }
+        }
+        operation.put("state","cancelled"); save(context,operation)
+        return publicOperation(operation)
+    }
 
     @Suppress("DEPRECATION")
     fun received(context: Context, intent: Intent) {
