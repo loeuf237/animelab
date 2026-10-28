@@ -28,3 +28,5 @@ rootProject.name = "AnimeLab"
 include(":app")
 include(":media-probe")
 include(":extension-runtime")
+include(":extension-fixture")
+include(":extension-probe")

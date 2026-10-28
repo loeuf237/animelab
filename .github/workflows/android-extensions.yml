@@ -41,10 +41,57 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew :extension-runtime:assembleDebug --no-daemon --max-workers=2
+          ./gradlew :extension-runtime:assembleDebug :extension-probe:assembleDebug :extension-probe:assembleDebugAndroidTest --no-daemon --max-workers=2
       - uses: actions/upload-artifact@v4
         if: success()
         with:
           name: extension-host-api
-          path: android/extension-runtime/build/outputs/aar/*.aar
+          path: |
+            android/extension-runtime/build/outputs/aar/*.aar
+            android/extension-probe/build/outputs/apk/**/*.apk
+          retention-days: 7
+
+  emulator:
+    name: Original APK execution Android ${{ matrix.api }}
+    needs: runtime-compile
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [29, 30, 35]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: extension-host-api
+          path: artifacts
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: |
+            adb install -r artifacts/extension-probe/build/outputs/apk/debug/extension-probe-debug.apk
+            adb install -r artifacts/extension-probe/build/outputs/apk/androidTest/debug/extension-probe-debug-androidTest.apk
+            adb shell am instrument -w -r com.animan.extensions.probe.test/androidx.test.runner.AndroidJUnitRunner | tee instrumentation.txt
+            adb logcat -d -s ANIMELAB_APK_PROOF:I > proof.txt
+            grep -q 'OK (' instrumentation.txt
+            grep -q 'executesComputedCode' proof.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: original-apk-android-${{ matrix.api }}-proof
+          path: |
+            instrumentation.txt
+            proof.txt
           retention-days: 7

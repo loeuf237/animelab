@@ -166,7 +166,7 @@ class ExtensionRuntimeService : Service() {
                 val shared = listOf("java.", "android.", "androidx.", "kotlin.", "kotlinx.", "rx.", "okhttp3.", "okio.",
                     "uy.kohesive.injekt.", "eu.kanade.tachiyomi.animesource.", "eu.kanade.tachiyomi.network.")
                 if (shared.any(name::startsWith)) return super.loadClass(name, resolve)
-                return synchronized(getClassLoadingLock(name)) {
+                return synchronized(this) {
                     findLoadedClass(name) ?: try { findClass(name) } catch (_: ClassNotFoundException) { super.loadClass(name, resolve) }
                 }
             }
