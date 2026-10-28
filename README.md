@@ -237,6 +237,7 @@ Python dependencies, including development tools, are pinned in `uv.lock`; `requ
 
 - [Architecture, UML diagrams and improvement plan](docs/architecture/README.md)
 - [Desktop distribution](docs/desktop-distribution.md) and [Android build and storage guide](docs/android-distribution.md)
+- [Aniyomi/Anikku extension management study and implementation plan](docs/studies/aniyomi-anikku/README.md)
 - [Docker setup](docs/docker.md)
 - [Mobile UI validation](docs/mobile-ui.md) and [proxy provider study](docs/proxy-providers.md)
 - [Release notes](docs/releases/) and [branding assets](docs/branding/README.md)

@@ -10,6 +10,7 @@ pluginManagement {
         mavenCentral()
         gradlePluginPortal()
         maven { url = uri("https://chaquo.com/maven") }
+        maven { url = uri("https://www.jitpack.io") }
     }
 }
 
@@ -18,6 +19,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven { url = uri("https://www.jitpack.io") }
         maven { url = uri("https://chaquo.com/maven") }
     }
 }
@@ -25,3 +27,4 @@ dependencyResolutionManagement {
 rootProject.name = "AnimeLab"
 include(":app")
 include(":media-probe")
+include(":extension-runtime")

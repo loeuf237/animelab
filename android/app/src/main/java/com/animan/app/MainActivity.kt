@@ -27,6 +27,10 @@ import java.net.Proxy
 import java.net.URL
 
 class MainActivity : AppCompatActivity() {
+    override fun onResume() {
+        super.onResume()
+        ExtensionBridge.resumePendingInstalls()
+    }
     private lateinit var binding: ActivityMainBinding
     private var customView: View? = null
     private var customCallback: WebChromeClient.CustomViewCallback? = null

@@ -209,6 +209,46 @@ def subtitle_provider_secrets(conn):
                          'provider TEXT PRIMARY KEY, payload TEXT NOT NULL)')
 
 
+def extension_lifecycle(conn):
+    additions = {
+        'extension_repos': [('signing_key', 'TEXT'), ('pending_signing_key', 'TEXT'),
+                            ('metadata_json', "TEXT NOT NULL DEFAULT '{}'"), ('last_error', 'TEXT'),
+                            ('checked_at', 'TEXT'), ('snapshot_hash', 'TEXT')],
+        'imported_extensions': [('installed_code', 'INTEGER'), ('available_code', 'INTEGER'),
+                                ('extension_lib', 'TEXT'), ('declared_signer', 'TEXT'),
+                                ('catalog_state', "TEXT NOT NULL DEFAULT 'available'"),
+                                ('runtime', "TEXT NOT NULL DEFAULT 'recipe'"), ('artifact_sha256', 'TEXT')],
+    }
+    for table, columns in additions.items():
+        known = {row[1] for row in conn.exec_driver_sql(f'PRAGMA table_info({table})')}
+        for name, definition in columns:
+            if name not in known:
+                conn.exec_driver_sql(f'ALTER TABLE {table} ADD COLUMN {name} {definition}')
+    conn.exec_driver_sql('CREATE TABLE IF NOT EXISTS extension_offers ('
+        'repo_id INTEGER NOT NULL REFERENCES extension_repos(id), pkg TEXT NOT NULL, '
+        'version_code INTEGER, version_name TEXT NOT NULL, extension_lib TEXT, signer TEXT, '
+        'apk_url TEXT NOT NULL, metadata_json TEXT NOT NULL, present INTEGER NOT NULL DEFAULT 1, '
+        'PRIMARY KEY(repo_id,pkg))')
+    conn.exec_driver_sql('CREATE TABLE IF NOT EXISTS extension_artifacts ('
+        'sha256 TEXT PRIMARY KEY, pkg TEXT NOT NULL, version_code INTEGER, api TEXT, '
+        'signer TEXT, path TEXT NOT NULL, authentication TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)')
+    conn.exec_driver_sql('CREATE TABLE IF NOT EXISTS extension_sources ('
+        'source_key TEXT PRIMARY KEY, ext_id INTEGER REFERENCES imported_extensions(id), '
+        'upstream_id TEXT, pkg TEXT NOT NULL, name TEXT NOT NULL, lang TEXT NOT NULL, base_url TEXT NOT NULL, '
+        'runtime TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 0, hidden INTEGER NOT NULL DEFAULT 0, '
+        'pinned INTEGER NOT NULL DEFAULT 0, metadata_json TEXT NOT NULL DEFAULT \'{}\', '
+        'preferences_json TEXT NOT NULL DEFAULT \'{}\')')
+    conn.exec_driver_sql('CREATE TABLE IF NOT EXISTS extension_operations ('
+        'id TEXT PRIMARY KEY, ext_id INTEGER REFERENCES imported_extensions(id), action TEXT NOT NULL, '
+        'state TEXT NOT NULL, progress INTEGER NOT NULL DEFAULT 0, error TEXT, '
+        'created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)')
+    conn.exec_driver_sql('CREATE TABLE IF NOT EXISTS extension_trust ('
+        'pkg TEXT NOT NULL, version_code INTEGER NOT NULL, signer TEXT NOT NULL, '
+        'created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(pkg,version_code,signer))')
+    conn.exec_driver_sql('CREATE TABLE IF NOT EXISTS extension_source_aliases ('
+        'alias TEXT PRIMARY KEY, source_key TEXT NOT NULL REFERENCES extension_sources(source_key))')
+
+
 MIGRATIONS = (
     Migration(1, 'core_tables', bootstrap),
     Migration(2, 'download_identity_and_verification', download_identity),
@@ -221,6 +261,7 @@ MIGRATIONS = (
     Migration(9, 'extension_update_source_url', extension_update_source_url),
     Migration(10, 'media_tracks_and_output_profiles', media_profiles),
     Migration(11, 'encrypted_subtitle_provider_credentials', subtitle_provider_secrets),
+    Migration(12, 'extension_catalog_installation_and_runtime', extension_lifecycle),
 )
 
 

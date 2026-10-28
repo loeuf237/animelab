@@ -1,0 +1,78 @@
+{
+  "date": "2026-10-28",
+  "timezone": "Africa/Douala",
+  "animelabCommit": "75c84ecac74454db5f1a95c6dfa81a699e2ffcc9",
+  "upstreamRuntimeExecuted": false,
+  "upstreamApksDownloaded": false,
+  "baseline": {
+    "tests": "79",
+    "errors": "0",
+    "failures": "0",
+    "skipped": "0",
+    "time": "2.56",
+    "meaning": "Existing selected extension tests; isolated HOME/database/cache",
+    "rerun": "Saved runner with --baseline: 79 passed, 2 warnings in 2.56s"
+  },
+  "audit": {
+    "tests": "6",
+    "errors": "0",
+    "failures": "0",
+    "skipped": "0",
+    "time": "0.74",
+    "meaning": "Passing tests reproduce current limitations; they are not fixes",
+    "cases": [
+      {
+        "id": "A01",
+        "test": "test_importing_second_repo_removes_first_sources_from_runtime",
+        "finding": "Only the newest repository contributes runtime sources"
+      },
+      {
+        "id": "A02",
+        "test": "test_catalog_removal_deletes_installed_extension_and_recipe_history",
+        "finding": "Catalog removal deletes an installed row and its recipe history"
+      },
+      {
+        "id": "A03",
+        "test": "test_multi_source_package_registers_only_one_source",
+        "finding": "Two declared sources become one package-identified runtime source"
+      },
+      {
+        "id": "A04",
+        "test": "test_lower_remote_version_is_reported_as_update",
+        "finding": "Lower numeric build code is announced as update because version strings differ"
+      },
+      {
+        "id": "A05",
+        "test": "test_refresh_clears_recipe_of_installed_disabled_extension",
+        "finding": "Refresh clears installed recipe when available version changes"
+      },
+      {
+        "id": "A06",
+        "test": "test_dex_zip_without_manifest_or_signature_passes_apk_validator",
+        "finding": "Minimal DEX ZIP passes structural APK validator without manifest/signature"
+      }
+    ],
+    "rerun": "Saved reproduction script executed successfully after writing the study files"
+  },
+  "reproduction": "uv run --locked python docs/studies/aniyomi-anikku/verify_current.py --baseline",
+  "limitations": [
+    "No upstream Android application execution",
+    "No real-device source compatibility measurement",
+    "No proof of future runtime isolation",
+    "No production extension changes implemented"
+  ],
+  "warnings": [
+    "Two baseline Starlette/AnyIO deprecation warnings"
+  ],
+  "androidApkRequirement": {
+    "requested": "2026-10-28",
+    "required": true,
+    "systemPackageInstallation": true,
+    "reuseSharedPackagesFromAniyomiAnikku": true,
+    "executeOriginalApkCode": true,
+    "acceptanceCases": 14,
+    "implementationStatus": "not-implemented",
+    "deviceRuntimeValidated": false,
+    "privateOtherAppStorageAccessible": false
+  }
+}

@@ -1,0 +1,15 @@
+# Extension DEX files link these public classes and facades dynamically.
+-keep class eu.kanade.tachiyomi.animesource.** { *; }
+-keep class eu.kanade.tachiyomi.network.** { *; }
+-keep class eu.kanade.tachiyomi.util.** { *; }
+-keep class uy.kohesive.injekt.** { *; }
+-keep class mihon.core.common.extensions.** { *; }
+-keep class tachiyomi.core.common.util.** { *; }
+-keep class com.animan.extensions.** { *; }
+-keep class rx.** { *; }
+-keep class okhttp3.** { *; }
+-keep class okio.** { *; }
+-keep class kotlinx.serialization.** { *; }
+-keep class androidx.preference.** { *; }
+-keep class org.jsoup.** { *; }
+-keep class app.cash.quickjs.** { *; }

@@ -51,10 +51,11 @@ async def list_extensions_api(
 ):
     """Retourne la liste JSON des extensions visibles (uniquement du dernier magasin actif)."""
     active_repo = extension_service.get_active_repository()
-    extensions = extension_service.get_visible_extensions(query=q, lang=lang, enabled_only=enabled_only) if active_repo else []
+    extensions = extension_service.get_visible_extensions(query=q, lang=lang, enabled_only=enabled_only)
     updates_count = sum(1 for e in extensions if e.get("has_update"))
     return JSONResponse(content={
         "active_repo": active_repo,
+        "repositories": extension_service.list_repositories(),
         "count": len(extensions),
         "updates_count": updates_count,
         "extensions": extensions
@@ -63,13 +64,23 @@ async def list_extensions_api(
 
 @router.post("/api/extensions/refresh")
 async def refresh_extensions_api():
-    repo = extension_service.get_active_repository()
-    if not repo:
-        raise HTTPException(status_code=400, detail="Aucun dépôt actif.")
     try:
-        return await extension_service.import_repository(repo["url"])
+        return await extension_service.refresh_repositories()
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get('/api/extensions/repositories')
+async def list_repositories_api():
+    return {'repositories': extension_service.list_repositories()}
+
+
+@router.put('/api/extensions/repositories/{repo_id}')
+async def set_repository_api(repo_id: int, payload: dict = Body(...)):
+    try:
+        return extension_service.set_repository_enabled(repo_id, payload.get('enabled'))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @router.post("/api/extensions/check-updates")

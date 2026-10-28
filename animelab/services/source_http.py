@@ -560,6 +560,24 @@ class AsyncSourceClient(SourceClient):
         # Hooks remain supported for callers with additional URL checks.
         for hook in self.event_hooks.get("request", []):
             await hook(httpx.Request(method, url))
+        maximum = kwargs.pop('max_response_bytes', None)
+        if maximum is not None:
+            if type(maximum) is not int or maximum < 1:
+                raise ValueError('Invalid response byte budget')
+            chunks, total = [], 0
+            headers = kwargs.pop('headers', {})
+            async with self.stream(method, url, headers=headers, **kwargs) as response:
+                async for chunk in response.aiter_bytes():
+                    total += len(chunk)
+                    if total > maximum:
+                        raise ValueError('La réponse dépasse la taille autorisée.')
+                    chunks.append(chunk)
+                # curl has already decoded HTTP content encodings. Do not ask
+                # HTTPX to decompress the resulting bytes a second time.
+                safe_headers = {key: value for key, value in response.headers.items()
+                                if key.lower() not in ('content-encoding', 'content-length')}
+                return httpx.Response(response.status_code, headers=safe_headers,
+                                      content=b''.join(chunks), request=response.request)
         call = partial(super().request, method, url, **kwargs)
         return await asyncio.get_running_loop().run_in_executor(self.service.executor, call)
 

@@ -20,6 +20,8 @@ from animelab.security import is_safe_url
 from animelab.config import settings
 from animelab.services.aniyomi_dex_parser import AniyomiDexParser, SourceRecipe
 from animelab.services.aniyomi_container import AniyomiContainerSource
+from animelab.services.extension_versions import newer, version_code
+from animelab.services.extension_catalog import read_catalog, MAX_INDEX_BYTES
 
 logger = logging.getLogger("animelab.extensions")
 
@@ -50,34 +52,16 @@ class ExtensionService:
 
     async def import_repository(self, repo_url: str) -> Dict[str, Any]:
         """Importe massivement un catalogue d'extensions depuis une URL compatible Aniyomi (index.min.json).
-        RÈGLE : Le dépôt nouvellement importé devient le seul magasin actif.
+        Les dépôts coexistent ; le catalogue ne modifie jamais une installation.
         RÈGLE : Toutes les sources importées sont désactivées par défaut (is_enabled = 0).
         """
-        clean_url = repo_url.strip()
-        if not clean_url:
-            raise ValueError("L'URL du magasin d'extensions ne peut pas être vide.")
-
-        # Normalisation si l'URL ne pointe pas directement vers index.min.json
-        if not urlparse(clean_url).path.endswith(".json"):
-            clean_url = clean_url.rstrip("/") + "/index.min.json"
-
-        logger.info("[extensions] Downloading extension repository: %s", clean_url)
-
-        # Téléchargement de l'index
-        try:
-            async with source_http.async_client(timeout=15.0, verify=settings.SSL_VERIFY, follow_redirects=True, event_hooks={"request": [self._validate_request]}) as client:
-                resp = await client.get(clean_url, headers={"User-Agent": settings.DEFAULT_USER_AGENT})
-                if resp.status_code != 200:
-                    raise ValueError(f"Impossible de joindre le magasin (HTTP {resp.status_code})")
-                data = resp.json()
-        except VerificationRequired:
-            raise
-        except Exception as e:
-            logger.error("[extensions] Failed downloading repository index: %s", e)
-            raise ValueError(f"Erreur lors de la récupération du catalogue: {e}")
-
-        if not isinstance(data, list):
-            raise ValueError("Le format de l'index du magasin est invalide (liste attendue).")
+        catalog = await read_catalog(repo_url, self._fetch_catalog_bytes)
+        clean_url, data = catalog.url, catalog.entries
+        metadata = catalog.metadata
+        declared_key = str(metadata.get('signingKeyFingerprint') or '')
+        if declared_key and not re.fullmatch(r'[0-9a-fA-F]{64}', declared_key):
+            raise ValueError('Empreinte de signature de dépôt invalide.')
+        declared_key = declared_key.lower() or None
 
         # Déduction du nom du dépôt et de la racine des APKs
         parsed_url = urlparse(clean_url)
@@ -88,6 +72,7 @@ class ExtensionService:
         elif parsed_url.netloc:
             repo_name = f"Dépôt {parsed_url.netloc}"
 
+        repo_name = str(metadata.get('name') or repo_name)
         # Racine relative pour les APKs
         # Ex: https://raw.githubusercontent.com/yuzono/anime-repo/repo/index.min.json -> https://raw.githubusercontent.com/yuzono/anime-repo/repo/apk/
         repo_base = clean_url.rsplit("/", 1)[0]
@@ -98,7 +83,7 @@ class ExtensionService:
             cursor = conn.cursor()
 
             # 1. RÈGLE : Désactive tous les dépôts existants
-            cursor.execute("UPDATE extension_repos SET is_active = 0;")
+            # Repository visibility and installed source lifetime are independent.
 
             # 2. Insère ou réactive le dépôt ciblé
             cursor.execute("""
@@ -113,6 +98,13 @@ class ExtensionService:
             cursor.execute("SELECT id FROM extension_repos WHERE url = ?;", (clean_url,))
             repo_id = cursor.fetchone()["id"]
 
+            previous_key = cursor.execute('SELECT signing_key FROM extension_repos WHERE id=?', (repo_id,)).fetchone()['signing_key']
+            pending = declared_key if previous_key and declared_key and previous_key != declared_key else None
+            cursor.execute('UPDATE extension_repos SET signing_key=COALESCE(signing_key,?), pending_signing_key=?, metadata_json=?, checked_at=CURRENT_TIMESTAMP, snapshot_hash=? WHERE id=?',
+                           (declared_key, pending, json.dumps({k:v for k,v in metadata.items() if k not in ('extensionList','extensionListUrl')}),
+                            hashlib.sha256(json.dumps(data,sort_keys=True).encode()).hexdigest(), repo_id))
+            cursor.execute('UPDATE extension_offers SET present=0 WHERE repo_id=?', (repo_id,))
+
             # 3. Importe massivement toutes les extensions (désactivées par défaut)
             imported_count = 0
             seen_packages = set()
@@ -126,6 +118,7 @@ class ExtensionService:
                 name = item.get("name") or pkg
                 lang = item.get("lang") or "all"
                 version = item.get("version") or str(item.get("code") or "1.0")
+                remote_code = version_code(item.get('code'))
                 raw_apk = item.get("apk") or ""
 
                 if raw_apk.startswith("http"):
@@ -148,34 +141,43 @@ class ExtensionService:
                 cursor.execute("""
                     INSERT INTO imported_extensions (
                         repo_id, pkg, name, lang, version, available_version, apk_url, available_apk_url,
-                        base_url, available_base_url, icon_url, sources_meta, is_enabled, has_update
+                        base_url, available_base_url, icon_url, sources_meta, is_enabled, has_update, available_code
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?)
                     ON CONFLICT(repo_id, pkg) DO UPDATE SET
                         name = excluded.name,
                         lang = excluded.lang,
-                        recipe_json = CASE WHEN version IS NOT excluded.version OR base_url IS NOT excluded.base_url OR apk_url IS NOT excluded.apk_url THEN NULL ELSE recipe_json END,
-                        has_update = CASE
-                            WHEN installed_version IS NOT NULL AND installed_version != '' AND installed_version IS NOT excluded.version THEN 1
-                            ELSE 0
-                        END,
-                        version = excluded.version,
+                        version = CASE WHEN installed_version IS NOT NULL OR recipe_json IS NOT NULL OR is_enabled=1 THEN version ELSE excluded.version END,
                         available_version = excluded.version,
-                        apk_url = excluded.apk_url,
+                        apk_url = CASE WHEN installed_version IS NOT NULL OR recipe_json IS NOT NULL OR is_enabled=1 THEN apk_url ELSE excluded.apk_url END,
                         available_apk_url = excluded.apk_url,
                         available_base_url = excluded.base_url,
-                        base_url = excluded.base_url,
+                        base_url = CASE WHEN installed_version IS NOT NULL OR recipe_json IS NOT NULL OR is_enabled=1 THEN base_url ELSE excluded.base_url END,
                         icon_url = excluded.icon_url,
-                        sources_meta = excluded.sources_meta;
+                        sources_meta = excluded.sources_meta,
+                        catalog_state = 'available',
+                        available_code = excluded.available_code;
                 """, (
-                    repo_id, pkg, name, lang, version, version, apk_url, apk_url, base_url, base_url, icon_url, json.dumps(sources)
+                    repo_id, pkg, name, lang, version, version, apk_url, apk_url, base_url, base_url, icon_url, json.dumps(sources), remote_code
                 ))
+                extension_lib = item.get('extensionLib')
+                cursor.execute('UPDATE imported_extensions SET extension_lib=?, declared_signer=? WHERE repo_id=? AND pkg=?',
+                               (extension_lib, declared_key, repo_id, pkg))
+                cursor.execute("INSERT INTO extension_offers(repo_id,pkg,version_code,version_name,extension_lib,signer,apk_url,metadata_json,present) VALUES (?,?,?,?,?,?,?,?,1) "
+                               "ON CONFLICT(repo_id,pkg) DO UPDATE SET version_code=excluded.version_code,version_name=excluded.version_name,extension_lib=excluded.extension_lib,signer=excluded.signer,apk_url=excluded.apk_url,metadata_json=excluded.metadata_json,present=1",
+                               (repo_id,pkg,remote_code,version,extension_lib,declared_key,apk_url,json.dumps(item)))
                 imported_count += 1
 
-            if not seen_packages:
+            if data and not seen_packages:
                 raise ValueError("Le dépôt ne contient aucune extension valide.")
-            placeholders = ",".join("?" for _ in seen_packages)
-            cursor.execute(f"DELETE FROM imported_extensions WHERE repo_id = ? AND pkg NOT IN ({placeholders})", (repo_id, *seen_packages))
+            if seen_packages:
+                placeholders = ",".join("?" for _ in seen_packages)
+                cursor.execute(f"UPDATE imported_extensions SET catalog_state='retired', has_update=0 WHERE repo_id=? AND pkg NOT IN ({placeholders})", (repo_id, *seen_packages))
+            else:
+                cursor.execute("UPDATE imported_extensions SET catalog_state='retired', has_update=0 WHERE repo_id=?", (repo_id,))
+            for row in cursor.execute('SELECT * FROM imported_extensions WHERE repo_id=?', (repo_id,)).fetchall():
+                update = row['catalog_state'] == 'available' and newer(row['available_version'], row['installed_version'], row['available_code'], row['installed_code'])
+                cursor.execute('UPDATE imported_extensions SET has_update=? WHERE id=?', (int(update), row['id']))
             conn.commit()
 
         # Réinitialise le cache des sources en mémoire pour ne conserver que celles du dépôt actif
@@ -189,6 +191,16 @@ class ExtensionService:
             "repo_url": clean_url,
             "count": imported_count,
         }
+
+    async def _fetch_catalog_bytes(self, url):
+        async with source_http.async_client(timeout=15.0, verify=settings.SSL_VERIFY, follow_redirects=True,
+                                            event_hooks={'request': [self._validate_request]}) as client:
+            response = await client.get(url, headers={'User-Agent': settings.DEFAULT_USER_AGENT}, max_response_bytes=MAX_INDEX_BYTES)
+            if response.status_code != 200:
+                raise ValueError(f'Catalogue indisponible (HTTP {response.status_code}).')
+            if len(response.content) > MAX_INDEX_BYTES:
+                raise ValueError('Index trop volumineux.')
+            return response.content
 
     def get_active_repository(self) -> Optional[Dict[str, Any]]:
         """Retourne le dernier magasin d'extensions ajouté (seul actif)."""
@@ -246,16 +258,12 @@ class ExtensionService:
 
     def get_visible_extensions(self, query: Optional[str] = None, lang: Optional[str] = None, enabled_only: bool = False) -> List[Dict[str, Any]]:
         """Retourne uniquement les extensions présentes dans le dernier magasin ajouté."""
-        active_repo = self.get_active_repository()
-        if not active_repo:
-            return []
-
-        repo_id = active_repo["id"]
-        sql = "SELECT * FROM imported_extensions WHERE repo_id = ?"
-        params: List[Any] = [repo_id]
+        sql = ("SELECT e.*, r.name AS repo_name, r.url AS repo_url FROM imported_extensions e "
+               "JOIN extension_repos r ON r.id=e.repo_id WHERE (r.is_active=1 OR e.installed_version IS NOT NULL OR e.recipe_json IS NOT NULL OR e.is_enabled=1)")
+        params: List[Any] = []
 
         if query:
-            sql += " AND (name LIKE ? OR pkg LIKE ? OR base_url LIKE ?)"
+            sql += " AND (e.name LIKE ? OR e.pkg LIKE ? OR e.base_url LIKE ?)"
             q_like = f"%{query.strip()}%"
             params.extend([q_like, q_like, q_like])
 
@@ -266,7 +274,7 @@ class ExtensionService:
         if enabled_only:
             sql += " AND is_enabled = 1"
 
-        sql += " ORDER BY has_update DESC, is_enabled DESC, lang = 'fr' DESC, name ASC;"
+        sql += " ORDER BY has_update DESC, is_enabled DESC, lang = 'fr' DESC, e.name ASC;"
 
         with self._get_conn() as conn:
             cursor = conn.cursor()
@@ -278,9 +286,8 @@ class ExtensionService:
                 is_installed = bool(entry.get("is_enabled") or entry.get("recipe_json") or entry.get("installed_version"))
                 installed_ver = entry.get("installed_version") or (entry.get("version") if is_installed else None)
                 available_ver = entry.get("available_version") or entry.get("version")
-                has_update = bool(entry.get("has_update")) or bool(
-                    is_installed and installed_ver and available_ver and installed_ver != available_ver
-                )
+                has_update = entry.get('catalog_state') == 'available' and is_installed and newer(
+                    available_ver, installed_ver, entry.get('available_code'), entry.get('installed_code'))
                 entry["is_installed"] = is_installed
                 entry["installed_version"] = installed_ver
                 entry["available_version"] = available_ver
@@ -302,9 +309,10 @@ class ExtensionService:
                 raise ValueError("Extension introuvable.")
 
             ext_data = dict(row)
-            active = self.get_active_repository()
-            if not active or active["id"] != ext_data["repo_id"]:
-                raise ValueError("Cette extension appartient à un dépôt inactif.")
+            if enabled and not ext_data.get('installed_version') and not ext_data.get('recipe_json'):
+                repo = cursor.execute('SELECT is_active FROM extension_repos WHERE id=?', (ext_data['repo_id'],)).fetchone()
+                if not repo or not repo['is_active'] or ext_data.get('catalog_state') == 'retired':
+                    raise ValueError('Cette extension ne dispose pas d’une offre active.')
             pkg = ext_data["pkg"]
 
             if enabled:
@@ -320,7 +328,7 @@ class ExtensionService:
 
                 installed_ver = ext_data.get("installed_version") or ext_data.get("available_version") or ext_data.get("version")
                 avail_ver = ext_data.get("available_version") or ext_data.get("version")
-                has_upd = 1 if (installed_ver and avail_ver and installed_ver != avail_ver) else 0
+                has_upd = int(newer(avail_ver, installed_ver, ext_data.get('available_code'), ext_data.get('installed_code')))
 
                 if not recipe_dict:
                     compile_target = self._available_target(ext_data)
@@ -332,7 +340,7 @@ class ExtensionService:
                         """
                         UPDATE imported_extensions
                         SET recipe_json = ?, is_enabled = 1,
-                            installed_version = ?, version = ?, apk_url = ?, base_url = ?,
+                            installed_version = ?, version = ?, apk_url = ?, base_url = ?, installed_code=available_code,
                             available_version = COALESCE(available_version, version),
                             has_update = ?, updated_at = CURRENT_TIMESTAMP
                         WHERE id = ?;
@@ -376,97 +384,43 @@ class ExtensionService:
             "name": ext_data["name"],
         }
 
-    async def check_updates(self) -> Dict[str, Any]:
-        """Vérifie auprès du dépôt actif si des mises à jour sont disponibles pour les extensions installées,
-        sans écraser les versions actuellement installées afin que l'utilisateur décide quand mettre à jour.
-        """
-        active_repo = self.get_active_repository()
-        if not active_repo:
-            raise ValueError("Aucun dépôt actif.")
-
-        clean_url = active_repo["url"]
-        try:
-            async with source_http.async_client(
-                timeout=15.0,
-                verify=settings.SSL_VERIFY,
-                follow_redirects=True,
-                event_hooks={"request": [self._validate_request]},
-            ) as client:
-                resp = await client.get(clean_url, headers={"User-Agent": settings.DEFAULT_USER_AGENT})
-                if resp.status_code != 200:
-                    raise ValueError(f"Impossible de joindre le magasin (HTTP {resp.status_code})")
-                data = resp.json()
-        except VerificationRequired:
-            raise
-        except Exception as e:
-            raise ValueError(f"Erreur lors de la vérification des mises à jour : {e}")
-
-        if not isinstance(data, list):
-            raise ValueError("Format d'index du dépôt invalide.")
-
-        repo_base = clean_url.rsplit("/", 1)[0]
-        apk_base_dir = f"{repo_base}/apk"
-
-        updates_available: List[Dict[str, Any]] = []
+    def list_repositories(self):
         with self._get_conn() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM imported_extensions WHERE repo_id = ?;", (active_repo["id"],))
-            existing_by_pkg = {row["pkg"]: dict(row) for row in cursor.fetchall()}
+            return [dict(row) for row in conn.execute('SELECT * FROM extension_repos ORDER BY id')]
 
-            for item in data:
-                if not isinstance(item, dict):
-                    continue
-                pkg = item.get("pkg") or ""
-                if pkg not in existing_by_pkg:
-                    continue
-                ext = existing_by_pkg[pkg]
-                remote_version = item.get("version") or str(item.get("code") or "1.0")
-                raw_apk = item.get("apk") or ""
-                sources = item.get('sources') or []
-                remote_base_url = (sources[0].get('baseUrl') or '') if isinstance(sources, list) and sources and isinstance(sources[0], dict) else ''
-                if raw_apk.startswith("http"):
-                    remote_apk_url = raw_apk
-                elif raw_apk:
-                    remote_apk_url = f"{apk_base_dir}/{raw_apk}"
-                else:
-                    remote_apk_url = ''
+    def set_repository_enabled(self, repo_id, enabled):
+        if type(enabled) is not bool:
+            raise ValueError('enabled doit être un booléen.')
+        with self._get_conn() as conn:
+            if not conn.execute('SELECT id FROM extension_repos WHERE id=?', (repo_id,)).fetchone():
+                raise ValueError('Dépôt introuvable.')
+            conn.execute('UPDATE extension_repos SET is_active=? WHERE id=?', (int(enabled), repo_id))
+        # Installed sources remain loaded when a repository stops publishing.
+        return {'success': True, 'id': repo_id, 'is_active': enabled}
 
-                is_installed = bool(ext.get("is_enabled") or ext.get("recipe_json") or ext.get("installed_version"))
-                installed_ver = ext.get("installed_version") or (ext.get("version") if is_installed else None)
-                has_upd = 1 if (is_installed and installed_ver and remote_version != installed_ver) else 0
+    async def refresh_repositories(self):
+        results, errors = [], []
+        for repo in self.list_repositories():
+            if not repo['is_active']:
+                continue
+            try:
+                results.append(await self.import_repository(repo['url']))
+                with self._get_conn() as conn:
+                    conn.execute('UPDATE extension_repos SET last_error=NULL, checked_at=CURRENT_TIMESTAMP WHERE id=?', (repo['id'],))
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                code = type(exc).__name__
+                errors.append({'id': repo['id'], 'code': code})
+                with self._get_conn() as conn:
+                    conn.execute('UPDATE extension_repos SET last_error=?, checked_at=CURRENT_TIMESTAMP WHERE id=?', (code, repo['id']))
+        return {'success': not errors, 'repositories': results, 'errors': errors}
 
-                cursor.execute(
-                    """
-                    UPDATE imported_extensions
-                    SET available_version = ?,
-                        available_apk_url = ?,
-                        available_base_url = ?,
-                        installed_version = COALESCE(installed_version, CASE WHEN is_enabled = 1 OR recipe_json IS NOT NULL THEN version ELSE NULL END),
-                        has_update = ?
-                    WHERE id = ?;
-                    """,
-                    (remote_version, remote_apk_url, remote_base_url or None, has_upd, ext["id"]),
-                )
-                if has_upd:
-                    updates_available.append({
-                        "id": ext["id"],
-                        "pkg": pkg,
-                        "name": ext["name"],
-                        "installed_version": installed_ver,
-                        "available_version": remote_version,
-                    })
-            conn.commit()
-
-        return {
-            "success": True,
-            "count": len(updates_available),
-            "updates": updates_available,
-            "message": (
-                f"{len(updates_available)} mise(s) à jour disponible(s)."
-                if updates_available
-                else "Toutes vos extensions installées sont à jour."
-            ),
-        }
+    async def check_updates(self) -> Dict[str, Any]:
+        result = await self.refresh_repositories()
+        updates = [entry for entry in self.get_visible_extensions() if entry['has_update']]
+        return {**result, 'count': len(updates), 'updates': updates,
+                'message': f'{len(updates)} mise(s) à jour disponible(s).'}
 
     async def update_extension(self, ext_id: int) -> Dict[str, Any]:
         """Met à jour une extension à la demande de l'utilisateur en téléchargeant le nouvel APK et en recompilant sa recette."""
@@ -475,9 +429,9 @@ class ExtensionService:
             if not row:
                 raise ValueError("Extension introuvable.")
             ext_data = dict(row)
-            active = self.get_active_repository()
-            if not active or active["id"] != ext_data["repo_id"]:
-                raise ValueError("Cette extension appartient à un dépôt inactif.")
+            repo = conn.execute('SELECT is_active FROM extension_repos WHERE id=?', (ext_data['repo_id'],)).fetchone()
+            if not repo or not repo['is_active'] or ext_data.get('catalog_state') == 'retired':
+                raise ValueError('Cette extension ne dispose pas d’une offre active.')
 
         compile_target = self._available_target(ext_data)
         target_version = compile_target['version']
@@ -500,6 +454,7 @@ class ExtensionService:
                 UPDATE imported_extensions
                 SET version = ?,
                     installed_version = ?,
+                    installed_code = available_code,
                     available_version = ?,
                     apk_url = ?,
                     available_apk_url = ?,
@@ -564,9 +519,9 @@ class ExtensionService:
             if not row:
                 raise ValueError("Extension introuvable.")
             ext_data = dict(row)
-            active = self.get_active_repository()
-            if not active or active["id"] != ext_data["repo_id"]:
-                raise ValueError("Cette extension appartient à un dépôt inactif.")
+            repo = conn.execute('SELECT is_active FROM extension_repos WHERE id=?', (ext_data['repo_id'],)).fetchone()
+            if not repo or not repo['is_active'] or ext_data.get('catalog_state') == 'retired':
+                raise ValueError('Cette extension ne dispose pas d’une offre active.')
 
         recipe_dict = await self._compile_extension_recipe(ext_data)
         recipe = SourceRecipe.from_dict(recipe_dict)
@@ -690,15 +645,10 @@ class ExtensionService:
         """Charge au démarrage toutes les sources activées du magasin actif."""
         loaded = {}
         failures = []
-        active_repo = self.get_active_repository()
-        if not active_repo:
-            self._active_container_sources = loaded
-            return
-
         with self._get_conn() as conn:
             conn.execute('BEGIN IMMEDIATE')
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM imported_extensions WHERE repo_id = ? AND is_enabled = 1;", (active_repo["id"],))
+            cursor.execute("SELECT * FROM imported_extensions WHERE is_enabled = 1 ORDER BY id;")
             rows = cursor.fetchall()
             for r in rows:
                 ext = dict(r)
@@ -766,8 +716,7 @@ class ExtensionService:
             raise ValueError("Champs de recette inconnus : " + ", ".join(sorted(unknown)))
         with self._get_conn() as conn:
             row = conn.execute("SELECT * FROM imported_extensions WHERE id = ?", (ext_id,)).fetchone()
-            active = self.get_active_repository()
-            if not row or not active or row["repo_id"] != active["id"]:
+            if not row:
                 raise ValueError("Extension introuvable dans le dépôt actif.")
             existing = json.loads(row["recipe_json"] or "{}")
             previous = dict(existing)

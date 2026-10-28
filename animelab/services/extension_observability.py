@@ -66,7 +66,7 @@ class ExtensionObservability:
         stamp=datetime.now(timezone.utc).isoformat()
         with sqlite_connection(db_path) as conn:
             conn.execute('BEGIN IMMEDIATE')
-            ext=conn.execute('SELECT e.id,e.recipe_revision FROM imported_extensions e JOIN extension_repos r ON r.id=e.repo_id WHERE e.pkg=? AND r.is_active=1',(pkg,)).fetchone()
+            ext=conn.execute('SELECT e.id,e.recipe_revision FROM imported_extensions e JOIN extension_repos r ON r.id=e.repo_id WHERE e.pkg=? AND e.is_enabled=1 ORDER BY e.id DESC LIMIT 1',(pkg,)).fetchone()
             if not ext: return {'status':status,'code':code}
             if recipe_revision is not None and recipe_revision != ext['recipe_revision']:
                 return {'status':status,'code':code,'discarded':True}
