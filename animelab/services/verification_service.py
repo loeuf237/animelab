@@ -172,6 +172,7 @@ class DownloadVerificationService:
                 cmd = [
                     self._ffprobe_path,
                     "-v", "error",
+                    "-protocol_whitelist", "file,pipe",
                     "-show_entries", "format=duration,size,format_name:stream=codec_type,codec_name",
                     "-of", "json",
                     str(path)

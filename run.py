@@ -249,6 +249,8 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS, 
 app.include_router(network_router)
 app.include_router(anime_router)
 app.include_router(download_router)
+from animelab.routers.subtitles import router as subtitles_router
+app.include_router(subtitles_router)
 app.include_router(library_router)
 app.include_router(media_router)
 app.include_router(extensions_router)

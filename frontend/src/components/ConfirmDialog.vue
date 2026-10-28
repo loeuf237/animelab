@@ -70,6 +70,7 @@ watch(
       cancelButton.value?.focus()
     } else restore()
   },
+  { immediate: true },
 )
 onUnmounted(() => {
   if (props.open) restore()

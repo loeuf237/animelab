@@ -591,17 +591,21 @@ async def get_subtitles_list(task_id: str):
     result = []
 
     video_stem = Path(task.savePath).stem if task.savePath else ""
+    metadata = {item['path']: item for item in json.loads(task.mediaJson).get('outputState', {}).get('sidecarTracks', [])}
     for idx, p in enumerate(paths):
         sf = Path(p)
         if sf.exists():
             lbl = sf.name.replace(video_stem, "").strip(".")
             if not lbl:
                 lbl = f"Sous-titres {idx + 1}"
-            lang = "fr" if "fr" in lbl.lower() else "und"
+            track = metadata.get(str(sf), {})
+            lbl = track.get('label') or lbl
+            lang = track.get('lang') or ("fr" if "fr" in lbl.lower() else "und")
             result.append({
                 "label": lbl,
                 "srclang": lang,
                 "src": f"/api/media/subtitle/{task_id}/{idx}",
+                "default": bool(track.get('default')),
             })
 
     return result

@@ -225,8 +225,10 @@ class BrowserVerificationService:
         result = {"success": True, "domain": job["domain"]}
         if self.verified_callback:
             result['resumed'] = self.verified_callback(job['domain'])
-        await self.cancel(job_id)
         self.completed[job_id] = {'created': time.monotonic(), 'result': result}
+        # status() is lock-free and may be polled while native close awaits
+        # process termination. Publish completion before removing the job.
+        await self.cancel(job_id)
         return result
 
     async def cancel(self, job_id):

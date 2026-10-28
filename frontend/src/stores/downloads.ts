@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { api } from '@/api/client'
-import type { DownloadTask, DownloadStats } from '@/types'
+import type { DownloadTask, DownloadStats, OutputProfile } from '@/types'
 
 function normalizeStatus(status: any): string {
   if (!status) return 'queued'
@@ -172,6 +172,7 @@ export const useDownloadStore = defineStore('downloads', () => {
     fileName?: string
     subtitleUrl?: string
     downloadSubtitles?: boolean
+    outputProfile?: OutputProfile
     source?: string
     selectedServer?: string
     selectedQuality?: string
@@ -195,6 +196,7 @@ export const useDownloadStore = defineStore('downloads', () => {
       fileName?: string
       subtitleUrl?: string
       downloadSubtitles?: boolean
+      outputProfile?: OutputProfile
     }[]
     preferredServer?: string
     preferredQuality?: string

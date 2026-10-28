@@ -8,7 +8,7 @@ import subprocess
 import time
 
 
-def validate(app, tests, output, skip_native_media=False, package="com.animan.app"):
+def validate(app, tests, output, skip_native_media=False, package="com.animan.app", require_hardsub=False):
     output.mkdir(parents=True, exist_ok=True)
     is_engine = package == "com.animan.app" or package.startswith("com.animan.app.")
     for apk in (app, tests):
@@ -44,6 +44,8 @@ def validate(app, tests, output, skip_native_media=False, package="com.animan.ap
     print(report)
     if result.returncode or not re.search(r"OK \(1 test\)", report) or "FAILURES" in report or "INSTRUMENTATION_FAILED" in report:
         raise RuntimeError("The installed Android engine did not pass instrumentation")
+    if require_hardsub:
+        validate_hardsub_report(report + '\n' + (output / 'logcat.txt').read_text(), output, api)
     if is_engine:
         footprint_path = output / "footprint.json"
         footprint = json.loads(footprint_path.read_text())
@@ -55,6 +57,21 @@ def validate(app, tests, output, skip_native_media=False, package="com.animan.ap
         footprint_path.write_text(json.dumps(footprint, indent=2) + "\n")
 
 
+def validate_hardsub_report(text, output, api):
+    matches = re.findall(r'ANIMAN_NATIVE_MEDIA_PROBE=(\{[^\r\n]*\})', text)
+    if not matches:
+        raise RuntimeError('Missing JNI hardsub evidence')
+    value = json.loads(matches[-1])
+    proof = value.get('hardsub', {})
+    if not (proof.get('available') is True and proof.get('renderVerified') is True and
+            proof.get('pixelDifference', 0) > 10000 and proof.get('api') == api and
+            proof.get('pageSize') in (4096, 16384) and value.get('managed_cancellation') is True and
+            value.get('managed_progress') is True and
+            value.get('storage_export') is True):
+        raise RuntimeError('Incomplete JNI hardsub rendering, cancellation or export evidence')
+    (output / 'hardsub-proof.json').write_text(json.dumps(value, indent=2) + '\n')
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("app", type=Path)
@@ -62,5 +79,6 @@ if __name__ == "__main__":
     parser.add_argument("output", type=Path)
     parser.add_argument("--skip-native-media", action="store_true")
     parser.add_argument("--package", default="com.animan.app")
+    parser.add_argument("--require-hardsub", action="store_true")
     args = parser.parse_args()
-    validate(args.app, args.tests, args.output, args.skip_native_media, args.package)
+    validate(args.app, args.tests, args.output, args.skip_native_media, args.package, args.require_hardsub)

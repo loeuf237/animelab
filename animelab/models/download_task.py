@@ -8,6 +8,7 @@ from typing import Optional, Deque, Tuple
 from urllib.parse import urlparse
 from sqlalchemy import Column, Integer, BigInteger, Float, String, Boolean, DateTime
 from animelab.database import Base
+from animelab.models import media_state  # Register additive media tables for fresh databases.
 
 def ensure_utc(dt: Optional[datetime]) -> Optional[datetime]:
     """Normalise une date en UTC aware.
@@ -149,6 +150,8 @@ class DownloadTaskEntity(Base):
     directDownloadUrl = Column(String, nullable=True)
     subtitleUrl = Column(String, nullable=True)
     subtitlesJson = Column(String, default="[]")
+    mediaJson = Column(String, default='{}')
+    outputProfileJson = Column(String, default='')
     error = Column(String, nullable=True)
     verificationUrl = Column(String, nullable=True)
     status = Column(String, default=DownloadStatus.PENDING.value, nullable=False)
@@ -190,6 +193,8 @@ class DownloadTaskEntity(Base):
             directDownloadUrl=self.directDownloadUrl,
             subtitleUrl=self.subtitleUrl,
             subtitlesJson=self.subtitlesJson or "[]",
+            mediaJson=self.mediaJson or '{}',
+            outputProfileJson=self.outputProfileJson or '',
             error=self.error,
             verificationUrl=self.verificationUrl,
             status=DownloadStatus(self.status),
@@ -258,6 +263,8 @@ class DownloadTask:
         exportError: Optional[str] = None,
         exportAttempts: int = 0,
         exportedAt: Optional[datetime] = None,
+        mediaJson: str = '{}',
+        outputProfileJson: str = '',
     ):
         self.id = id or str(uuid.uuid4())
         self.animeName = animeName
@@ -272,6 +279,10 @@ class DownloadTask:
         self.directDownloadUrl = directDownloadUrl
         self.subtitleUrl = subtitleUrl
         self.subtitlesJson = subtitlesJson if isinstance(subtitlesJson, str) else json.dumps(subtitlesJson or [])
+        from animelab.services.output_profiles import snapshot
+        self.mediaJson = mediaJson if isinstance(mediaJson, str) else json.dumps(mediaJson)
+        self.outputProfileJson = outputProfileJson or snapshot(legacy_subtitles=downloadSubtitles)
+        self.requestHeaders = {}  # Session credentials are re-resolved, never serialized.
         self.error = error
         self.verificationUrl = verificationUrl
         self.status = status
@@ -381,6 +392,10 @@ class DownloadTask:
             "downloadPageUrl": self.downloadPageUrl,
             "directDownloadUrl": self.directDownloadUrl,
             "downloadSubtitles": self.downloadSubtitles,
+            "outputProfile": json.loads(self.outputProfileJson),
+            "mediaTracks": self.public_tracks(),
+            "mediaProgressSeconds": getattr(self, 'mediaProgressSeconds', None),
+            "outputWarnings": json.loads(self.mediaJson).get('outputState', {}).get('warnings', []),
             "maxSpeedLimit": self.maxSpeedLimit,
             "verificationStatus": self.verificationStatus,
             "videoDuration": self.videoDuration,
@@ -398,6 +413,7 @@ class DownloadTask:
         }
 
     def to_entity(self) -> DownloadTaskEntity:
+        from animelab.services.output_profiles import private_snapshot
         return DownloadTaskEntity(
             id=self.id,
             animeName=self.animeName,
@@ -411,7 +427,9 @@ class DownloadTask:
             downloadPageUrl=self.downloadPageUrl,
             directDownloadUrl=self.directDownloadUrl,
             subtitleUrl=self.subtitleUrl,
-            subtitlesJson=self.subtitlesJson,
+            subtitlesJson=json.dumps(private_snapshot(json.loads(self.subtitlesJson))),
+            mediaJson=json.dumps(private_snapshot(json.loads(self.mediaJson))),
+            outputProfileJson=self.outputProfileJson,
             error=self.error,
             verificationUrl=self.verificationUrl,
             status=self.status.value,
@@ -438,3 +456,9 @@ class DownloadTask:
             exportAttempts=self.exportAttempts,
             exportedAt=self.exportedAt,
         )
+
+    def public_tracks(self):
+        from animelab.services.media_contracts import ResolvedMedia
+        info = json.loads(self.mediaJson)
+        info['subtitles'] = json.loads(self.subtitlesJson)
+        return [t.public() for t in ResolvedMedia.from_info(info, self.downloadPageUrl or self.fileUrl).tracks]

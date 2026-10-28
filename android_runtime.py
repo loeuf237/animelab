@@ -137,16 +137,7 @@ def start(data_dir, cache_dir, port, token, test_mode=False):
         from animelab.services.subtitle_service import normalize_subtitles
         if not task.savePath or not Path(task.savePath).is_file():
             raise FileNotFoundError("The private download is missing")
-        paths = [task.savePath]
-        for track in normalize_subtitles(task.subtitlesJson):
-            if not track.get("muxed") and track.get("path"):
-                paths.append(track["path"])
-        if task.savePathSubtitle and not any(track.get("muxed") for track in normalize_subtitles(task.subtitlesJson)):
-            try:
-                sidecars = json.loads(task.savePathSubtitle)
-            except (ValueError, TypeError):
-                sidecars = task.savePathSubtitle
-            paths.extend(sidecars if isinstance(sidecars, list) else [sidecars])
+        paths = platform_events.completed_paths(task)
         uris = [str(hooks.exportFile(path, task.id)) for path in dict.fromkeys(paths) if path and Path(path).is_file()]
         if not uris:
             raise FileNotFoundError("The private download is missing")

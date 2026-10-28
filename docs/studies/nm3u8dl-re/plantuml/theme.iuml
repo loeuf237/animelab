@@ -1,0 +1,20 @@
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName DejaVu Sans
+skinparam defaultFontSize 14
+skinparam shadowing false
+skinparam ArrowColor #475569
+skinparam roundcorner 8
+skinparam packageStyle rectangle
+skinparam classAttributeIconSize 0
+skinparam classBackgroundColor #ECFDF5
+skinparam classBorderColor #059669
+skinparam componentBackgroundColor #ECFDF5
+skinparam componentBorderColor #059669
+skinparam usecaseBackgroundColor #ECFDF5
+skinparam usecaseBorderColor #059669
+skinparam noteBackgroundColor #FFF7ED
+skinparam noteBorderColor #D97706
+skinparam participantBackgroundColor #ECFDF5
+skinparam participantBorderColor #059669
+skinparam componentStyle uml2
+hide empty members

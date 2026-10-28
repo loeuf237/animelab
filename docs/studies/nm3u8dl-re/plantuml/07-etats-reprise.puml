@@ -1,0 +1,41 @@
+@startuml
+!include theme.iuml
+title États proposés — pas de reprise aveugle entre moteurs
+[*] --> EnAttente
+EnAttente --> Resolution : démarrer
+Resolution --> ChoixPistes : média disponible
+ChoixPistes --> Transfert : plan confirmé
+Transfert --> SousTitres : média récupéré
+SousTitres --> Sortie : pistes validées
+Sortie --> Validation : mux ou burn-in terminé
+Validation --> Termine : publication / export vérifiés
+Transfert --> Pause : arrêt coopératif ; fichiers conservés
+Pause --> ControleReprise : reprendre
+ControleReprise --> Transfert : même backend/version compatible\net empreinte de représentation
+ControleReprise --> Resolution : session / URL expirée
+ControleReprise --> NouveauPlan : représentation ou backend différent
+NouveauPlan --> ChoixPistes : conserver ancien espace de travail\nchoisir un nouveau plan
+Resolution --> VerificationNecessaire : challenge
+Transfert --> VerificationNecessaire : challenge / session expirée
+VerificationNecessaire --> Resolution : session renouvelée sur client compatible
+SousTitres --> EchecLocal : piste absente / quota / mauvais fichier
+Sortie --> EchecLocal : filtre / encodeur / espace disque
+Validation --> EchecLocal : fichier invalide
+EchecLocal --> SousTitres : réessayer à partir des fichiers présents
+Transfert --> EchecReseau : retries épuisés
+EchecReseau --> ControleReprise : reprise demandée
+Termine --> [*]
+state Annule
+EnAttente --> Annule : annuler
+Transfert --> Annule : arrêter processus et révoquer relais
+Pause --> Annule : annuler
+note bottom of Annule
+Les autres phases acceptent aussi l’annulation.
+Politique de conservation explicite des fichiers.
+end note
+note bottom of Sortie
+Une pause de l’encodage peut imposer de
+recommencer l’encodage, pas le téléchargement.
+end note
+
+@enduml

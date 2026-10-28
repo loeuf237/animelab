@@ -1,0 +1,55 @@
+{
+  "consulted_on": "2026-10-27",
+  "repository": "nilaoda/N_m3u8DL-RE",
+  "tag": "v0.6.0-beta",
+  "published_at": "2026-06-28T16:12:55Z",
+  "source": "https://api.github.com/repos/nilaoda/N_m3u8DL-RE/releases/latest",
+  "note": "Compressed upstream archive sizes; no binary downloaded or executed",
+  "assets": [
+    {
+      "name": "N_m3u8DL-RE_v0.6.0-beta_android-bionic-arm64_20260629.tar.gz",
+      "bytes": 5764262,
+      "url": "https://github.com/nilaoda/N_m3u8DL-RE/releases/download/v0.6.0-beta/N_m3u8DL-RE_v0.6.0-beta_android-bionic-arm64_20260629.tar.gz"
+    },
+    {
+      "name": "N_m3u8DL-RE_v0.6.0-beta_android-bionic-x64_20260629.tar.gz",
+      "bytes": 6078228,
+      "url": "https://github.com/nilaoda/N_m3u8DL-RE/releases/download/v0.6.0-beta/N_m3u8DL-RE_v0.6.0-beta_android-bionic-x64_20260629.tar.gz"
+    },
+    {
+      "name": "N_m3u8DL-RE_v0.6.0-beta_linux-arm64_20260629.tar.gz",
+      "bytes": 8037403,
+      "url": "https://github.com/nilaoda/N_m3u8DL-RE/releases/download/v0.6.0-beta/N_m3u8DL-RE_v0.6.0-beta_linux-arm64_20260629.tar.gz"
+    },
+    {
+      "name": "N_m3u8DL-RE_v0.6.0-beta_linux-x64_20260629.tar.gz",
+      "bytes": 8045197,
+      "url": "https://github.com/nilaoda/N_m3u8DL-RE/releases/download/v0.6.0-beta/N_m3u8DL-RE_v0.6.0-beta_linux-x64_20260629.tar.gz"
+    },
+    {
+      "name": "N_m3u8DL-RE_v0.6.0-beta_osx-arm64_20260629.tar.gz",
+      "bytes": 5463707,
+      "url": "https://github.com/nilaoda/N_m3u8DL-RE/releases/download/v0.6.0-beta/N_m3u8DL-RE_v0.6.0-beta_osx-arm64_20260629.tar.gz"
+    },
+    {
+      "name": "N_m3u8DL-RE_v0.6.0-beta_osx-x64_20260629.tar.gz",
+      "bytes": 5938418,
+      "url": "https://github.com/nilaoda/N_m3u8DL-RE/releases/download/v0.6.0-beta/N_m3u8DL-RE_v0.6.0-beta_osx-x64_20260629.tar.gz"
+    },
+    {
+      "name": "N_m3u8DL-RE_v0.6.0-beta_win-arm64_20260629.zip",
+      "bytes": 5277364,
+      "url": "https://github.com/nilaoda/N_m3u8DL-RE/releases/download/v0.6.0-beta/N_m3u8DL-RE_v0.6.0-beta_win-arm64_20260629.zip"
+    },
+    {
+      "name": "N_m3u8DL-RE_v0.6.0-beta_win-NT6.0-x86_20260629.zip",
+      "bytes": 5215925,
+      "url": "https://github.com/nilaoda/N_m3u8DL-RE/releases/download/v0.6.0-beta/N_m3u8DL-RE_v0.6.0-beta_win-NT6.0-x86_20260629.zip"
+    },
+    {
+      "name": "N_m3u8DL-RE_v0.6.0-beta_win-x64_20260629.zip",
+      "bytes": 5477475,
+      "url": "https://github.com/nilaoda/N_m3u8DL-RE/releases/download/v0.6.0-beta/N_m3u8DL-RE_v0.6.0-beta_win-x64_20260629.zip"
+    }
+  ]
+}

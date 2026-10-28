@@ -71,11 +71,17 @@ class YtDlpFallbackExtractor(BaseVideoExtractor):
             if not info:
                 return None
 
-            direct = info.get("url")
+            selected = info
+            requested = info.get('requested_formats') or []
+            video_formats = [f for f in requested if f.get('vcodec') != 'none' and f.get('url')]
+            if video_formats:
+                selected = video_formats[0]
+            direct = selected.get("url")
             if not direct and info.get("formats"):
-                valid_fmts = [f for f in info["formats"] if f.get("url")]
+                valid_fmts = [f for f in info["formats"] if f.get("url") and f.get('vcodec') != 'none']
                 if valid_fmts:
-                    direct = valid_fmts[-1]["url"]
+                    selected = valid_fmts[-1]
+                    direct = selected['url']
 
             if not direct:
                 return None
@@ -85,6 +91,25 @@ class YtDlpFallbackExtractor(BaseVideoExtractor):
             headers = {"User-Agent": USER_AGENT}
             if referer:
                 headers["Referer"] = referer
+            headers.update(info.get('http_headers') or {})
+            headers.update(selected.get('http_headers') or {})
+            subtitles = []
+            for key, automatic in (('subtitles', False), ('automatic_captions', True)):
+                for lang, formats in (info.get(key) or {}).items():
+                    for track in formats:
+                        if track.get('url'):
+                            subtitles.append(dict(url=track['url'], lang=lang,
+                                label=track.get('name') or lang, format=track.get('ext', ''),
+                                automatic=automatic, provenance='yt-dlp',
+                                headers={**headers, **(track.get('http_headers') or {})}))
+            audio = [dict(url=f['url'], lang=f.get('language') or 'und',
+                          label=f.get('format_note') or f.get('format_id') or 'Audio',
+                          format=f.get('ext', ''), required=True,
+                          headers={**headers, **(f.get('http_headers') or {})}, provenance='yt-dlp')
+                     for f in requested if f.get('url') and f.get('vcodec') == 'none']
+            requirements = []
+            if selected.get('acodec') == 'none':
+                requirements.append('separate_audio')
 
             return ExtractorResult(
                 video_url=direct,
@@ -93,6 +118,9 @@ class YtDlpFallbackExtractor(BaseVideoExtractor):
                 qualities={"HD": direct},
                 headers=headers,
                 size=sz if sz and sz > 0 else -1,
+                subtitles=subtitles,
+                audio_tracks=audio,
+                requirements=requirements,
             )
         except VerificationRequired:
             raise

@@ -57,6 +57,7 @@ files = [
     "animelab/android_security.py",
     "animelab/services/download_resume.py",
     "animelab/services/subtitle_service.py",
+    "animelab/services/media_contracts.py",
     "animelab/services/download_errors.py",
     "scripts/check.py",
 ]

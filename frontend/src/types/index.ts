@@ -1,3 +1,44 @@
+export interface OutputTrackSelection {
+  trackId: string
+  offsetSeconds: number
+  default: boolean
+  forced: boolean
+  required: boolean
+}
+export interface OutputMediaTrack {
+  id: string
+  kind: 'video' | 'audio' | 'subtitle' | 'font'
+  lang: string
+  label: string
+  format: string
+  automatic: boolean
+  default: boolean
+  forced: boolean
+  embedded: boolean
+  local?: boolean
+  canRestore?: boolean
+}
+export interface OutputInventory {
+  tracks: OutputMediaTrack[]
+  outputProfile: OutputProfile
+  profiles: OutputProfileCapability[]
+  warnings: string[]
+  duration: string | number | null
+}
+export interface OutputProfile {
+  version: 1
+  mode: 'ORIGINAL' | 'SIDECAR' | 'MKV_SOFT' | 'MP4_HARD'
+  keepOriginals: boolean
+  selections?: OutputTrackSelection[]
+  burnTrackId?: string | null
+}
+export interface OutputProfileCapability {
+  mode: OutputProfile['mode']
+  available: boolean
+  reason: string
+  trackSelectionAvailable: boolean
+}
+
 export interface SourceChallenge {
   domain: string
   url?: string
@@ -102,6 +143,10 @@ export interface AnimeDetailResponse {
 }
 
 export interface DownloadTask {
+  outputProfile?: OutputProfile
+  outputWarnings?: string[]
+  mediaProgressSeconds?: number | null
+  mediaTracks?: { id: string; kind: string; lang: string; label: string; automatic: boolean }[]
   exportStatus?: 'NOT_REQUESTED' | 'PENDING' | 'EXPORTING' | 'EXPORTED' | 'EXPORT_FAILED'
   exportUris?: string[]
   exportDestination?: string | null

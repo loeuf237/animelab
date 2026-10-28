@@ -1,0 +1,6 @@
+#EXTM3U
+#EXT-X-MAP:URI="init.mp4"
+#EXT-X-BYTERANGE:1200@0
+#EXTINF:2,
+video.m4s
+#EXT-X-ENDLIST

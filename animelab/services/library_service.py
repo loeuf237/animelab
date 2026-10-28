@@ -230,7 +230,11 @@ class LibraryService:
         entity.downloadPageUrl = task.downloadPageUrl
         entity.directDownloadUrl = task.directDownloadUrl
         entity.subtitleUrl = task.subtitleUrl
-        entity.subtitlesJson = task.subtitlesJson
+        from animelab.services.output_profiles import private_snapshot
+        import json
+        entity.subtitlesJson = json.dumps(private_snapshot(json.loads(task.subtitlesJson)))
+        entity.mediaJson = json.dumps(private_snapshot(json.loads(task.mediaJson)))
+        entity.outputProfileJson = task.outputProfileJson
         entity.error = task.error
         entity.status = task.status.value
         entity.progress = task.progress
@@ -264,6 +268,8 @@ class LibraryService:
                                      task.animeName, task.episodeNumber, task.version)
 
     def save_task(self, task: DownloadTask):
+        if getattr(task, '_removed', False):
+            return
         with transaction(SessionLocal) as db:
             entity = db.query(DownloadTaskEntity).filter(DownloadTaskEntity.id == task.id).first()
             if entity:
@@ -272,8 +278,11 @@ class LibraryService:
                 db.add(task.to_entity())
             self._update_auto_download_outcome(db, task)
             db.flush()
+            from animelab.models.media_state import sync_media_state
+            sync_media_state(db, task)
 
     def save_tasks_batch(self, tasks: List[DownloadTask]):
+        tasks = [task for task in tasks if not getattr(task, '_removed', False)]
         if not tasks:
             return
         with transaction(SessionLocal) as db:
@@ -289,6 +298,10 @@ class LibraryService:
                     db.add(task.to_entity())
                 self._update_auto_download_outcome(db, task)
             db.flush()
+
+            from animelab.models.media_state import sync_media_state
+            for task in tasks:
+                sync_media_state(db, task)
 
     def get_history(self, anime_name: Optional[str] = None) -> List[DownloadTaskEntity]:
         with transaction(SessionLocal) as db:

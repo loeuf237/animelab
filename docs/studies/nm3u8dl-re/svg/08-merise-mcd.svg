@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentScriptType="application/ecmascript" contentStyleType="text/css" height="716px" preserveAspectRatio="none" style="width:1326px;height:716px;" version="1.1" viewBox="0 0 1326 716" width="1326px" zoomAndPan="magnify"><defs/><g><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="357" x="492.5" y="12.9951">MCD de type Merise — modèle conceptuel proposé</text><!--MD5=[999e208607ac560644345f0e54c4133c]
+class COMPTE--><rect fill="#ECFDF5" height="54.2969" id="COMPTE" rx="4" ry="4" style="stroke: #059669; stroke-width: 1.5;" width="141" x="126" y="179.2969"/><ellipse cx="162.95" cy="194.2969" fill="#ADD1B2" rx="10" ry="10" style="stroke: #059669; stroke-width: 1.0;"/><path d="M165.95,199.2969 L159.6063,199.2969 L159.6063,189.0938 L165.95,189.0938 L165.95,190.875 L161.6219,190.875 L161.6219,193.0625 L165.5438,193.0625 L165.5438,194.8438 L161.6219,194.8438 L161.6219,197.5156 L165.95,197.5156 L165.95,199.2969 Z "/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="60" x="181.05" y="199.1436">COMPTE</text><line style="stroke: #059669; stroke-width: 1.5;" x1="127" x2="266" y1="209.2969" y2="209.2969"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="129" x="132" y="226.292">*identifiantCompte</text><!--MD5=[923678aa59d5b005e1f72a59ed9ff142]
+class EPISODE--><rect fill="#ECFDF5" height="86.8906" id="EPISODE" rx="4" ry="4" style="stroke: #059669; stroke-width: 1.5;" width="326" x="33.5" y="401.2969"/><ellipse cx="162" cy="416.2969" fill="#ADD1B2" rx="10" ry="10" style="stroke: #059669; stroke-width: 1.0;"/><path d="M165,421.2969 L158.6563,421.2969 L158.6563,411.0938 L165,411.0938 L165,412.875 L160.6719,412.875 L160.6719,415.0625 L164.5938,415.0625 L164.5938,416.8438 L160.6719,416.8438 L160.6719,419.5156 L165,419.5156 L165,421.2969 Z "/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="61" x="181" y="421.1436">EPISODE</text><line style="stroke: #059669; stroke-width: 1.5;" x1="34.5" x2="358.5" y1="431.2969" y2="431.2969"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="130" x="39.5" y="448.292">*identifiantEpisode</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="314" x="39.5" y="464.5889">titre / saison / numéro / numérotationAbsolue</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="219" x="39.5" y="480.8857">imdbId / tmdbId / versionSource</text><!--MD5=[de52194a8b75593d4361e1bb723d0298]
+class TELECHARGEMENT--><rect fill="#ECFDF5" height="86.8906" id="TELECHARGEMENT" rx="4" ry="4" style="stroke: #059669; stroke-width: 1.5;" width="329" x="539" y="205.2969"/><ellipse cx="633" cy="220.2969" fill="#ADD1B2" rx="10" ry="10" style="stroke: #059669; stroke-width: 1.0;"/><path d="M636,225.2969 L629.6563,225.2969 L629.6563,215.0938 L636,215.0938 L636,216.875 L631.6719,216.875 L631.6719,219.0625 L635.5938,219.0625 L635.5938,220.8438 L631.6719,220.8438 L631.6719,223.5156 L636,223.5156 L636,225.2969 Z "/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="133" x="652" y="225.1436">TELECHARGEMENT</text><line style="stroke: #059669; stroke-width: 1.5;" x1="540" x2="867" y1="235.2969" y2="235.2969"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="117" x="545" y="252.292">*identifiantTache</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="317" x="545" y="268.5889">modeSortie / état / backend / versionBackend</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="239" x="545" y="284.8857">empreinteReprésentation / reprise</text><!--MD5=[e5809f16ec146562bbe94487c82fc21f]
+class PISTE_MEDIA--><rect fill="#ECFDF5" height="86.8906" id="PISTE_MEDIA" rx="4" ry="4" style="stroke: #059669; stroke-width: 1.5;" width="292" x="557.5" y="401.2969"/><ellipse cx="654.5" cy="416.2969" fill="#ADD1B2" rx="10" ry="10" style="stroke: #059669; stroke-width: 1.0;"/><path d="M657.5,421.2969 L651.1563,421.2969 L651.1563,411.0938 L657.5,411.0938 L657.5,412.875 L653.1719,412.875 L653.1719,415.0625 L657.0938,415.0625 L657.0938,416.8438 L653.1719,416.8438 L653.1719,419.5156 L657.5,419.5156 L657.5,421.2969 Z "/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="90" x="673.5" y="421.1436">PISTE_MEDIA</text><line style="stroke: #059669; stroke-width: 1.5;" x1="558.5" x2="848.5" y1="431.2969" y2="431.2969"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="108" x="563.5" y="448.292">*identifiantPiste</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="280" x="563.5" y="464.5889">type / langue / rôle / codec / provenance</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="219" x="563.5" y="480.8857">référenceDistanteRenouvelable</text><!--MD5=[dd72273d08598609231017479d8efc89]
+class FICHIER_SOUS_TITRES--><rect fill="#ECFDF5" height="86.8906" id="FICHIER_SOUS_TITRES" rx="4" ry="4" style="stroke: #059669; stroke-width: 1.5;" width="237" x="1057.5" y="618.2969"/><ellipse cx="1094.9" cy="633.2969" fill="#ADD1B2" rx="10" ry="10" style="stroke: #059669; stroke-width: 1.0;"/><path d="M1097.9,638.2969 L1091.5563,638.2969 L1091.5563,628.0938 L1097.9,628.0938 L1097.9,629.875 L1093.5719,629.875 L1093.5719,632.0625 L1097.4938,632.0625 L1097.4938,633.8438 L1093.5719,633.8438 L1093.5719,636.5156 L1097.9,636.5156 L1097.9,638.2969 Z "/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="155" x="1113.1" y="638.1436">FICHIER_SOUS_TITRES</text><line style="stroke: #059669; stroke-width: 1.5;" x1="1058.5" x2="1293.5" y1="648.2969" y2="648.2969"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="119" x="1063.5" y="665.292">*identifiantFichier</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="225" x="1063.5" y="681.5889">format / cheminPrivé / empreinte</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="219" x="1063.5" y="697.8857">fournisseur / fichierExterne / fps</text><!--MD5=[b654821faf59d067a0bda2ca02e92d30]
+class ARTEFACT_SORTIE--><rect fill="#ECFDF5" height="86.8906" id="ARTEFACT_SORTIE" rx="4" ry="4" style="stroke: #059669; stroke-width: 1.5;" width="248" x="1052" y="44.2969"/><ellipse cx="1106.5" cy="59.2969" fill="#ADD1B2" rx="10" ry="10" style="stroke: #059669; stroke-width: 1.0;"/><path d="M1109.5,64.2969 L1103.1563,64.2969 L1103.1563,54.0938 L1109.5,54.0938 L1109.5,55.875 L1105.1719,55.875 L1105.1719,58.0625 L1109.0938,58.0625 L1109.0938,59.8438 L1105.1719,59.8438 L1105.1719,62.5156 L1109.5,62.5156 L1109.5,64.2969 Z "/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="131" x="1125.5" y="64.1436">ARTEFACT_SORTIE</text><line style="stroke: #059669; stroke-width: 1.5;" x1="1053" x2="1299" y1="74.2969" y2="74.2969"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="127" x="1058" y="91.292">*identifiantArtefact</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="236" x="1058" y="107.5889">format / chemin / taille / empreinte</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="147" x="1058" y="123.8857">durée / étatValidation</text><!--MD5=[9c2a823d07c28877e4acafe1e058ed62]
+class TENTATIVE_TRANSFERT--><rect fill="#ECFDF5" height="86.8906" id="TENTATIVE_TRANSFERT" rx="4" ry="4" style="stroke: #059669; stroke-width: 1.5;" width="242" x="1055" y="205.2969"/><ellipse cx="1089.7" cy="220.2969" fill="#ADD1B2" rx="10" ry="10" style="stroke: #059669; stroke-width: 1.0;"/><path d="M1092.7,225.2969 L1086.3563,225.2969 L1086.3563,215.0938 L1092.7,215.0938 L1092.7,216.875 L1088.3719,216.875 L1088.3719,219.0625 L1092.2938,219.0625 L1092.2938,220.8438 L1088.3719,220.8438 L1088.3719,223.5156 L1092.7,223.5156 L1092.7,225.2969 Z "/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="166" x="1107.3" y="225.1436">TENTATIVE_TRANSFERT</text><line style="stroke: #059669; stroke-width: 1.5;" x1="1056" x2="1296" y1="235.2969" y2="235.2969"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="138" x="1061" y="252.292">*identifiantTentative</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="230" x="1061" y="268.5889">backend / version / espaceTravail</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="135" x="1061" y="284.8857">résultat / début / fin</text><!--MD5=[4d7547876fa31e7b99ac9db4e31777d4]
+class SELECTION_PISTE--><rect fill="#ECFDF5" height="83.1875" id="SELECTION_PISTE" rx="4" ry="4" style="stroke: #059669; stroke-width: 1.5;" width="213" x="1069.5" y="366.7969"/><ellipse cx="1095.65" cy="388.0938" fill="#ADD1B2" rx="10" ry="10" style="stroke: #059669; stroke-width: 1.0;"/><path d="M1098.65,393.0938 L1092.3063,393.0938 L1092.3063,382.8906 L1098.65,382.8906 L1098.65,384.6719 L1094.3219,384.6719 L1094.3219,386.8594 L1098.2438,386.8594 L1098.2438,388.6406 L1094.3219,388.6406 L1094.3219,391.3125 L1098.65,391.3125 L1098.65,393.0938 Z "/><text fill="#000000" font-family="DejaVu Sans" font-size="14" font-style="italic" lengthAdjust="spacingAndGlyphs" textLength="160" x="1109.35" y="384.792">«association porteuse»</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="123" x="1127.85" y="401.0889">SELECTION_PISTE</text><line style="stroke: #059669; stroke-width: 1.5;" x1="1070.5" x2="1281.5" y1="409.3906" y2="409.3906"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="188" x="1075.5" y="426.3857">décalageMs / défaut / forcé</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="201" x="1075.5" y="442.6826">conserverStyle / rôleDeSortie</text><path d="M6,291.8469 L6,342.7375 A4,4 0 0 0 10,346.7375 L383,346.7375 A4,4 0 0 0 387,342.7375 L387,297.8469 L377,287.8469 L188.78,287.8469 L185.14,233.1269 L180.78,287.8469 L10,287.8469 A4,4 0 0 0 6,291.8469 " fill="#FFF7ED" style="stroke: #D97706; stroke-width: 1.0;"/><path d="M377,287.8469 L377,295.8469 A2,2 0 0 0 379,297.8469 L387,297.8469 L377,287.8469 " fill="#FFF7ED" style="stroke: #D97706; stroke-width: 1.0;"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="347" x="12" y="305.842">Conceptuellement propriétaire ; en mode partagé,</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="360" x="12" y="322.1389">chaque compte garde sa base et ses fichiers privés.</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="355" x="12" y="338.4357">Pas de fusion des bases privées dans la passerelle.</text><path d="M1038,508.8469 L1038,559.7375 A4,4 0 0 0 1042,563.7375 L1310,563.7375 A4,4 0 0 0 1314,559.7375 L1314,514.8469 L1304,504.8469 L1168.73,504.8469 L1163.62,449.5569 L1160.73,504.8469 L1042,504.8469 A4,4 0 0 0 1038,508.8469 " fill="#FFF7ED" style="stroke: #D97706; stroke-width: 1.0;"/><path d="M1304,504.8469 L1304,512.8469 A2,2 0 0 0 1306,514.8469 L1314,514.8469 L1304,504.8469 " fill="#FFF7ED" style="stroke: #D97706; stroke-width: 1.0;"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="200" x="1044" y="522.842">MLD : clé (tache_id, piste_id).</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="255" x="1044" y="539.1389">Le décalage appartient à la sélection,</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="226" x="1044" y="555.4357">pas au fichier original réutilisable.</text><!--MD5=[a10fe018e660631b8050e3c3aac3c737]
+link COMPTE to TELECHARGEMENT--><path d="M266.92,212.0669 C336.74,217.8769 446.95,227.0469 539.03,234.6969 " fill="none" id="COMPTE-TELECHARGEMENT" style="stroke: #475569; stroke-width: 1.0;"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="61" x="420.5" y="220.782">possède</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="33" x="274.9329" y="226.3314">(0,N)</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="32" x="498.8525" y="247.4248">(1,1)</text><!--MD5=[ed2340fbe436f13950601f17db5ab1a4]
+link EPISODE to TELECHARGEMENT--><path d="M308.01,401.4069 C392.19,368.7369 507.57,323.9569 591.8,291.2669 " fill="none" id="EPISODE-TELECHARGEMENT" style="stroke: #475569; stroke-width: 1.0;"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="66" x="418" y="330.562">concerne</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="33" x="340.3294" y="390.211">(0,N)</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="32" x="537.0534" y="313.2881">(1,1)</text><!--MD5=[0d3a504f54884158dafd53b59f657300]
+link EPISODE to PISTE_MEDIA--><path d="M359.37,444.2969 C423.13,444.2969 495.77,444.2969 557.76,444.2969 " fill="none" id="EPISODE-PISTE_MEDIA" style="stroke: #475569; stroke-width: 1.0;"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="58" x="422" y="440.292">propose</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="33" x="367.4977" y="457.641">(0,N)</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="32" x="517.4203" y="457.6892">(1,1)</text><!--MD5=[6eec25a10550d0442da0e06ec3d069a2]
+link PISTE_MEDIA to FICHIER_SOUS_TITRES--><path d="M797.46,487.1669 C879.81,525.1469 999.42,580.3169 1081.84,618.3269 " fill="none" id="PISTE_MEDIA-FICHIER_SOUS_TITRES" style="stroke: #475569; stroke-width: 1.0;"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="74" x="923" y="542.282">matérialise</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="33" x="778.2576" y="509.1703">(0,N)</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="32" x="1017.4805" y="620.9623">(1,1)</text><!--MD5=[3e1fe7a3f0d3cd15d0bddcb85b0977aa]
+link TELECHARGEMENT to TENTATIVE_TRANSFERT--><path d="M867.74,248.2969 C929.31,248.2969 998.17,248.2969 1055.07,248.2969 " fill="none" id="TELECHARGEMENT-TENTATIVE_TRANSFERT" style="stroke: #475569; stroke-width: 1.0;"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="56" x="932" y="244.292">exécute</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="33" x="875.9298" y="261.641">(0,N)</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="32" x="1015.1537" y="261.7373">(1,1)</text><!--MD5=[1528cb0fd84019f63fa684728b202054]
+link TELECHARGEMENT to ARTEFACT_SORTIE--><path d="M829.97,205.3669 C898.84,181.7969 983.9,152.6869 1052.32,129.2769 " fill="none" id="TELECHARGEMENT-ARTEFACT_SORTIE" style="stroke: #475569; stroke-width: 1.0;"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="49" x="935.5" y="144.632">produit</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="33" x="872.5744" y="194.1435">(0,N)</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="32" x="1011.8083" y="145.2996">(1,1)</text><!--MD5=[3774d8c5348d42ee61d792e4c0208960]
+link TELECHARGEMENT to SELECTION_PISTE--><path d="M830.89,291.2769 C905.61,316.6869 999.12,348.4869 1069.8,372.5169 " fill="none" id="TELECHARGEMENT-SELECTION_PISTE" style="stroke: #475569; stroke-width: 1.0;"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="33" x="817.6423" y="313.2999">(0,N)</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="32" x="1029.5897" y="383.6492">(1,1)</text><!--MD5=[e948ba526c4d83ae6ff207c8b1057696]
+link PISTE_MEDIA to SELECTION_PISTE--><path d="M849.18,433.2269 C920.35,427.7769 1004.56,421.3369 1069.54,416.3669 " fill="none" id="PISTE_MEDIA-SELECTION_PISTE" style="stroke: #475569; stroke-width: 1.0;"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="33" x="857.5424" y="446.0484">(0,N)</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="32" x="1029.3122" y="430.4454">(1,1)</text><!--MD5=[8fdfb2504c6e15ce12171497cf0d57f2]
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName DejaVu Sans
+skinparam defaultFontSize 14
+skinparam shadowing false
+skinparam ArrowColor #475569
+skinparam roundcorner 8
+skinparam packageStyle rectangle
+skinparam classAttributeIconSize 0
+skinparam classBackgroundColor #ECFDF5
+skinparam classBorderColor #059669
+skinparam componentBackgroundColor #ECFDF5
+skinparam componentBorderColor #059669
+skinparam usecaseBackgroundColor #ECFDF5
+skinparam usecaseBorderColor #059669
+skinparam noteBackgroundColor #FFF7ED
+skinparam noteBorderColor #D97706
+skinparam participantBackgroundColor #ECFDF5
+skinparam participantBorderColor #059669
+skinparam componentStyle uml2
+hide empty members
+title MCD de type Merise — modèle conceptuel proposé
+left to right direction
+entity COMPTE {
+ * identifiantCompte
+}
+entity EPISODE {
+ * identifiantEpisode
+ titre / saison / numéro / numérotationAbsolue
+ imdbId / tmdbId / versionSource
+}
+entity TELECHARGEMENT {
+ * identifiantTache
+ modeSortie / état / backend / versionBackend
+ empreinteReprésentation / reprise
+}
+entity PISTE_MEDIA {
+ * identifiantPiste
+ type / langue / rôle / codec / provenance
+ référenceDistanteRenouvelable
+}
+entity FICHIER_SOUS_TITRES {
+ * identifiantFichier
+ format / cheminPrivé / empreinte
+ fournisseur / fichierExterne / fps
+}
+entity ARTEFACT_SORTIE {
+ * identifiantArtefact
+ format / chemin / taille / empreinte
+ durée / étatValidation
+}
+entity TENTATIVE_TRANSFERT {
+ * identifiantTentative
+ backend / version / espaceTravail
+ résultat / début / fin
+}
+entity SELECTION_PISTE <<association porteuse>> {
+ décalageMs / défaut / forcé
+ conserverStyle / rôleDeSortie
+}
+COMPTE "(0,N)" - - "(1,1)" TELECHARGEMENT : possède
+EPISODE "(0,N)" - - "(1,1)" TELECHARGEMENT : concerne
+EPISODE "(0,N)" - - "(1,1)" PISTE_MEDIA : propose
+PISTE_MEDIA "(0,N)" - - "(1,1)" FICHIER_SOUS_TITRES : matérialise
+TELECHARGEMENT "(0,N)" - - "(1,1)" TENTATIVE_TRANSFERT : exécute
+TELECHARGEMENT "(0,N)" - - "(1,1)" ARTEFACT_SORTIE : produit
+TELECHARGEMENT "(0,N)" - - "(1,1)" SELECTION_PISTE
+PISTE_MEDIA "(0,N)" - - "(1,1)" SELECTION_PISTE
+note bottom of COMPTE
+Conceptuellement propriétaire ; en mode partagé,
+chaque compte garde sa base et ses fichiers privés.
+Pas de fusion des bases privées dans la passerelle.
+end note
+note bottom of SELECTION_PISTE
+MLD : clé (tache_id, piste_id).
+Le décalage appartient à la sélection,
+pas au fichier original réutilisable.
+end note
+
+@enduml
+
+PlantUML version 1.2020.02(Sun Mar 01 11:22:07 WAT 2020)
+(GPL source distribution)
+Java Runtime: OpenJDK Runtime Environment
+JVM: OpenJDK 64-Bit Server VM
+Java Version: 25.0.4.1+1-1-26.04.4-Ubuntu
+Operating System: Linux
+Default Encoding: UTF-8
+Language: en
+Country: null
+--></g></svg>

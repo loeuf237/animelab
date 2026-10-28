@@ -1,0 +1,37 @@
+@startuml
+!include theme.iuml
+title Existant vérifié — ce que le code fait aujourd’hui
+left to right direction
+component "Vue / API\noptions de téléchargement" as UI #F5F3FF
+component "DownloadManagerService\n1 688 lignes" as M #F5F3FF
+component "TransferWorker\n1 154 lignes" as T #F5F3FF
+component "Extensions / recettes\n+ registre d’extracteurs" as R #F5F3FF
+component "yt-dlp : repli d’extraction\nskip_download=True" as Y #F5F3FF
+component "SourceHTTPService\nsessions, proxy, vérification" as H #F5F3FF
+component "MediaPipeline\nsous-titres + mux MKV" as P #F5F3FF
+component "media_tools\nFFmpeg / ffprobe" as F #F5F3FF
+database "Tâches et reprise\nSQLite + fichiers .part" as DB
+UI --> M
+M --> R
+R --> Y
+M --> T
+T --> H
+T --> P
+P --> F
+M --> DB
+T --> DB
+note bottom of T
+HTTP Range, HLS natif, chunks spécifiques.
+HLS : BYTERANGE / EXT-X-MAP refusés.
+Pas de moteur DASH dédié identifié.
+end note
+note bottom of Y
+Les champs sous-titres renvoyés par yt-dlp
+ne sont pas copiés dans ExtractorResult.
+end note
+note bottom of F
+Desktop : sous-processus.
+Android : MediaBridge JNI + FFmpegKit min.
+end note
+
+@enduml

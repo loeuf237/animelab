@@ -23,6 +23,7 @@ class ExtractorResult:
     size: int = -1
     subtitles: List[Dict[str, str]] = field(default_factory=list)
     audio_tracks: List[Dict[str, str]] = field(default_factory=list)
+    requirements: List[str] = field(default_factory=list)
 
     def to_download_info(self) -> Dict[str, Any]:
         """Convertit le résultat au format attendu par le download_manager."""
@@ -41,6 +42,7 @@ class ExtractorResult:
             "headers": self.headers,
             "subtitles": self.subtitles,
             "audioTracks": self.audio_tracks,
+            "requirements": self.requirements,
         }
 
 class BaseVideoExtractor(ABC):

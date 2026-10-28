@@ -1,0 +1,44 @@
+@startuml
+!include theme.iuml
+title Déploiement proposé — desktop d’abord, Android sous conditions
+top to bottom direction
+node "Windows / Linux / macOS" {
+ component "AnimeLab Python\ncoordinateur et session du compte" as D
+ artifact "N_m3u8DL-RE\nbinaire natif épinglé + empreinte" as RE
+ artifact "FFmpeg / ffprobe\nlibass + encodeur validé" as FF
+ component "Relais local par tâche" as L
+ D --> RE : argv sans shell\nprocessus supervisé
+ RE --> L : manifeste et fragments locaux
+ D --> FF : mux / burn-in
+}
+node "Android API 29+ — APK actuel" {
+ component "Moteur Python" as AP
+ component "HTTP/HLS natif" as AH
+ component "MediaBridge JNI" as JNI
+ artifact "FFmpegKit min 6.0.4" as MIN
+ AP --> AH
+ AP --> JNI
+ JNI --> MIN
+}
+cloud "Hébergeurs / API sous-titres" as NET
+L --> NET : SourceHTTP ; sessions + politique réseau
+AH --> NET
+node "GitHub Actions — cible de packaging" {
+ artifact "Binaire amont vérifié\nWindows / Linux / macOS" as CI
+ artifact "APK signé dans Actions\nbackend natif conservé" as APK
+}
+CI ..> RE : intégration après preuve de concept
+APK ..> AP
+note bottom of MIN
+AAR inspecté : pas de --enable-libass / libx264.
+Hardsub : nouveau build / nouveau chemin natif requis.
+Le binaire Bionic amont vise Termux :
+ce n’est pas une preuve d’intégration APK.
+end note
+note bottom of CI
+Le poids exact installé et la compatibilité
+sont à mesurer sur chaque paquet produit.
+Aucun binaire ajouté pendant cette étude.
+end note
+
+@enduml

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import ipaddress
 import math
+import re
 import time
 from urllib.parse import urlsplit
 
@@ -149,6 +150,9 @@ class BodyLimit:
     async def __call__(self, scope, receive, send):
         if scope['type'] != 'http':
             return await self.app(scope, receive, send)
+        subtitle_upload = (scope.get('method') == 'POST' and
+                           re.fullmatch(r'/api/download/[^/]{1,128}/subtitles/import', scope.get('path', '')))
+        limit = 10 * 1024 * 1024 if subtitle_upload else self.limit
         size = 0
         messages = []
         while True:
@@ -156,8 +160,8 @@ class BodyLimit:
             if message['type'] == 'http.disconnect':
                 return
             size += len(message.get('body', b''))
-            if size > self.limit:
-                return await JSONResponse({'error': 'Request body exceeds 2 MiB'}, status_code=413)(scope, receive, send)
+            if size > limit:
+                return await JSONResponse({'error': f'Request body exceeds {limit // (1024 * 1024)} MiB'}, status_code=413)(scope, receive, send)
             messages.append(message)
             if not message.get('more_body', False):
                 break

@@ -318,7 +318,10 @@
             gap: 12px;
           "
         >
-          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+          <div
+            class="batch-options"
+            style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap"
+          >
             <button type="button" class="btn btn-sm" @click="selectAllEpisodes">
               {{ tx('Tout') }}
             </button>
@@ -342,6 +345,7 @@
                 {{ tx(version) }}
               </option>
             </select>
+            <OutputProfilePicker v-model="outputProfile" />
             <!-- Qualité par lot -->
             <select
               v-model="batchQuality"
@@ -619,6 +623,9 @@
             </dd>
           </div>
         </dl>
+        <p v-if="pendingBatch.episodes[0]?.outputProfile" class="source-hint">
+          {{ tx('Format de sortie') }} : {{ pendingBatch.episodes[0].outputProfile.mode }}
+        </p>
         <p class="source-hint">
           {{ tx('La qualité et les sous-titres dépendent des pistes proposées par la source.') }}
         </p>
@@ -645,7 +652,8 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useSearchContext } from '@/stores/searchContext'
 import { useNotifications } from '@/stores/notifications'
 import { episodeKey, episodeFileName } from '@/utils/episodes'
-import type { Episode } from '@/types'
+import type { Episode, OutputProfile } from '@/types'
+import OutputProfilePicker from '@/components/OutputProfilePicker.vue'
 
 const searchContext = useSearchContext()
 const notifications = useNotifications()
@@ -668,6 +676,7 @@ const episodeVersions = computed(() =>
 const epSubtitles = ref<Record<string, boolean>>({})
 const batchSubtitles = ref(false)
 const batchQuality = ref('auto')
+const outputProfile = ref<OutputProfile | undefined>(undefined)
 const selectedEpisodes = ref<Set<string>>(new Set())
 const downloadingEpisodes = ref<Set<string>>(new Set())
 const isBatchDownloading = ref(false)
@@ -879,7 +888,8 @@ async function downloadEp(ep: Episode) {
       url: targetUrl,
       fileName: episodeFileName(detail.value.anime.title, ep),
       subtitleUrl: ep.subtitleUrl || undefined,
-      downloadSubtitles: subEnabled,
+      downloadSubtitles: outputProfile.value ? outputProfile.value.mode !== 'ORIGINAL' : subEnabled,
+      outputProfile: outputProfile.value,
       source: detail.value.source,
       selectedQuality: batchQuality.value !== 'auto' ? batchQuality.value : undefined,
     })
@@ -905,7 +915,10 @@ function previewBatch(targetEps: Episode[]) {
       title: ep.title,
       fileName: episodeFileName(detail.value!.anime.title, ep),
       subtitleUrl: ep.subtitleUrl || undefined,
-      downloadSubtitles: isSubEnabled(ep),
+      downloadSubtitles: outputProfile.value
+        ? outputProfile.value.mode !== 'ORIGINAL'
+        : isSubEnabled(ep),
+      outputProfile: outputProfile.value,
     })),
   }
 }
@@ -1012,6 +1025,14 @@ async function markAll(watched: boolean) {
 </script>
 
 <style scoped>
+.batch-options {
+  min-width: 0;
+  max-width: 100%;
+}
+.batch-options > select {
+  min-width: 0;
+  max-width: 100%;
+}
 .tachiyomi-container {
   display: flex;
   flex-direction: column;

@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-27",
+  "version": "0.6.0+df70f0b3da0c630bd413bf617e758051f6b64757",
+  "decision": "not-adopted-for-production",
+  "gates": {
+    "P10": "evaluated-with-positive-and-negative-corpus",
+    "P11": "Linux-x64-offline-namespace-prototype-only",
+    "P12": "not-adopted",
+    "P13": "not-retained-P12-gate",
+    "P14": "implemented-locally-awaiting-Android-CI-and-device-validation",
+    "P15": "not-retained-P12-gate"
+  },
+  "blockers": [
+    "WebVTT timeline reset across discontinuity: expected 2.2s, observed 0.2s",
+    "Upstream accepts corrupted existing fragment and reports success",
+    "Safe workaround requires own resource cache, HTTP relay and network namespace; no native Windows/macOS isolation validated"
+  ],
+  "productionPlannerRegistered": false,
+  "bundleBinaryInReleases": false,
+  "bundleBinaryInDocker": false,
+  "automaticWorkflow": false,
+  "proof": "nm3u8dl-proof.json",
+  "report": "IMPLEMENTATION_P10_P13.md",
+  "optionalWorkflow": ".github/workflows/nm3u8dl-evaluation.yml"
+}

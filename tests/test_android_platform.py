@@ -51,6 +51,14 @@ def test_android_hls_assembly_uses_absolute_paths_without_process_cwd(tmp_path, 
     old_cwd = Path.cwd()
     calls = []
     class NativeRemux:
+        def executeManaged(self, tool, arguments, timeout, job):
+            return self.execute(tool, arguments, timeout)
+        def pollManaged(self, job):
+            return '{}'
+        def cancelManaged(self, job):
+            pass
+        def releaseManaged(self, job):
+            pass
         def execute(self, tool, arguments, timeout):
             args = json.loads(arguments)
             calls.append(args)

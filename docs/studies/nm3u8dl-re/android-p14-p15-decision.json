@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-27",
+  "P14": {
+    "status": "implemented-locally-awaiting-Android-validation",
+    "dependency": "dev.ffmpegkit-maintained:ffmpeg-kit-full-gpl:6.0.4",
+    "admission": "successful real JNI render probe plus actual codecs and readable system font",
+    "mediaWorkers": 1,
+    "encoderThreads": 1,
+    "maxLongEdge": 1920,
+    "maxShortEdge": 1080,
+    "maxDurationSeconds": 10800,
+    "workflow": ".github/workflows/android-hardsub-evaluation.yml",
+    "ciExecuted": false,
+    "deviceValidated": false,
+    "arm64RuntimeValidated": false,
+    "device16kbValidated": false,
+    "connectedDeviceCompatible": false,
+    "localApkBuilt": false,
+    "releasePublished": false
+  },
+  "P15": {
+    "decision": "not-retained-for-studied-version",
+    "upstreamTag": "v0.6.0-beta",
+    "bionicAssetsExist": true,
+    "bionicArchivesDownloaded": false,
+    "bionicBinaryExecuted": false,
+    "existingAndroidBackendPreserved": true,
+    "blockingEvidence": [
+      "P12 failures not resolved on Android",
+      "APK execution and dependencies not demonstrated",
+      "Android policy isolation not demonstrated",
+      "ABI/API/16KB lifecycle and representative resource metrics absent"
+    ]
+  },
+  "validation": {
+    "hostAdapterSuite": "31 passed in 30.63s (includes real Linux FFmpeg, simulated JNI)",
+    "gateAndAuditSuite": "12 passed in 1.58s (includes Android native-backend preservation)",
+    "androidRegressionSuite": "36 passed, 2 skipped in 4.27s",
+    "kotlinBridgesAndInstrumentationCompile": "passed against cached API, not an APK build",
+    "fullPythonSuite": "916 passed, 5 skipped, 2 warnings in 232.43s (0:03:52)",
+    "qualitySuite": "passed, including final localization changes"
+  },
+  "report": "IMPLEMENTATION_P14_P15.md"
+}

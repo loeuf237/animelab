@@ -21,6 +21,7 @@ class StageBudget:
             self.semaphore.release()
             raise ValueError('Operation was paused or cancelled')
         self.active += 1
+        task._media_loop = asyncio.get_running_loop()
         job = asyncio.create_task(asyncio.to_thread(function, *args, **kwargs))
         jobs[task.id] = job
         def finished(result):

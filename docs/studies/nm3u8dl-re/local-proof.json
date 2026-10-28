@@ -1,0 +1,123 @@
+{
+  "scope": "offline synthetic FFmpeg proof; not N_m3u8DL-RE or Android runtime validation",
+  "source_seconds": 2,
+  "ffmpeg_version": "ffmpeg version 8.0.1-3ubuntu2 Copyright (c) 2000-2025 the FFmpeg developers",
+  "commands": {
+    "hardsub": [
+      "ffmpeg",
+      "-v",
+      "error",
+      "-y",
+      "-i",
+      "source.mp4",
+      "-map",
+      "0:v:0",
+      "-map",
+      "0:a:0?",
+      "-vf",
+      "subtitles=fr.srt",
+      "-c:v",
+      "libx264",
+      "-crf",
+      "20",
+      "-preset",
+      "veryfast",
+      "-c:a",
+      "aac",
+      "-sn",
+      "-movflags",
+      "+faststart",
+      "hardsub.mp4"
+    ],
+    "multipiste": [
+      "ffmpeg",
+      "-v",
+      "error",
+      "-y",
+      "-i",
+      "source.mp4",
+      "-i",
+      "fr.srt",
+      "-i",
+      "en.srt",
+      "-map",
+      "0:v:0",
+      "-map",
+      "0:a?",
+      "-map",
+      "1:s:0",
+      "-map",
+      "2:s:0",
+      "-c:v",
+      "copy",
+      "-c:a",
+      "copy",
+      "-c:s",
+      "srt",
+      "-metadata:s:s:0",
+      "language=fra",
+      "-metadata:s:s:1",
+      "language=eng",
+      "-disposition:s:0",
+      "default",
+      "-disposition:s:1",
+      "0",
+      "multipiste.mkv"
+    ]
+  },
+  "outputs": {
+    "hardsub.mp4": {
+      "bytes": 21512,
+      "streams": [
+        {
+          "type": "video",
+          "codec": "h264",
+          "language": "und",
+          "default": 1
+        },
+        {
+          "type": "audio",
+          "codec": "aac",
+          "language": "jpn",
+          "default": 1
+        }
+      ]
+    },
+    "multipiste.mkv": {
+      "bytes": 39377,
+      "streams": [
+        {
+          "type": "video",
+          "codec": "h264",
+          "language": null,
+          "default": 1
+        },
+        {
+          "type": "audio",
+          "codec": "aac",
+          "language": "jpn",
+          "default": 1
+        },
+        {
+          "type": "audio",
+          "codec": "aac",
+          "language": "eng",
+          "default": 0
+        },
+        {
+          "type": "subtitle",
+          "codec": "subrip",
+          "language": "fra",
+          "default": 1
+        },
+        {
+          "type": "subtitle",
+          "codec": "subrip",
+          "language": "eng",
+          "default": 0
+        }
+      ]
+    }
+  },
+  "burned_pixels_confirmed": true
+}
