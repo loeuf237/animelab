@@ -15,6 +15,7 @@ import eu.kanade.tachiyomi.animesource.model.*
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
 import eu.kanade.tachiyomi.network.JavaScriptEngine
 import eu.kanade.tachiyomi.network.NetworkHelper
+import eu.kanade.tachiyomi.network.SourceGatewayException
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.Json
 import org.json.JSONArray
@@ -81,6 +82,12 @@ class ExtensionRuntimeService : Service() {
         require(result.toByteArray().size <= 700_000) { "Result exceeds IPC budget; request a smaller page" }
         result
     } catch (error: Throwable) {
+        val networkError = generateSequence(error) { it.cause }.take(12).filterIsInstance<SourceGatewayException>().firstOrNull()
+        if (networkError != null) {
+            val code = networkError.code.takeIf { it in setOf("verification_required","rate_limited","source_network_error") } ?: "source_network_error"
+            JSONObject().put("ok",false).put("code",code)
+                .apply { if (code=="verification_required") put("url",networkError.target) }.toString()
+        } else {
         val code = when (error) {
             is CancellationException -> "cancelled"
             is LinkageError -> "extension_abi_incompatible"
@@ -90,6 +97,7 @@ class ExtensionRuntimeService : Service() {
         }
         // Remote exceptions can contain URLs/credentials; export only a stable code/type.
         JSONObject().put("ok", false).put("code", code).put("type", error.javaClass.simpleName).toString()
+        }
     }
 
     private fun packageInfo(pkg: String): PackageInfo = packageManager.getPackageInfo(pkg,

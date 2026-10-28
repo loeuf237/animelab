@@ -27,6 +27,7 @@ internal object ExtensionPreferences {
     suspend fun describe(context: Context, source: AnimeSource): JSONArray = withContext(Dispatchers.Main) {
         val root = screen(context, source)
         JSONArray(collect(root).map { preference ->
+            val secret = preference is EditTextPreference && Regex("(?i)password|passwd|token|secret|api.?key|credential|cookie|authorization").containsMatchIn("${preference.key} ${preference.title}")
             val type = when (preference) {
                 is PreferenceGroup -> "group"
                 is TwoStatePreference -> "boolean"
@@ -43,7 +44,8 @@ internal object ExtensionPreferences {
                 else -> null
             }
             JSONObject().put("key", preference.key).put("title", preference.title?.toString())
-                .put("type", type).put("enabled", preference.isEnabled).put("value", value)
+                .put("type", type).put("enabled", preference.isEnabled).put("value", if(secret) "" else value)
+                .put("secret",secret).put("hasValue", secret && !preference.sharedPreferences?.getString(preference.key,"").isNullOrEmpty())
                 .put("entries", when (preference) {
                     is ListPreference -> JSONArray(preference.entries?.map { it.toString() } ?: emptyList<String>())
                     is MultiSelectListPreference -> JSONArray(preference.entries?.map { it.toString() } ?: emptyList<String>())

@@ -15,6 +15,8 @@ import org.json.JSONObject
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
+class SourceGatewayException(val code: String, val target: String) : IOException(code)
+
 /** Default source HTTP goes through the existing Python URL/session/proxy policy. */
 class NetworkHelper(context: Context) {
     val cookieJar = AndroidCookieJar()
@@ -45,7 +47,7 @@ class NetworkHelper(context: Context) {
                 output.toByteArray()
             }
             val response = JSONObject(String(bytes, Charsets.UTF_8))
-            if (response.has("error")) throw IOException(response.getString("error"))
+            if (response.has("error")) throw SourceGatewayException(response.getString("error"),response.optString("url",original.url.toString()))
             val headers = Headers.Builder()
             val pairs = response.optJSONArray("headers") ?: JSONArray()
             for (i in 0 until pairs.length()) {

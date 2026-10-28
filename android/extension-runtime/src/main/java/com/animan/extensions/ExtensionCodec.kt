@@ -19,17 +19,22 @@ internal object ExtensionCodec {
         url = value.getString("url"); title = value.optString("title", url)
         thumbnail_url = value.optString("thumbnail_url"); description = value.optString("description")
         genre = value.optString("genre"); status = value.optInt("status")
+        background_url = value.optString("background_url"); artist = value.optString("artist"); author = value.optString("author")
+        initialized = value.optBoolean("initialized"); season_number = value.optDouble("season_number", -1.0)
+        value.optString("fetch_type").takeIf { it.isNotEmpty() }?.let { fetch_type = FetchType.valueOf(it) }
         value.optJSONObject("memo")?.let { memo = Json.parseToJsonElement(it.toString()) as JsonObject }
     }
 
     fun episode(value: SEpisode): JSONObject = JSONObject().put("url", value.url).put("name", value.name)
         .put("episode_number", value.episode_number).put("date_upload", value.date_upload)
         .put("scanlator", value.scanlator).put("memo", JSONObject(value.memo.toString()))
+        .put("fillermark", value.fillermark).put("summary", value.summary).put("preview_url", value.preview_url)
 
     fun episode(value: JSONObject): SEpisode = SEpisode.create().apply {
         url = value.getString("url"); name = value.optString("name", url)
         episode_number = value.optDouble("episode_number", -1.0).toFloat()
         date_upload = value.optLong("date_upload"); scanlator = value.optString("scanlator")
+        fillermark = value.optBoolean("fillermark"); summary = value.optString("summary"); preview_url = value.optString("preview_url")
         value.optJSONObject("memo")?.let { memo = Json.parseToJsonElement(it.toString()) as JsonObject }
     }
 
@@ -56,8 +61,18 @@ internal object ExtensionCodec {
             val array = value.optJSONArray(key) ?: JSONArray()
             return (0 until array.length()).map { array.getJSONObject(it).let { Track(it.getString("url"), it.optString("lang")) } }
         }
+        fun args(key: String): List<Pair<String,String>> {
+            val array = value.optJSONArray(key) ?: JSONArray()
+            return (0 until array.length()).map { array.getJSONArray(it).let { it.getString(0) to it.getString(1) } }
+        }
+        val chapters = value.optJSONArray("timestamps") ?: JSONArray()
         return Video(videoUrl=value.optString("videoUrl"), videoTitle=value.optString("videoTitle"),
+            resolution=if(value.has("resolution")) value.getInt("resolution") else null,
+            bitrate=if(value.has("bitrate")) value.getInt("bitrate") else null,
             headers=headers.build(), preferred=value.optBoolean("preferred"), subtitleTracks=tracks("subtitleTracks"),
+            timestamps=(0 until chapters.length()).map { chapters.getJSONObject(it).let { row ->
+                TimeStamp(row.getDouble("start"),row.getDouble("end"),row.optString("name"),ChapterType.valueOf(row.optString("type","Other"))) } },
+            mpvArgs=args("mpvArgs"), ffmpegStreamArgs=args("ffmpegStreamArgs"), ffmpegVideoArgs=args("ffmpegVideoArgs"),
             audioTracks=tracks("audioTracks"), internalData=value.optString("internalData"),
             initialized=value.optBoolean("initialized"),
             memo=value.optJSONObject("memo")?.let { Json.parseToJsonElement(it.toString()) as JsonObject } ?: JsonObject(emptyMap()))
