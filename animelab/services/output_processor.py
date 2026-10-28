@@ -522,7 +522,9 @@ class OutputProcessor:
                              f'-metadata:s:a:{index}', 'title=' + track.label,
                              f'-disposition:a:{index}', '+'.join(flag for flag, active in [('default', track.default), ('forced', track.forced)] if active) or '0']
                 if profile.mode == 'MKV_SOFT':
-                    args += ['-c:v', 'copy', '-c:a', 'copy', '-c:s', 'copy']
+                    # FFmpeg 4.4 defaults to inferring FlagDefault for the first
+                    # track of each kind, even after an explicit disposition=0.
+                    args += ['-default_mode', 'passthrough', '-c:v', 'copy', '-c:a', 'copy', '-c:s', 'copy']
                     for index, ((track, path), mapping) in enumerate(zip(subs, sub_maps)):
                         args += ['-map', mapping, f'-metadata:s:s:{index}', 'language=' + subtitle_language(track.lang),
                                  f'-metadata:s:s:{index}', 'title=' + track.label,

@@ -326,8 +326,15 @@ def test_profile_cannot_disable_strict_processing():
 
 
 @pytest.mark.asyncio
-async def test_mkv_subtitle_offset_is_preserved_in_packets(output_case):
+async def test_mkv_subtitle_offset_is_preserved_in_packets(output_case, monkeypatch):
     manager, task, files, requests = output_case
+    run = manager.media_pipeline._run_media
+    def legacy_default_mode(task, args, **kwargs):
+        # Reproduce FFmpeg 4.4's default on modern development machines too.
+        if str(args[-1]).endswith('.mkv') and '-default_mode' not in args:
+            args = [*args[:-1], '-default_mode', 'infer', args[-1]]
+        return run(task, args, **kwargs)
+    monkeypatch.setattr(manager.media_pipeline, '_run_media', legacy_default_mode)
     inventory = manager.media_pipeline.output_processor.inventory(task)[0]
     audio = next(t for t in inventory if t.kind == 'audio')
     sub = next(t for t in inventory if t.kind == 'subtitle' and t.remote is None)
@@ -335,6 +342,8 @@ async def test_mkv_subtitle_offset_is_preserved_in_packets(output_case):
         {'trackId': audio.id, 'default': True}, {'trackId': sub.id, 'offsetSeconds': .6, 'forced': True}]})
     await manager._finalize_task(task)
     assert task.status == DownloadStatus.COMPLETED, task.error
+    subtitle = next(s for s in probe(task.savePath)['streams'] if s['codec_type'] == 'subtitle')
+    assert not subtitle['disposition']['default'] and subtitle['disposition']['forced']
     packets = json.loads(subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 's', '-show_packets', '-of', 'json', task.savePath],
                                        check=True, capture_output=True, text=True).stdout)['packets']
     assert abs(float(packets[0]['pts_time']) - .6) < .04

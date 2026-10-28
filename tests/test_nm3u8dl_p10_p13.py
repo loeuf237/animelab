@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -44,8 +45,17 @@ async def test_rewrites_all_supported_references_to_verified_local_files(tmp_pat
         if name.endswith('.m3u8'):assert b'https://' not in data and b'file://' not in data
     if case=='fmp4':
         text=(r.directory/entry).read_text()
-        assert '#EXT-X-BYTERANGE:10511@0' in text
-        assert any(req.headers.get('range')=='bytes=1354-11864' for req in corpus.calls)
+        # Encoded byte counts depend on the FFmpeg/codec version. Validate the
+        # actual fixture range, its HTTP request and the exact relayed bytes.
+        original=(corpus.root/'fmp4/index.m3u8').read_text()
+        match=re.search(r'#EXT-X-BYTERANGE:(\d+)@(\d+)\n([^\n]+)',original)
+        assert match is not None
+        length,offset=int(match[1]),int(match[2])
+        segment=re.search(rf'#EXT-X-BYTERANGE:{length}@0\n([^\n]+)',text)
+        assert segment is not None
+        assert any(req.headers.get('range')==f'bytes={offset}-{offset+length-1}' for req in corpus.calls)
+        expected=(corpus.root/'fmp4'/match[3]).read_bytes()[offset:offset+length]
+        assert (r.directory/segment[1]).read_bytes()==expected
     if case=='dash':
         root=ET.fromstring((r.directory/entry).read_bytes())
         templates=[item for item in root.iter() if item.tag.endswith('SegmentTemplate')]
