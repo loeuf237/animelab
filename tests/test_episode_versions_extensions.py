@@ -128,7 +128,8 @@ async def test_repository_refresh_preserves_installed_recipe_and_retires_stale(i
     rows[:] = [{**rows[0], 'version':'2'}]
     await service.import_repository('https://repo.example/index.min.json')
     visible = service.get_visible_extensions()
-    assert len(visible) == 1
+    assert len(visible) == 2
+    assert next(row for row in visible if row['pkg']=='ext.beta')['catalog_state'] == 'retired'
     # A13 stores the regenerated effective recipe as a new revision after invalidation.
     assert json.loads(visible[0]['recipe_json'])['schema_version'] == 1
     assert service.recipe_history(visible[0]['id'])['revisions']

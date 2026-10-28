@@ -24,14 +24,14 @@ android {
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
-    sourceSets["main"].assets.srcDir(fixtures)
+    sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/fixture-assets"))
     sourceSets["main"].java.srcDir(layout.buildDirectory.dir("generated/package-installer"))
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
 }
-tasks.named("preBuild").configure { dependsOn(installerSource) }
+tasks.named("preBuild").configure { dependsOn(installerSource, fixtures) }
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 dependencies {
     implementation(project(":extension-runtime"))
