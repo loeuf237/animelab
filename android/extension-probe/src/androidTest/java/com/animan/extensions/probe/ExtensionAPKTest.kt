@@ -49,7 +49,8 @@ class ExtensionAPKTest {
                 assertTrue(latch.await(20,TimeUnit.SECONDS))
                 val proofs=JSONArray()
                 for (api in 12..17) {
-                    val asset=context.assets.list("")!!.single { it.endsWith("api$api-debug.apk") }
+                    val assets=context.assets.list("")!!.toList()
+                    val asset=requireNotNull(assets.singleOrNull { it.endsWith("api$api-debug.apk") }) { "Missing fixture api$api; assets=$assets" }
                     val apk=File(context.cacheDir,asset)
                     context.assets.open(asset).use { input -> apk.outputStream().use(input::copyTo) }
                     val pkg="eu.kanade.tachiyomi.animeextension.all.animelabfixture.api$api"
@@ -68,7 +69,7 @@ class ExtensionAPKTest {
                     assertEquals("PackageInstaller state for $pkg", "installed",state)
                     fun discovered(): JSONObject {
                         val packages=decoded(runtime.discover()) as JSONArray
-                        return (0 until packages.length()).map { packages.getJSONObject(it) }.single { it.getString("pkg")==pkg }
+                        return requireNotNull((0 until packages.length()).map { packages.getJSONObject(it) }.singleOrNull { it.getString("pkg")==pkg }) { "Installed $pkg absent from discovery: $packages" }
                     }
                     var descriptor=discovered()
                     assertEquals("untrusted",descriptor.getString("state"))
