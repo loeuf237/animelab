@@ -4,6 +4,8 @@ from contextlib import closing
 import os
 from pathlib import Path
 import sqlite3
+import subprocess
+import sys
 import time
 from urllib.request import ProxyHandler, build_opener
 
@@ -237,6 +239,55 @@ def qt_app():
     pytest.importorskip('PySide6.QtWidgets')
     from animelab.desktop.launcher_widgets import application
     return application()
+
+
+def test_closing_configuration_process_keeps_real_server_available(tmp_path, monkeypatch):
+    pytest.importorskip('PySide6.QtWidgets')
+    monkeypatch.setenv('HOME', str(tmp_path))
+    monkeypatch.setenv('USERPROFILE', str(tmp_path))
+    monkeypatch.setenv('ANIMAN_DB_PATH', str(tmp_path / 'library.sqlite3'))
+    monkeypatch.setenv('ANIMAN_CACHE_DIR', str(tmp_path / 'cache'))
+    monkeypatch.setenv('ANIMAN_STARTUP_REFRESH', 'false')
+    monkeypatch.setenv('QT_QPA_PLATFORM', 'offscreen')
+    directory = tmp_path / '.animan/desktop'
+    directory.mkdir(parents=True)
+    model = LauncherModel(directory)
+    model.save(normalize_config({'port': choose_port(0), 'browser': True,
+        'launcher': {'openUi': False, 'downloadDir': str(tmp_path / 'downloads')}}))
+    script = '''
+from pathlib import Path
+from PySide6.QtCore import QTimer
+from animelab.desktop.launcher import NativeLauncher
+from animelab.desktop.launcher_widgets import application
+app = application()
+ui = NativeLauncher(Path.home() / '.animan/desktop')
+ui.show()
+ui.launch()
+def close_when_ready():
+    if not ui.busy and ui.model.status().get('ready'):
+        ui.close()
+    else:
+        QTimer.singleShot(100, close_when_ready)
+QTimer.singleShot(100, close_when_ready)
+app.exec()
+'''
+    try:
+        subprocess.run([sys.executable, '-c', script], cwd=Path(__file__).resolve().parents[1],
+                       capture_output=True, text=True, check=True, timeout=75)
+        # Probe beyond the worker's parent-watch failure threshold, after the
+        # configuration process (and its QApplication) has fully exited.
+        deadline = time.monotonic() + 4
+        while True:
+            state = model.status()
+            assert state['running'] and state['ready']
+            with build_opener(ProxyHandler({})).open(f"http://127.0.0.1:{state['port']}/openapi.json", timeout=5) as response:
+                assert response.status == 200
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(.2)
+    finally:
+        model.stop()
+    assert not model.status()['running']
 
 
 @pytest.mark.parametrize('language', ['fr', 'en'])

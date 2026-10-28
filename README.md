@@ -28,6 +28,51 @@ Android device coverage remains **beta**. The [0.1.4 release notes](docs/release
 
 In supporting browsers, install the web interface as a PWA using the browser's install or **Add to Home Screen** option. The AnimeLab server must remain available.
 
+## Start the desktop application
+
+**If your folder contains `desktop.py`, `pyproject.toml` and an `animelab/` directory, you have the source code.** Open a terminal in that folder and run:
+
+```bash
+uv run --locked --group desktop python desktop.py
+```
+
+This command works on Linux and Windows and installs the locked desktop dependencies if needed. The `animelab/` directory is the Python package, not an executable. See [Run from source](#run-from-source) for prerequisites and the frontend build required before starting the engine.
+
+On Linux, you can also run **`./launcher.sh`** from the repository root. The script opens the launcher, installs the locked desktop Python dependencies if needed, and builds the frontend if it is missing (requires Node.js/npm). Run `./launcher.sh --help` for startup, status, shutdown and launcher self-test options.
+
+The following Linux and Windows instructions apply to **downloaded release archives**, which contain an `AnimeLab` executable or `AnimeLab.exe`.
+
+Download the package for your platform from [GitHub Releases](https://github.com/loeuf237/animelab/releases) and **extract the entire archive**. Keep the executable beside its bundled files and folders. These packages include their Python dependencies and compiled interface; you do not need to install Python, Node.js or uv.
+
+### Linux
+
+Extract the Linux x64 TAR.GZ archive, then open a terminal in the extracted folder containing `AnimeLab` and run:
+
+```bash
+chmod +x AnimeLab
+./AnimeLab
+```
+
+Linux builds require glibc 2.35 or newer (for example, Ubuntu 22.04 or newer).
+
+### Windows
+
+Extract the Windows x64 ZIP archive and double-click **`AnimeLab.exe`** inside the extracted folder. Alternatively, open PowerShell in that folder and run:
+
+```powershell
+.\AnimeLab.exe
+```
+
+### Use the launcher
+
+The launcher opens first. Choose your interface, port and download folder, then click **Launch** to start the engine and open the application. Choose browser mode to use your installed browser; an embedded native window requires the platform's WebView libraries.
+
+Use the application address shown by the launcher. If the requested port is occupied, AnimeLab selects a free port, so the address may differ from `http://localhost:8080/`.
+
+Closing the configuration window leaves a started server running. Use **Stop** to stop it. To reopen the launcher, run `./AnimeLab --admin` on Linux or `.\AnimeLab.exe --admin` in Windows PowerShell. Use `--launch` instead to start directly with your saved preferences.
+
+For a source checkout, follow [Run from source](#run-from-source) below, including the frontend build and desktop dependency installation. See [desktop tools and recovery](docs/desktop-distribution.md) for troubleshooting and additional commands.
+
 ## Main features
 
 - **Browse and search:** built-in French-Manga, VoirAnime and AnimePahe sources, plus supported imported sources. Latest releases, popular titles, genres and tags depend on each source's capabilities.
@@ -77,23 +122,43 @@ uv sync --locked
 
 uv selects Python 3.13 from `.python-version` and downloads it if necessary. No virtual-environment activation is needed; the same commands work in PowerShell.
 
-Install dependencies, build the interface and start the server:
+Install dependencies and build the interface:
 
 ```bash
 cd frontend
 npm ci
 npm run build
 cd ..
+```
+
+Then choose how to start the application from the repository root. Rebuild the interface after changing its source files.
+
+### Desktop launcher (Linux and Windows)
+
+Install the desktop dependencies and open the launcher. These commands work in a Linux terminal and Windows PowerShell:
+
+```bash
+uv sync --locked --group desktop
+uv run --locked --group desktop python desktop.py
+```
+
+Choose your settings and click **Launch**. Browser mode uses your installed browser. For an embedded native window, see the platform's WebView prerequisites in [desktop package details](docs/desktop-distribution.md).
+
+### Web server
+
+To start the server directly:
+
+```bash
 uv run --locked python run.py
 ```
 
-Open **[http://localhost:8080/app/](http://localhost:8080/app/)**. Rebuild the interface after changing its source files.
+Open **[http://localhost:8080/app/](http://localhost:8080/app/)**.
 
 Vue is the only web frontend. Old bookmarks (`/downloads`, `/settings`, `/anime`,
 `/search`, etc.) redirect to the corresponding SPA screen, preserving their query
 parameters. The former Jinja pages, scripts and styles are no longer shipped.
 
-For a native desktop window, use the separate desktop packaging dependencies and the platform's WebView libraries. See [desktop package details](docs/desktop-distribution.md) for setup and compatibility. The default locked environment runs the web server; it does not install native desktop or Android build dependencies.
+The default locked environment runs the web server; it does not install native desktop or Android build dependencies.
 
 ### Configuration and data
 
