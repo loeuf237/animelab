@@ -13,6 +13,7 @@ from animelab.services.download_manager import download_manager
 from animelab.services.proxy_service import proxy_service
 from animelab.services.voiranime_service import voiranime_service
 from animelab import platform_events
+from animelab.services.output_profiles import OutputProfile
 
 logger = logging.getLogger("animelab.router.download")
 router = APIRouter(route_class=ContractRoute)
@@ -24,6 +25,11 @@ async def start_download(request: Request):
     if storage is not None and not storage.get("authorized"):
         return JSONResponse(status_code=409, content={"error": "Storage access unavailable; authorize a folder in Settings > Storage", "code": "storage_permission_required"})
     body = await request.json()
+    from animelab.services.output_profiles import snapshot, require_available
+    try:
+        require_available(snapshot(body.get('outputProfile'), legacy_subtitles=body.get('downloadSubtitles', False)))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
     anime_name = body.get("animeName", "Unknown")
     episode_number = int(body.get("episodeNumber", 0))
     url = body.get("url", "").strip()
@@ -85,6 +91,7 @@ async def start_download(request: Request):
         source=source,
         version=version,
         anime_url=body.get("animeUrl") or "",
+        output_profile=body.get('outputProfile'),
     )
 
     msg = (
@@ -108,6 +115,12 @@ async def set_global_speed_limit(request: Request):
 @router.post("/api/download/batch")
 async def start_batch_download(request: Request):
     body = await request.json()
+    from animelab.services.output_profiles import snapshot, require_available
+    try:
+        for episode in body.get('episodes', []):
+            require_available(snapshot(episode.get('outputProfile'), legacy_subtitles=episode.get('downloadSubtitles', False)))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
     anime_name = body.get("animeName", "Unknown")
     source = body.get("source", "french-manga")
     episodes = body.get("episodes", [])
@@ -144,6 +157,39 @@ async def start_batch_download(request: Request):
         "count": len(tasks),
         "message": f"{len(tasks)} téléchargement(s) démarré(s)"
     }
+
+
+@router.get('/api/download/output-profiles')
+async def get_output_profiles():
+    from animelab.services.output_profiles import available_profiles
+    return await asyncio.to_thread(available_profiles)
+
+
+@router.get('/api/download/media-capabilities')
+async def get_media_capabilities():
+    from animelab import media_tools
+    return await asyncio.to_thread(media_tools.capabilities)
+
+
+@router.get('/api/download/{task_id}/media-inventory')
+async def get_output_inventory(task_id: str):
+    try:
+        return await download_manager.output_inventory(task_id)
+    except KeyError as exc:
+        raise HTTPException(404, 'Tâche introuvable') from exc
+    except (ValueError, OSError) as exc:
+        raise HTTPException(409, str(exc)) from exc
+
+
+@router.post('/api/download/{task_id}/output')
+async def reprocess_output(task_id: str, profile: OutputProfile):
+    try:
+        task = await download_manager.reprocess_output(task_id, profile.model_dump())
+        return {'success': True, 'taskId': task.id}
+    except KeyError as exc:
+        raise HTTPException(404, 'Tâche introuvable') from exc
+    except (ValueError, OSError) as exc:
+        raise HTTPException(422, str(exc)) from exc
 
 @router.delete("/api/download/{task_id}")
 async def cancel_download(task_id: str, remove: bool = False):

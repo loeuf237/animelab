@@ -1,0 +1,48 @@
+@startuml
+!include theme.iuml
+title Architecture cible — responsabilités séparées
+top to bottom direction
+component "Vue / API\nchoix pistes + mode de sortie" as UI
+component "DownloadCoordinator\nétat, budget, autorisation" as C
+component "SourceResolver\nextensions + extracteurs + yt-dlp" as R
+component "SubtitleCoordinator\npistes source / manifeste / sites / import" as S
+component "TransferPlanner\nchoix selon capacités et protocole" as P
+package "Backends derrière un même contrat" {
+ component "HttpRangeBackend\nMP4 / fichiers directs" as H #F5F3FF
+ component "NativeHlsBackend\nAndroid et repli contrôlé" as N #F5F3FF
+ component "Nm3u8Backend\nHLS / DASH VOD validés" as RE
+}
+component "ManifestRelay (à développer)\nURL locales avec capacité par tâche\nréécriture + SourceHTTP + politiques" as Relay
+component "SourceHTTPService\ntransport et session du compte" as HTTP #F5F3FF
+component "OutputProcessor\nFFmpeg : mux OU burn-in" as O
+component "IntegrityVerifier\nffprobe + vérification de pistes" as V
+database "TaskRepository\nétat / checkpoint / artefacts" as DB
+UI --> C
+C --> R
+R --> P : ResolvedMedia
+R --> HTTP : extraction
+C --> S
+C --> P
+P --> H
+P --> N
+P --> RE
+H --> O
+N --> O
+RE --> O
+S --> O : fichiers de sous-titres
+RE --> Relay : manifestes / fragments locaux
+Relay --> HTTP : ressources originales
+O --> V
+V --> DB : publication atomique
+C --> DB
+note bottom of RE
+Ne remplace ni l’extraction de pages
+ni FFmpeg ni les fournisseurs de sous-titres.
+end note
+note bottom of Relay
+Un proxy HTTPS CONNECT ne réutilise pas,
+à lui seul, l’empreinte TLS de curl_cffi.
+Le relais reste un chantier à valider.
+end note
+
+@enduml

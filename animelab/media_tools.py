@@ -21,13 +21,36 @@ def is_native():
     return _native_media is not None
 
 
+def native_hardsub_status():
+    """Only a successful JNI render probe can enable Android hardsub."""
+    unavailable = dict(available=False, reason='Le hardsub Android reste à valider : pont JNI ou libass/libx264 indisponible')
+    if not is_native() or not hasattr(_native_media, 'probeHardsub'):
+        return unavailable
+    import tempfile
+    try:
+        with tempfile.TemporaryDirectory(prefix='animelab-p14-') as directory:
+            status = json.loads(str(_native_media.probeHardsub(directory)))
+        if status.get('available') is True and status.get('renderVerified') is True:
+            font = Path(status.get('fontPath', ''))
+            if font.is_file() and font.is_absolute():
+                return dict(available=True, reason='', fontPath=str(font))
+        return dict(available=False, reason='Le hardsub Android reste à valider : essai JNI de rendu non réussi')
+    except (OSError, ValueError, RuntimeError, TypeError):
+        return unavailable
+
+
 def which(name):
     if name not in ("ffmpeg", "ffprobe"):
         raise ValueError("Unsupported media tool")
     return name if is_native() else shutil.which(name)
 
 
-def run(args, *, capture_output=True, text=True, timeout=30, check=False, cwd=None):
+def run(args, *, capture_output=True, text=True, timeout=30, check=False, cwd=None, cancel=None, on_event=None):
+    if cancel is not None or on_event is not None:
+        from animelab.services.media_execution import run_process, run_native
+        kwargs = dict(timeout=timeout, cancel=cancel or (lambda: False),
+                      emit=on_event or (lambda event: None), text=text, check=check, cwd=cwd)
+        return run_native(_native_media, args, **kwargs) if is_native() else run_process(args, **kwargs)
     if not is_native():
         kwargs = dict(capture_output=capture_output, text=text, timeout=timeout, check=check)
         if cwd is not None:
@@ -42,6 +65,22 @@ def run(args, *, capture_output=True, text=True, timeout=30, check=False, cwd=No
     result = subprocess.CompletedProcess(args, payload["returncode"], payload.get("stdout", ""), payload.get("stderr", ""))
     if check:
         result.check_returncode()
+    return result
+
+
+def capabilities():
+    """Probe actual tools, not package names or assumed platform features."""
+    result = {'native': is_native(), 'ffmpeg': bool(which('ffmpeg')), 'ffprobe': bool(which('ffprobe')),
+              'filters': [], 'encoders': [], 'error': None}
+    if not result['ffmpeg']:
+        return result
+    import re
+    try:
+        for key, flag in (('filters', '-filters'), ('encoders', '-encoders')):
+            response = run([which('ffmpeg'), '-hide_banner', flag], timeout=15, check=True)
+            result[key] = sorted(set(re.findall(r'^\s*[A-Z.]{2,6}\s+([a-zA-Z0-9_]+)\s', response.stdout, re.M)))
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
+        result['error'] = 'Impossible de détecter les capacités des outils média'
     return result
 
 

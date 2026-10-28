@@ -1,3 +1,13 @@
+import type {
+  SubtitleProviderStatus,
+  SubtitleSearchQuery,
+  SubtitleSearchResult,
+  SubtitleImport,
+  SubtitleProvider,
+  SubtitleSyncCapabilities,
+  SubtitleTimingCorrection,
+} from '@/types/subtitles'
+import type { OutputProfile, OutputProfileCapability, OutputInventory } from '@/types'
 import type { PlaybackOpen, PlaybackState, PlaybackCheckpoint, RecipeRevision } from '@/types/api'
 import type {
   ErrorResponse,
@@ -376,6 +386,138 @@ export const api = {
   },
 
   // --- Downloads ---
+  async getOutputProfiles(): Promise<OutputProfileCapability[]> {
+    return request('/api/download/output-profiles')
+  },
+  async getSubtitleContext(taskId: string | number): Promise<{
+    query: string
+    season: number | null
+    episode: number
+    provider: SubtitleProviderStatus
+    providers?: Partial<Record<SubtitleProvider, SubtitleProviderStatus>>
+    video?: { fps: number | null; duration: number | null }
+  }> {
+    return request(`/api/download/${encodeURIComponent(taskId)}/subtitles/context`)
+  },
+  async configureSubtitleProvider(
+    credentials: {
+      apiKey?: string
+      username: string
+      password: string
+      remember: boolean
+    },
+    provider: SubtitleProvider = 'opensubtitles',
+  ): Promise<SubtitleProviderStatus> {
+    return request(
+      '/api/download/subtitle-provider' + (provider === 'subdl' ? '?provider=subdl' : ''),
+      {
+        method: 'PUT',
+        body: JSON.stringify(credentials),
+      },
+    )
+  },
+  async forgetSubtitleProvider(
+    provider: SubtitleProvider = 'opensubtitles',
+  ): Promise<SubtitleProviderStatus> {
+    return request(
+      '/api/download/subtitle-provider' + (provider === 'subdl' ? '?provider=subdl' : ''),
+      { method: 'DELETE' },
+    )
+  },
+  async searchSubtitles(
+    taskId: string | number,
+    query: SubtitleSearchQuery,
+  ): Promise<{
+    results: SubtitleSearchResult[]
+    page: number
+    totalPages: number
+    provider: SubtitleProviderStatus
+    providers?: Partial<Record<SubtitleProvider, SubtitleProviderStatus>>
+    errors?: { provider: SubtitleProvider; message: string }[]
+  }> {
+    return request(`/api/download/${encodeURIComponent(taskId)}/subtitles/search`, {
+      method: 'POST',
+      body: JSON.stringify(query),
+    })
+  },
+  async uploadSubtitles(
+    taskId: string | number,
+    file: File,
+    encoding: string,
+  ): Promise<SubtitleImport> {
+    return request(
+      `/api/download/${encodeURIComponent(taskId)}/subtitles/import?filename=${encodeURIComponent(file.name)}&encoding=${encodeURIComponent(encoding)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: await file.arrayBuffer(),
+      },
+    )
+  },
+  async previewProviderSubtitle(
+    taskId: string | number,
+    resultId: string,
+  ): Promise<SubtitleImport> {
+    return request(`/api/download/${encodeURIComponent(taskId)}/subtitles/provider-preview`, {
+      method: 'POST',
+      body: JSON.stringify({ resultId }),
+    })
+  },
+  async attachSubtitle(
+    taskId: string | number,
+    selection: {
+      importId: string
+      entryId: string
+      language: string
+      label: string
+      confirmedEpisode: boolean
+    },
+  ): Promise<{ trackId: string; duplicate: boolean }> {
+    return request(`/api/download/${encodeURIComponent(taskId)}/subtitles/attach`, {
+      method: 'POST',
+      body: JSON.stringify(selection),
+    })
+  },
+  async getOutputInventory(taskId: string | number): Promise<OutputInventory> {
+    return request(`/api/download/${encodeURIComponent(taskId)}/media-inventory`)
+  },
+  async getSubtitleSyncCapabilities(): Promise<SubtitleSyncCapabilities> {
+    return request('/api/download/subtitle-sync-capabilities')
+  },
+  async getSubtitleImport(taskId: string | number, importId: string): Promise<SubtitleImport> {
+    return request(
+      `/api/download/${encodeURIComponent(taskId)}/subtitles/imports/${encodeURIComponent(importId)}`,
+    )
+  },
+  async correctSubtitle(
+    taskId: string | number,
+    body: SubtitleTimingCorrection,
+  ): Promise<SubtitleImport> {
+    return request(`/api/download/${encodeURIComponent(taskId)}/subtitles/transform`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
+  },
+  async cancelSubtitleSync(taskId: string | number): Promise<{ cancelled: boolean }> {
+    return request(`/api/download/${encodeURIComponent(taskId)}/subtitles/cancel-sync`, {
+      method: 'POST',
+    })
+  },
+  async restoreSubtitle(taskId: string | number, trackId: string): Promise<{ trackId: string }> {
+    return request(
+      `/api/download/${encodeURIComponent(taskId)}/subtitles/tracks/${encodeURIComponent(trackId)}/restore`,
+      { method: 'POST' },
+    )
+  },
+  async reprocessOutput(
+    taskId: string | number,
+    profile: OutputProfile,
+  ): Promise<{ success: boolean }> {
+    return request(`/api/download/${encodeURIComponent(taskId)}/output`, {
+      method: 'POST',
+      body: JSON.stringify(profile),
+    })
+  },
   async getDownloadTasks(): Promise<DownloadTask[]> {
     return request<DownloadTask[]>('/api/download/status')
   },
@@ -389,6 +531,7 @@ export const api = {
     fileName?: string
     subtitleUrl?: string
     downloadSubtitles?: boolean
+    outputProfile?: OutputProfile
     source?: string
     selectedServer?: string
     selectedQuality?: string
@@ -406,6 +549,7 @@ export const api = {
         fileName: payload.fileName,
         subtitleUrl: payload.subtitleUrl,
         downloadSubtitles: Boolean(payload.downloadSubtitles),
+        outputProfile: payload.outputProfile,
         source: payload.source || 'french-manga',
         selectedServer: payload.selectedServer,
         selectedQuality: payload.selectedQuality,
@@ -427,6 +571,7 @@ export const api = {
       fileName?: string
       subtitleUrl?: string
       downloadSubtitles?: boolean
+      outputProfile?: OutputProfile
     }[]
     preferredServer?: string
     preferredQuality?: string

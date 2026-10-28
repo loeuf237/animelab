@@ -178,6 +178,37 @@ def extension_update_source_url(conn):
         conn.exec_driver_sql('ALTER TABLE imported_extensions ADD COLUMN available_base_url TEXT')
 
 
+def media_profiles(conn):
+    columns = {row[1] for row in conn.exec_driver_sql('PRAGMA table_info(download_tasks)')}
+    for name, default in (('mediaJson', '{}'), ('outputProfileJson', '')):
+        if name not in columns:
+            conn.exec_driver_sql(f"ALTER TABLE download_tasks ADD COLUMN {name} TEXT NOT NULL DEFAULT '{default}'")
+    # Keep legacy JSON/status/files intact; snapshots are derived on load and
+    # written on the next normal save, never by rewriting completed downloads.
+    conn.exec_driver_sql('CREATE TABLE IF NOT EXISTS media_track ('
+        'task_id TEXT NOT NULL REFERENCES download_tasks(id) ON DELETE CASCADE, '
+        'track_id TEXT NOT NULL, kind TEXT NOT NULL, metadata_json TEXT NOT NULL, '
+        'PRIMARY KEY(task_id,track_id))')
+    conn.exec_driver_sql('CREATE TABLE IF NOT EXISTS task_track_selection ('
+        'task_id TEXT NOT NULL REFERENCES download_tasks(id) ON DELETE CASCADE, '
+        'track_id TEXT NOT NULL, selection_json TEXT NOT NULL, PRIMARY KEY(task_id,track_id))')
+    conn.exec_driver_sql('CREATE TABLE IF NOT EXISTS subtitle_asset ('
+        'id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES download_tasks(id) ON DELETE CASCADE, '
+        'track_id TEXT NOT NULL, path TEXT NOT NULL, fingerprint TEXT, provider TEXT)')
+    conn.exec_driver_sql('CREATE TABLE IF NOT EXISTS transfer_attempt ('
+        'id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES download_tasks(id) ON DELETE CASCADE, '
+        'backend TEXT NOT NULL, version TEXT NOT NULL, representation TEXT NOT NULL, '
+        'status TEXT NOT NULL, checkpoint_json TEXT NOT NULL DEFAULT \'{}\')')
+    conn.exec_driver_sql('CREATE TABLE IF NOT EXISTS output_artifact ('
+        'id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES download_tasks(id) ON DELETE CASCADE, '
+        'path TEXT NOT NULL, profile_json TEXT NOT NULL, verified INTEGER NOT NULL DEFAULT 0)')
+
+
+def subtitle_provider_secrets(conn):
+    conn.exec_driver_sql('CREATE TABLE IF NOT EXISTS subtitle_provider_secret ('
+                         'provider TEXT PRIMARY KEY, payload TEXT NOT NULL)')
+
+
 MIGRATIONS = (
     Migration(1, 'core_tables', bootstrap),
     Migration(2, 'download_identity_and_verification', download_identity),
@@ -188,6 +219,8 @@ MIGRATIONS = (
     Migration(7, 'persistent_download_preferences', download_preferences),
     Migration(8, 'extension_update_management', extension_update_management),
     Migration(9, 'extension_update_source_url', extension_update_source_url),
+    Migration(10, 'media_tracks_and_output_profiles', media_profiles),
+    Migration(11, 'encrypted_subtitle_provider_credentials', subtitle_provider_secrets),
 )
 
 
@@ -195,6 +228,8 @@ def migrate(engine: Engine, migrations: Sequence[Migration] = MIGRATIONS) -> Non
     versions = [m.version for m in migrations]
     if versions != list(range(1, len(versions) + 1)):
         raise ValueError('Migration versions must be consecutive and start at 1')
+    if 10 in versions:
+        backup_before_media_upgrade(engine)
     with engine.connect() as conn:
         try:
             # Explicit BEGIN is necessary: pysqlite otherwise auto-commits DDL.
@@ -218,3 +253,40 @@ def migrate(engine: Engine, migrations: Sequence[Migration] = MIGRATIONS) -> Non
         except BaseException:
             conn.rollback()
             raise
+
+
+def backup_before_media_upgrade(engine: Engine) -> None:
+    """SQLite backup includes WAL; never copy a live database file with shutil."""
+    import os
+    from pathlib import Path
+    import sqlite3
+    import tempfile
+    name = engine.url.database
+    if not name or name == ':memory:' or not Path(name).is_file():
+        return
+    with sqlite3.connect(name) as source:
+        history = source.execute("SELECT name FROM sqlite_master WHERE name='schema_migrations'").fetchone()
+        if not history:
+            # Bootstrap upgrades old unversioned libraries too.
+            if not source.execute("SELECT name FROM sqlite_master WHERE name='download_tasks'").fetchone():
+                return
+        elif source.execute('SELECT COALESCE(MAX(version),0) FROM schema_migrations').fetchone()[0] >= 10:
+            return
+        if list(Path(name).parent.glob(Path(name).name + '.before-media-v10*.sqlite3')):
+            return  # A previous, published backup must never be overwritten.
+        descriptor, temporary = tempfile.mkstemp(prefix='.media-v10-backup-', dir=Path(name).parent)
+        os.close(descriptor)
+        try:
+            with sqlite3.connect(temporary) as target:
+                source.backup(target)
+                if target.execute('PRAGMA quick_check').fetchone()[0] != 'ok':
+                    raise RuntimeError('Media migration backup failed integrity check')
+            # Publish a unique completed snapshot atomically. Concurrent startups
+            # can create distinct backups; neither observes a half-written file.
+            import uuid
+            destination = Path(name + '.before-media-v10.' + uuid.uuid4().hex + '.sqlite3')
+            with open(temporary, 'rb') as complete:
+                os.fsync(complete.fileno())
+            Path(temporary).replace(destination)
+        finally:
+            Path(temporary).unlink(missing_ok=True)

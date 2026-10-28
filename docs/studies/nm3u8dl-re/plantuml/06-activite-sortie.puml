@@ -1,0 +1,39 @@
+@startuml
+!include theme.iuml
+title Activité proposée — choisir le transfert et la sortie
+start
+:Résoudre média et pistes,\nvérifier session et permissions;
+if (Fichier HTTP direct ?) then (oui)
+ :HttpRangeBackend, reprise .part actuelle;
+else (manifeste)
+ if (Moteur N validé ici et relais disponible ?) then (oui)
+  :Nm3u8Backend, HLS / DASH VOD;
+ else (non)
+  if (HLS supporté par le moteur natif ?) then (oui)
+   :NativeHlsBackend;
+  else (non)
+   :Expliquer le format / moteur indisponible;
+   stop
+  endif
+ endif
+endif
+:Obtenir vidéo, audio et pistes sélectionnées;
+:Valider les sous-titres et la synchronisation;
+if (Mode hardsub MP4 ?) then (oui)
+ if (Filtre libass et encodeur disponibles ?) then (oui)
+  :Choisir UNE langue de texte\net UN audio, rendre le texte;
+  :Réencoder vidéo H.264 et audio AAC si besoin,\naucune piste de sous-titres séparée;
+ else (non)
+  :Proposer MKV ou fichier annexe,\nne pas changer le mode silencieusement;
+  stop
+ endif
+else (MKV / annexe)
+ if (Mode MKV multipiste ?) then (oui)
+  :Conserver vidéos / audios compatibles,\najouter langues, titres, défaut / forcé et polices ASS;
+ else (annexe)
+  :Conserver vidéo et fichiers de sous-titres séparés;
+ endif
+endif
+:Valider pistes, durée et lecture,\npublier / exporter atomiquement;
+stop
+@enduml

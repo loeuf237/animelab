@@ -19,6 +19,7 @@ import xml.sax.saxutils as saxutils
 from datetime import datetime, timezone
 from collections import Counter
 from pathlib import Path
+from urllib.parse import urlparse
 
 import httpx
 
@@ -40,7 +41,10 @@ class MediaPipeline:
         self.manager = manager
         self.locks = {}
         self.jobs = {}
-        self.budget = StageBudget(settings.MAX_MEDIA_WORKERS)
+        self.budget = StageBudget(1 if media_tools.is_native() else settings.MAX_MEDIA_WORKERS)
+        from animelab.services.output_processor import OutputProcessor
+        self.output_processor = OutputProcessor(self)
+        self.inventory_budget = asyncio.Semaphore(2)
 
     async def _finalize_task(self, task: DownloadTask, verification=None):
         ctx = self.manager
@@ -52,6 +56,8 @@ class MediaPipeline:
             raise ValueError("Media finalization is already in progress")
         try:
             async with lock:
+                from animelab.services.output_profiles import require_available
+                require_available(task.outputProfileJson)
                 await ctx._finalize_task_locked(task, verification)
         except asyncio.CancelledError:
             task.paused = True
@@ -74,8 +80,45 @@ class MediaPipeline:
         task.progress = 100.0
         task.speed = 0
 
+        profile = json.loads(task.outputProfileJson)
+        modern_output = profile.get('strict') and profile['mode'] != 'ORIGINAL'
+        if modern_output:
+            verification = None
+            try:
+                await self.output_processor.acquire_inputs(task)
+                if task.paused or task.cancelled:
+                    raise ValueError('Traitement interrompu')
+                transition(task, DownloadStatus.MUXING)
+                task.phase = 'burning' if profile['mode'] == 'MP4_HARD' else 'muxing'
+                task.mediaProgressSeconds = 0
+                ctx.broadcast_update(task)
+                library_service.save_task(task)
+                await self.budget.run(task, self.jobs, self.output_processor.process, task)
+            except (VerificationRequired, RateLimited):
+                raise
+            except Exception as exc:
+                task.status = (DownloadStatus.CANCELLED if task.cancelled else DownloadStatus.PAUSED
+                               if task.paused else DownloadStatus.FAILED)
+                task.error = None if task.paused or task.cancelled else str(exc)
+                library_service.save_task(task)
+                ctx.broadcast_update(task)
+                return
+        if (not modern_output and profile.get('strict') and profile['mode'] == 'MKV_SOFT' and not task.savePathSubtitle
+                and Path(task.savePath or '').suffix.lower() != '.mkv'):
+            transition(task, DownloadStatus.FAILED)
+            task.error = 'Aucune piste de sous-titres disponible pour le MKV demandé ; la vidéo est conservée'
+            library_service.save_task(task)
+            ctx.broadcast_update(task)
+            return
+
         # Muxing FFmpeg si sous-titres présents
-        if task.savePathSubtitle and ctx.is_ffmpeg_available():
+        if not modern_output and task.savePathSubtitle and not ctx.is_ffmpeg_available():
+            transition(task, DownloadStatus.FAILED)
+            task.error = 'FFmpeg est requis pour produire le MKV demandé ; les fichiers récupérés sont conservés'
+            library_service.save_task(task)
+            ctx.broadcast_update(task)
+            return
+        if not modern_output and task.savePathSubtitle and ctx.is_ffmpeg_available():
             verification = None  # A newly muxed output needs its own integrity check.
             transition(task, DownloadStatus.MUXING)
             task.phase = "muxing"
@@ -84,6 +127,11 @@ class MediaPipeline:
             try:
                 await self.budget.run(task, self.jobs, ctx._mux_subtitles_with_ffmpeg, task)
             except Exception as exc:
+                if task.paused or task.cancelled:
+                    task.status = DownloadStatus.CANCELLED if task.cancelled else DownloadStatus.PAUSED
+                    library_service.save_task(task)
+                    ctx.broadcast_update(task)
+                    return
                 transition(task, DownloadStatus.FAILED)
                 task.error = f"Échec de fusion des sous-titres : {exc}"
                 ctx.broadcast_update(task)
@@ -167,13 +215,14 @@ class MediaPipeline:
 
     def _update_resolved_subtitles(self, task: DownloadTask, value, base_url: str):
         ctx = self.manager
-        tracks = normalize_subtitles(value, base_url)
+        from animelab.services.media_contracts import normalize_tracks
+        tracks = normalize_tracks(normalize_subtitles(value, base_url), kind='subtitle')
         # A failed/empty re-extraction must not erase known pending subtitles.
         if not tracks:
             return
-        previous = {track["url"]: track for track in normalize_subtitles(task.subtitlesJson)}
+        previous = {track['id']: track for track in normalize_tracks(normalize_subtitles(task.subtitlesJson), kind='subtitle')}
         for track in tracks:
-            cached = previous.get(track["url"], {})
+            cached = previous.get(track['id'], {})
             for key in ("path", "muxed"):
                 if key in cached:
                     track[key] = cached[key]
@@ -187,6 +236,15 @@ class MediaPipeline:
         must be present with its title and language. Never adopt an arbitrary MKV.
         """
         ctx = self.manager
+        profile = json.loads(task.outputProfileJson)
+        if profile.get('strict') and profile['mode'] != 'ORIGINAL':
+            if self.output_processor.recover(task):
+                return True
+            state = self.output_processor.state(task)
+            if state.get('master') and is_safe_path(state['master'], [self.manager.download_dir]) and Path(state['master']).is_file():
+                task.savePath = state['master']
+                task.totalBytes = task.downloadedBytes = Path(task.savePath).stat().st_size
+            return False
         if not task.savePath or Path(task.savePath).exists():
             return False
         candidate = Path(task.savePath).with_suffix(".mkv")
@@ -225,6 +283,9 @@ class MediaPipeline:
 
     def _has_pending_subtitles(self, task: DownloadTask) -> bool:
         ctx = self.manager
+        profile = json.loads(task.outputProfileJson)
+        if profile.get('strict') and profile['mode'] != 'ORIGINAL':
+            return not self.output_processor.ready(task)
         if not task.downloadSubtitles:
             return False
         if task.savePathSubtitle:
@@ -237,6 +298,10 @@ class MediaPipeline:
 
 
     async def _download_subtitles(self, task: DownloadTask):
+        profile = json.loads(task.outputProfileJson)
+        if profile.get('strict') and profile['mode'] != 'ORIGINAL':
+            await self.output_processor.acquire_inputs(task)
+            return
         ctx = self.manager
         base_url = task.downloadPageUrl or task.fileUrl or task.directDownloadUrl or ""
         try:
@@ -245,7 +310,8 @@ class MediaPipeline:
             raise SubtitleError(f"Métadonnées de sous-titres invalides : {exc}") from exc
         if not subs and task.subtitleUrl:
             subs = normalize_subtitles([{"url": task.subtitleUrl}], base_url)
-        pending = [(index, sub) for index, sub in enumerate(subs) if not sub.get("muxed")]
+        pending = [(index, sub) for index, sub in enumerate(subs)
+                   if not sub.get("muxed") and not sub.get('automatic')]
         if not pending:
             return
 
@@ -285,6 +351,10 @@ class MediaPipeline:
                         if not is_safe_url(url):
                             raise ValueError("URL de sous-titres non autorisée")
                         request_headers = dict(sub.get("headers") or {})
+                        video_origin = urlparse(task.directDownloadUrl or task.fileUrl or '')
+                        subtitle_origin = urlparse(url)
+                        if (video_origin.scheme, video_origin.netloc) == (subtitle_origin.scheme, subtitle_origin.netloc):
+                            request_headers = {**task.requestHeaders, **request_headers}
                         if sub.get("referer"):
                             request_headers["Referer"] = sub["referer"]
                         for attempt in range(3):
@@ -349,6 +419,25 @@ class MediaPipeline:
         ctx = self.manager
         return media_tools.which("ffmpeg") is not None
 
+    def _run_media(self, task, args, *, timeout=300, text=True, cwd=None):
+        """The budget owns the worker until this supervised invocation stops."""
+        def progress(event):
+            if event.media_seconds is not None:
+                def apply():
+                    if not task.paused and not task.cancelled:
+                        task.mediaProgressSeconds = event.media_seconds
+                        self.manager.broadcast_update(task)
+                loop = getattr(task, '_media_loop', None)
+                if loop and not loop.is_closed():
+                    loop.call_soon_threadsafe(apply)
+                else:
+                    apply()
+        if not media_tools.is_native():
+            args = [args[0], '-nostdin', '-progress', 'pipe:1', '-nostats', *args[1:]]
+        kwargs = {'cwd': cwd} if cwd is not None else {}
+        return media_tools.run(args, timeout=timeout, text=text,
+            cancel=lambda: task.paused or task.cancelled, on_event=progress, **kwargs)
+
 
     def _mux_subtitles_with_ffmpeg(self, task: DownloadTask):
         ctx = self.manager
@@ -384,6 +473,8 @@ class MediaPipeline:
 
         embedded = [s for s in probe(video_path) if s.get("codec_type") == "subtitle"]
         output_path = video_path.with_suffix(".mkv")
+        if output_path == video_path and json.loads(task.outputProfileJson).get('keepOriginals'):
+            output_path = video_path.with_name(video_path.stem + '.subtitled.mkv')
         with tempfile.NamedTemporaryFile(dir=video_path.parent, prefix=".animan-mux-", suffix=".mkv", delete=False) as temp:
             staging = Path(temp.name)
         try:
@@ -406,7 +497,7 @@ class MediaPipeline:
                 cmd.extend([f"-metadata:s:s:{stream_index}", f"language={lang}",
                             f"-metadata:s:s:{stream_index}", f"title={title}"])
             cmd.append(str(staging))
-            result = media_tools.run(cmd, capture_output=True, text=True, timeout=300)
+            result = self._run_media(task, cmd)
             if result.returncode:
                 raise RuntimeError(result.stderr.strip()[-1000:] or "FFmpeg a échoué")
             verification = verification_service.verify_file(str(staging))
@@ -428,7 +519,8 @@ class MediaPipeline:
                     track["muxed"] = True
             task.subtitlesJson = json.dumps(tracks)
             library_service.save_task(task)
-            for obsolete in ([video_path] if video_path != output_path else []) + existing_subs:
+            keep_originals = json.loads(task.outputProfileJson).get('keepOriginals', False)
+            for obsolete in ([] if keep_originals else ([video_path] if video_path != output_path else []) + existing_subs):
                 try:
                     obsolete.unlink(missing_ok=True)
                 except OSError:
@@ -446,7 +538,7 @@ class MediaPipeline:
         # Preserve unrelated episodes, including a destination created during mux.
         for collision in range(1000):
             candidate = output_path if collision == 0 else output_path.with_name(
-                f"{output_path.stem}.subtitled-{ctx.sanitize_file_name(task_id)[:12]}-{collision}.mkv")
+                f"{output_path.stem}.subtitled-{ctx.sanitize_file_name(task_id)[:12]}-{collision}{output_path.suffix}")
             try:
                 if not media_tools.is_native():
                     try:
@@ -556,7 +648,7 @@ class MediaPipeline:
                 "-bsf:a", "aac_adtstoasc",
                 str(temp_output)
             ]
-            result = media_tools.run(remux_cmd, capture_output=True, timeout=300)
+            result = self._run_media(task, remux_cmd)
             r_rc = result.returncode
             if r_rc and media_tools.is_native():
                 raise RuntimeError("Android HLS remux failed: " + result.stderr[-1000:])

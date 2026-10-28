@@ -1,0 +1,102 @@
+@startuml
+!include theme.iuml
+title Diagramme de classes — contrats proposés, non implémentés
+left to right direction
+class DownloadCoordinator {
+ +start(taskId)
+ +pause(taskId)
+ +resume(taskId)
+ +cancel(taskId)
+}
+class SourceResolver {
+ +resolve(episode, selection) : ResolvedMedia
+ +refresh(sessionRef) : ResolvedMedia
+}
+class ResolvedMedia {
+ +manifestOrFile
+ +protocol : HTTP / HLS / DASH
+ +sessionRef
+ +representationFingerprint
+}
+class MediaTrack {
+ +id / kind / language / role / codec
+ +origin : source / manifest / provider / local
+ +remoteRef : renouvelable
+ +offsetMs / default / forced
+}
+interface DownloadBackend {
+ +capabilities() : CapabilitySet
+ +probe(plan) : TrackInventory
+ +run(plan, checkpoint) : TransferResult
+ +stop(taskId)
+}
+class HttpRangeBackend
+class NativeHlsBackend
+class Nm3u8Backend {
+ +binaryVersion / isolatedWorkDir
+ +planToArgs() : argv
+ +observe() : ProgressEvent
+}
+class DownloadPlan {
+ +backend / trackIds / fingerprint
+ +sessionRef / workDir
+ +outputProfile
+}
+class ResumeCheckpoint {
+ +backendName / backendVersion
+ +workDir / representationFingerprint
+ +verifiedResources
+}
+interface SubtitleProvider {
+ +search(episodeIdentity, language)
+ +download(candidateRef) : SubtitleAsset
+}
+class OpenSubtitlesProvider
+class SubDlProvider
+class SubtitleCoordinator {
+ +collect() : TrackInventory
+ +match() : rankedCandidates
+ +validateAndNormalize() : SubtitleAsset
+}
+class SubtitleAsset {
+ +format / checksum / localPath
+ +language / fps / offsetMs
+ +providerId / externalFileId
+}
+class OutputProcessor {
+ +muxMkv(selectedTracks)
+ +burnMp4(oneSubtitle, oneAudio)
+}
+class OutputProfile {
+ +mode : SIDECAR / MKV_SOFT / MP4_HARD
+ +subtitleIds / audioIds / preserveMaster
+}
+class ManifestRelay {
+ +issueTaskCapability(plan)
+ +rewriteAndFetch(resourceRef)
+ +revoke(taskId)
+}
+DownloadCoordinator --> SourceResolver
+SourceResolver --> ResolvedMedia
+ResolvedMedia "1" o-- "0..*" MediaTrack
+DownloadCoordinator --> DownloadBackend
+DownloadCoordinator --> SubtitleCoordinator
+DownloadCoordinator --> OutputProcessor
+DownloadBackend <|.. HttpRangeBackend
+DownloadBackend <|.. NativeHlsBackend
+DownloadBackend <|.. Nm3u8Backend
+DownloadBackend --> DownloadPlan
+DownloadBackend --> ResumeCheckpoint
+DownloadPlan "1" *-- "1" OutputProfile
+SubtitleCoordinator --> SubtitleProvider
+SubtitleProvider <|.. OpenSubtitlesProvider
+SubtitleProvider <|.. SubDlProvider
+SubtitleCoordinator --> SubtitleAsset
+Nm3u8Backend --> ManifestRelay
+OutputProcessor --> OutputProfile
+note bottom of ResumeCheckpoint
+Ne pas réutiliser les .part d’un autre backend.
+URL signée et mot de passe ne sont pas une identité.
+end note
+
+@enduml

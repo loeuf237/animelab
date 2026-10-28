@@ -30,6 +30,8 @@ jobs:
       - run: uv sync --locked --group desktop
       - name: Test desktop administration and launch regressions
         run: uv run --locked --group desktop python -m pytest tests/test_desktop_admin.py tests/test_native_launcher.py tests/test_launcher_auth.py tests/test_release_tools.py -q
+      - name: Test supervised media process lifecycle
+        run: uv run --locked python -m pytest tests/test_media_pipeline_p1_p5.py -k "process or native_progress" -q
       - name: Render all native launcher tabs
         run: uv run --locked --group desktop python scripts/desktop_release.py launcher-check --source
       - name: Render and close a native Edge WebView2 window

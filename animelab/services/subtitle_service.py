@@ -21,12 +21,15 @@ def normalize_subtitles(value: object, base_url: str = "") -> list[dict[str, Any
         if not isinstance(url, str) or not url.strip():
             raise ValueError("URL de sous-titres manquante")
         url = urljoin(base_url, html.unescape(url.strip().replace("\\/", "/")))
-        if url in seen:
+        identity = (url, item.get('lang') or item.get('srclang') or item.get('language') or 'und',
+                    item.get('label') or 'Sous-titres', item.get('role'),
+                    bool(item.get('forced')), bool(item.get('automatic')))
+        if identity in seen:
             continue
-        seen.add(url)
+        seen.add(identity)
         track = dict(item)
         track.update(url=url, label=item.get("label") or "Sous-titres",
-                     lang=item.get("lang") or item.get("srclang") or "und")
+                     lang=item.get("lang") or item.get("srclang") or item.get('language') or "und")
         if base_url:
             track.setdefault("referer", base_url)
         tracks.append(track)

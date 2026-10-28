@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AnimeLab — sous-titres et N_m3u8DL-RE</title>
+<style>
+:root{color-scheme:light dark;--bg:#f5f6fb;--fg:#172033;--surface:#fff;--muted:#536174;--line:#d5d9e4;--accent:#6d28d9}
+@media(prefers-color-scheme:dark){:root{--bg:#101422;--fg:#edf0f6;--surface:#191f31;--muted:#bac3d6;--line:#3b455c;--accent:#c4a7ff}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,sans-serif}
+header,main,footer{max-width:1440px;margin:auto;padding:24px}h1{font-size:clamp(24px,4vw,38px);line-height:1.2}
+h2{font-size:21px;line-height:1.35;margin:0 0 8px}p{max-width:90ch}a{color:var(--accent);overflow-wrap:anywhere}
+button,input{font:inherit;color:inherit;background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:9px 13px}
+button{cursor:pointer}button:hover,button[aria-pressed=true]{border-color:var(--accent);color:var(--accent)}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+nav,.actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}nav{margin:20px 0}input{max-width:100%;width:420px}
+.kind,footer{color:var(--muted)}article{background:var(--surface);padding:24px;margin-bottom:30px;border-radius:10px;scroll-margin-top:18px}
+article[hidden]{display:none}.actions{margin:14px 0 18px}.actions a{font-size:14px}
+figure{margin:0;background:#fff;overflow:auto}figure img{display:block;width:100%;height:auto;max-height:78vh;object-fit:contain}
+figcaption{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+details{margin-top:16px}details ul{padding-left:22px;font-size:14px}code{overflow-wrap:anywhere}
+dialog{width:96vw;max-width:96vw;height:94vh;max-height:94vh;padding:16px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--fg)}
+dialog::backdrop{background:#000b}.dialog-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.dialog-bar strong{flex:1;min-width:200px}.viewport{height:calc(100% - 88px);overflow:auto;background:#fff}
+.viewport img{display:block;max-width:none;height:auto}.empty{padding:20px}footer{font-size:14px}
+@media(max-width:600px){header,main,footer{padding:16px}article{padding:14px}.dialog-bar strong{flex-basis:100%}.viewport{height:calc(100% - 150px)}}
+@media print{@page{size:A3 landscape;margin:12mm}body{background:#fff;color:#111}header{padding:0}nav,.actions,.search,details,dialog,footer{display:none!important}
+main{max-width:none;padding:0}article{break-before:page;break-inside:avoid;background:#fff;padding:0;border-radius:0;margin:0}
+figure img{max-height:220mm;width:100%;height:220mm;object-fit:contain}a{color:#111}.kind{color:#333}}
+</style></head><body><header>
+<h1>AnimeLab — sous-titres et N_m3u8DL-RE</h1>
+<p>3 classes · 1 cas d’utilisation · 1 séquences · 1 déploiements · 3 proposition. Le diagramme violet décrit l’existant ; les vues vertes sont des propositions. Binaire N_m3u8DL-RE évalué sous Linux x64 ; non adopté en production.</p>
+<p><a href="README.md">Étude de faisabilité et plan de migration</a> · Révision analysée : <code>1cea1983ec741c502cf5241d3b5ebdfacb38330a</code>.</p>
+<p>27 octobre 2026 · <a href="dossier-nm3u8dl-re.zip">Télécharger tout le dossier</a> · <a href="local-proof.json">Preuve FFmpeg locale</a> · <a href="PRIORITES_IMPLEMENTATION.md">Priorités d’implémentation P1 à P15</a> · <a href="IMPLEMENTATION_P1_P5.md">Livraison P1–P5</a> · <a href="IMPLEMENTATION_P6_P7.md">Livraison P6–P7</a> · <a href="IMPLEMENTATION_P8.md">Livraison P8 et validations</a> · <a href="IMPLEMENTATION_P9.md">Livraison P9 et synchronisation</a> · <a href="subtitle-sync-proof.json">Mesures Alass</a></p>
+<p><a href="IMPLEMENTATION_P10_P13.md">Bilan P10–P13</a> · <a href="nm3u8dl-proof.json">Mesures du vrai binaire</a> · <a href="nm3u8dl-decision.json">Décision P12</a> · <a href="N_m3u8DL-RE-LICENSE.txt">Licence amont MIT</a></p>
+<p><a href="IMPLEMENTATION_P14_P15.md">Bilan P14–P15</a> · <a href="android-p14-p15-decision.json">Validation Android et décision Bionic</a> : JNI implémenté localement, essais Android/CI encore requis.</p>
+<aside><h2>Décision P12 : non adopté en production</h2><p>Conserver les extracteurs et FFmpeg. N_m3u8DL-RE 0.6.0-beta a été évalué sur un corpus synthétique sous Linux x64. Deux défauts de reprise et de synchronisation empêchent son adoption ; P13/P15 sont non retenus pour cette version.</p>
+<ul><li><strong>MP4 hardsub :</strong> une langue incrustée dans l’image, un audio choisi, aucune piste de sous-titres séparée. Réencodage requis.</li>
+<li><strong>MKV multipiste :</strong> langues sélectionnables et pistes vidéo/audio copiées lorsque compatibles. Une base de multiplexage existe déjà dans AnimeLab.</li>
+<li><strong>Sous-titres externes :</strong> préserver les pistes des extensions et ajouter des fournisseurs API indépendants (OpenSubtitles/SubDL), avec aperçu et décalage.</li></ul>
+<p>Preuves locales : sorties FFmpeg vérifiées et cinq cas N_m3u8DL-RE utilisables sur six, avec contre-exemples conservés. Ces mesures ne démontrent pas un gain réseau en production. Hardsub Android P14, autres plateformes et fournisseurs authentifiés restent à valider. <a href="README.md">Lire l’étude et les critères de passage</a>.</p></aside><nav aria-label="Familles de diagrammes"><button type="button" data-category="all" aria-pressed="true">Tout</button><button type="button" data-category="classes" aria-pressed="false">Classes</button><button type="button" data-category="cas" aria-pressed="false">Cas d’utilisation</button><button type="button" data-category="sequence" aria-pressed="false">Séquences</button><button type="button" data-category="deploiement" aria-pressed="false">Déploiement</button><button type="button" data-category="cible" aria-pressed="false">Proposition</button><button type="button" id="print">Imprimer la sélection</button></nav>
+<div class="search"><label for="filter">Filtrer les titres</label> <input id="filter" type="search" placeholder="Ex. : Android, reprise, classes…"></div>
+<p id="count" role="status" aria-live="polite">9 diagrammes affichés</p></header>
+<main><article data-category="cas" id="01-cas-utilisation">
+<h2>Cas d’utilisation — cible proposée</h2><p class="kind">Cas d’utilisation
+ · Socle P1–P9 réalisé ; P13/P15 non retenus ; P14 implémenté, validation Android en attente</p>
+<div class="actions"><button type="button" class="zoom" data-svg="svg/01-cas-utilisation.svg"
+data-title="Cas d’utilisation — cible proposée" data-width="1148">Agrandir</button>
+<a href="svg/01-cas-utilisation.svg" target="_blank" rel="noopener">SVG original</a>
+<a href="plantuml/01-cas-utilisation.puml">Source PlantUML</a><a href="#01-cas-utilisation">Lien direct</a></div>
+<figure><img src="svg/01-cas-utilisation.svg" width="1148" height="992"
+loading="lazy" alt="Cas d’utilisation — cible proposée"><figcaption>Cas d’utilisation — cible proposée</figcaption></figure>
+<details><summary>Références vérifiées dans le code</summary><ul><li><a href="../../../animelab/api_contracts.py#L227">SubtitleTrack</a> — <code>animelab/api_contracts.py</code></li></ul></details>
+</article>
+<article data-category="classes" id="02-composants-existants">
+<h2>Existant vérifié — ce que le code fait aujourd’hui</h2><p class="kind">Classes
+ · Architecture observée</p>
+<div class="actions"><button type="button" class="zoom" data-svg="svg/02-composants-existants.svg"
+data-title="Existant vérifié — ce que le code fait aujourd’hui" data-width="1661">Agrandir</button>
+<a href="svg/02-composants-existants.svg" target="_blank" rel="noopener">SVG original</a>
+<a href="plantuml/02-composants-existants.puml">Source PlantUML</a><a href="#02-composants-existants">Lien direct</a></div>
+<figure><img src="svg/02-composants-existants.svg" width="1661" height="520"
+loading="lazy" alt="Existant vérifié — ce que le code fait aujourd’hui"><figcaption>Existant vérifié — ce que le code fait aujourd’hui</figcaption></figure>
+<details><summary>Références vérifiées dans le code</summary><ul><li><a href="../../../animelab/services/download_manager.py#L67">DownloadManagerService</a> — <code>animelab/services/download_manager.py</code></li><li><a href="../../../animelab/services/download_stages/transfer.py#L265">TransferWorker._download_single_file</a> — <code>animelab/services/download_stages/transfer.py</code></li><li><a href="../../../animelab/services/download_stages/transfer.py#L702">TransferWorker._download_hls_segments_native</a> — <code>animelab/services/download_stages/transfer.py</code></li><li><a href="../../../animelab/services/download_stages/media.py#L442">MediaPipeline._mux_subtitles_with_ffmpeg</a> — <code>animelab/services/download_stages/media.py</code></li><li><a href="../../../animelab/services/extractors/ytdlp_fallback.py#L29">YtDlpFallbackExtractor.extract</a> — <code>animelab/services/extractors/ytdlp_fallback.py</code></li></ul></details>
+</article>
+<article data-category="cible" id="03-composants-cibles">
+<h2>Architecture cible — responsabilités séparées</h2><p class="kind">Proposition
+ · Socle P1–P9 réalisé ; P13/P15 non retenus ; P14 implémenté, validation Android en attente</p>
+<div class="actions"><button type="button" class="zoom" data-svg="svg/03-composants-cibles.svg"
+data-title="Architecture cible — responsabilités séparées" data-width="1191">Agrandir</button>
+<a href="svg/03-composants-cibles.svg" target="_blank" rel="noopener">SVG original</a>
+<a href="plantuml/03-composants-cibles.puml">Source PlantUML</a><a href="#03-composants-cibles">Lien direct</a></div>
+<figure><img src="svg/03-composants-cibles.svg" width="1191" height="1070"
+loading="lazy" alt="Architecture cible — responsabilités séparées"><figcaption>Architecture cible — responsabilités séparées</figcaption></figure>
+<details><summary>Références vérifiées dans le code</summary><ul><li><a href="../../../animelab/services/source_http.py#L97">SourceHTTPService</a> — <code>animelab/services/source_http.py</code></li><li><a href="../../../animelab/media_policy.py#L22">validate_media_url</a> — <code>animelab/media_policy.py</code></li><li><a href="../../../animelab/services/download_stages/scheduler.py#L22">DownloadScheduler</a> — <code>animelab/services/download_stages/scheduler.py</code></li></ul></details>
+</article>
+<article data-category="classes" id="04-classes-cibles">
+<h2>Diagramme de classes — contrats proposés, non implémentés</h2><p class="kind">Classes
+ · Socle P1–P9 réalisé ; P13/P15 non retenus ; P14 implémenté, validation Android en attente</p>
+<div class="actions"><button type="button" class="zoom" data-svg="svg/04-classes-cibles.svg"
+data-title="Diagramme de classes — contrats proposés, non implémentés" data-width="1438">Agrandir</button>
+<a href="svg/04-classes-cibles.svg" target="_blank" rel="noopener">SVG original</a>
+<a href="plantuml/04-classes-cibles.puml">Source PlantUML</a><a href="#04-classes-cibles">Lien direct</a></div>
+<figure><img src="svg/04-classes-cibles.svg" width="1438" height="1109"
+loading="lazy" alt="Diagramme de classes — contrats proposés, non implémentés"><figcaption>Diagramme de classes — contrats proposés, non implémentés</figcaption></figure>
+<details><summary>Références vérifiées dans le code</summary><ul><li><a href="../../../animelab/models/download_task.py#L225">DownloadTask</a> — <code>animelab/models/download_task.py</code></li><li><a href="../../../animelab/services/subtitle_service.py#L8">normalize_subtitles</a> — <code>animelab/services/subtitle_service.py</code></li><li><a href="../../../animelab/services/recipe_runtime.py#L276">RecipeRuntime.stream</a> — <code>animelab/services/recipe_runtime.py</code></li></ul></details>
+</article>
+<article data-category="sequence" id="05-sequence-episode">
+<h2>Séquence proposée — épisode, pistes et fichier final</h2><p class="kind">Séquences
+ · Socle P1–P9 réalisé ; P13/P15 non retenus ; P14 implémenté, validation Android en attente</p>
+<div class="actions"><button type="button" class="zoom" data-svg="svg/05-sequence-episode.svg"
+data-title="Séquence proposée — épisode, pistes et fichier final" data-width="1820">Agrandir</button>
+<a href="svg/05-sequence-episode.svg" target="_blank" rel="noopener">SVG original</a>
+<a href="plantuml/05-sequence-episode.puml">Source PlantUML</a><a href="#05-sequence-episode">Lien direct</a></div>
+<figure><img src="svg/05-sequence-episode.svg" width="1820" height="1197"
+loading="lazy" alt="Séquence proposée — épisode, pistes et fichier final"><figcaption>Séquence proposée — épisode, pistes et fichier final</figcaption></figure>
+<details><summary>Références vérifiées dans le code</summary><ul><li><a href="../../../animelab/services/aniyomi_container.py#L502">AniyomiContainerSource.get_episode_sources</a> — <code>animelab/services/aniyomi_container.py</code></li><li><a href="../../../animelab/services/download_stages/media.py#L300">MediaPipeline._download_subtitles</a> — <code>animelab/services/download_stages/media.py</code></li></ul></details>
+</article>
+<article data-category="cible" id="06-activite-sortie">
+<h2>Activité proposée — choisir le transfert et la sortie</h2><p class="kind">Proposition
+ · Socle P1–P9 réalisé ; P13/P15 non retenus ; P14 implémenté, validation Android en attente</p>
+<div class="actions"><button type="button" class="zoom" data-svg="svg/06-activite-sortie.svg"
+data-title="Activité proposée — choisir le transfert et la sortie" data-width="1487">Agrandir</button>
+<a href="svg/06-activite-sortie.svg" target="_blank" rel="noopener">SVG original</a>
+<a href="plantuml/06-activite-sortie.puml">Source PlantUML</a><a href="#06-activite-sortie">Lien direct</a></div>
+<figure><img src="svg/06-activite-sortie.svg" width="1487" height="883"
+loading="lazy" alt="Activité proposée — choisir le transfert et la sortie"><figcaption>Activité proposée — choisir le transfert et la sortie</figcaption></figure>
+<details><summary>Références vérifiées dans le code</summary><ul><li><a href="../../../animelab/services/download_stages/media.py#L73">MediaPipeline._prepare</a> — <code>animelab/services/download_stages/media.py</code></li></ul></details>
+</article>
+<article data-category="cible" id="07-etats-reprise">
+<h2>États proposés — pas de reprise aveugle entre moteurs</h2><p class="kind">Proposition
+ · Socle P1–P9 réalisé ; P13/P15 non retenus ; P14 implémenté, validation Android en attente</p>
+<div class="actions"><button type="button" class="zoom" data-svg="svg/07-etats-reprise.svg"
+data-title="États proposés — pas de reprise aveugle entre moteurs" data-width="2214">Agrandir</button>
+<a href="svg/07-etats-reprise.svg" target="_blank" rel="noopener">SVG original</a>
+<a href="plantuml/07-etats-reprise.puml">Source PlantUML</a><a href="#07-etats-reprise">Lien direct</a></div>
+<figure><img src="svg/07-etats-reprise.svg" width="2214" height="1143"
+loading="lazy" alt="États proposés — pas de reprise aveugle entre moteurs"><figcaption>États proposés — pas de reprise aveugle entre moteurs</figcaption></figure>
+<details><summary>Références vérifiées dans le code</summary><ul><li><a href="../../../animelab/services/download_stages/state.py#L19">transition</a> — <code>animelab/services/download_stages/state.py</code></li></ul></details>
+</article>
+<article data-category="classes" id="08-merise-mcd">
+<h2>MCD de type Merise — modèle conceptuel proposé</h2><p class="kind">Classes
+ · Socle P1–P9 réalisé ; P13/P15 non retenus ; P14 implémenté, validation Android en attente</p>
+<div class="actions"><button type="button" class="zoom" data-svg="svg/08-merise-mcd.svg"
+data-title="MCD de type Merise — modèle conceptuel proposé" data-width="1326">Agrandir</button>
+<a href="svg/08-merise-mcd.svg" target="_blank" rel="noopener">SVG original</a>
+<a href="plantuml/08-merise-mcd.puml">Source PlantUML</a><a href="#08-merise-mcd">Lien direct</a></div>
+<figure><img src="svg/08-merise-mcd.svg" width="1326" height="716"
+loading="lazy" alt="MCD de type Merise — modèle conceptuel proposé"><figcaption>MCD de type Merise — modèle conceptuel proposé</figcaption></figure>
+<details><summary>Références vérifiées dans le code</summary><ul><li><a href="../../../animelab/models/download_task.py#L137">DownloadTaskEntity</a> — <code>animelab/models/download_task.py</code></li></ul></details>
+</article>
+<article data-category="deploiement" id="09-deploiement">
+<h2>Déploiement proposé — desktop d’abord, Android sous conditions</h2><p class="kind">Déploiement
+ · Socle P1–P9 réalisé ; P13/P15 non retenus ; P14 implémenté, validation Android en attente</p>
+<div class="actions"><button type="button" class="zoom" data-svg="svg/09-deploiement.svg"
+data-title="Déploiement proposé — desktop d’abord, Android sous conditions" data-width="1366">Agrandir</button>
+<a href="svg/09-deploiement.svg" target="_blank" rel="noopener">SVG original</a>
+<a href="plantuml/09-deploiement.puml">Source PlantUML</a><a href="#09-deploiement">Lien direct</a></div>
+<figure><img src="svg/09-deploiement.svg" width="1366" height="714"
+loading="lazy" alt="Déploiement proposé — desktop d’abord, Android sous conditions"><figcaption>Déploiement proposé — desktop d’abord, Android sous conditions</figcaption></figure>
+<details><summary>Références vérifiées dans le code</summary><ul><li><a href="../../../animelab/media_tools.py#L48">run</a> — <code>animelab/media_tools.py</code></li><li><a href="../../../android/app/src/main/java/com/animan/app/MediaBridge.kt#L17">MediaBridge</a> — <code>android/app/src/main/java/com/animan/app/MediaBridge.kt</code></li></ul></details>
+</article><p class="empty" id="empty" hidden>Aucun diagramme ne correspond à ce filtre.</p></main>
+<dialog id="viewer" aria-labelledby="viewer-title"><div class="dialog-bar"><strong id="viewer-title"></strong>
+<button type="button" id="minus" aria-label="Réduire le diagramme">−</button><span id="scale"></span>
+<button type="button" id="plus" aria-label="Agrandir le diagramme">+</button><button type="button" id="fit">Ajuster</button>
+<button type="button" id="close">Fermer</button></div><div class="viewport" tabindex="0" aria-label="Diagramme agrandi, défilement disponible"><img id="large" alt=""></div></dialog>
+<footer>Consultation hors ligne. Les liens de code nécessitent le dépôt complet. Les diagrammes décrivent le code ; ils ne remplacent pas les tests de fonctionnement.</footer>
+<script>
+const articles=[...document.querySelectorAll('article')], input=document.getElementById('filter');let category='all';
+const norm=s=>s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+function filter(){let count=0;for(const item of articles){item.hidden=!(category==='all'||item.dataset.category===category)||!norm(item.querySelector('h2').textContent).includes(norm(input.value));if(!item.hidden)count++}
+document.getElementById('count').textContent=count+' diagramme'+(count===1?'':'s')+' affiché'+(count===1?'':'s');document.getElementById('empty').hidden=count>0}
+document.querySelectorAll('nav [data-category]').forEach(button=>button.addEventListener('click',()=>{category=button.dataset.category;document.querySelectorAll('nav [data-category]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));filter()}));input.addEventListener('input',filter);
+document.getElementById('print').addEventListener('click',()=>window.print());
+const viewer=document.getElementById('viewer'),large=document.getElementById('large'),viewport=document.querySelector('.viewport');let width=1000,factor=1;
+function scale(){large.style.width=Math.round(width*factor)+'px';document.getElementById('scale').textContent=Math.round(factor*100)+' %'}
+function fit(){factor=Math.min(1,Math.max(.1,(viewport.clientWidth-20)/width));scale()}
+document.querySelectorAll('.zoom').forEach(button=>button.addEventListener('click',()=>{if(!viewer.showModal){window.open(button.dataset.svg,'_blank','noopener');return}width=Number(button.dataset.width);large.src=button.dataset.svg;large.alt=button.dataset.title;document.getElementById('viewer-title').textContent=button.dataset.title;viewer.showModal();fit();viewport.scrollTop=0;viewport.scrollLeft=0}));
+document.getElementById('close').addEventListener('click',()=>viewer.close());document.getElementById('plus').addEventListener('click',()=>{factor=Math.min(3,factor*1.25);scale()});document.getElementById('minus').addEventListener('click',()=>{factor=Math.max(.1,factor/1.25);scale()});document.getElementById('fit').addEventListener('click',fit);
+if(location.hash){const target=document.getElementById(location.hash.slice(1));if(target)target.scrollIntoView()}
+</script></body></html>

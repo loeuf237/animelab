@@ -1,0 +1,52 @@
+{
+  "tool": "alass-cli",
+  "version": "2.0.0",
+  "seed": 9321,
+  "cues": 70,
+  "synthetic": true,
+  "binarySha256": "7bd0b9ae7e035d3ba940eacffb21243614df36231d47f21f0b4ce42001ab7fcd",
+  "source": "https://github.com/kaegi/alass/releases/tag/v2.0.0",
+  "checksumOrigin": "Locally computed, not an upstream signature",
+  "platform": "linux",
+  "splitPenalty": 10,
+  "allowSplits": true,
+  "minimumOverlap": 0.55,
+  "cases": [
+    {
+      "case": "offset",
+      "cues": 70,
+      "beforeMeanSeconds": 3.2,
+      "afterMeanSeconds": 0.000277,
+      "overlapAfter": 0.999752,
+      "accepted": true,
+      "elapsedSeconds": 0.143
+    },
+    {
+      "case": "fps",
+      "cues": 70,
+      "beforeMeanSeconds": 10.61206,
+      "afterMeanSeconds": 0.000534,
+      "overlapAfter": 0.999455,
+      "accepted": true,
+      "elapsedSeconds": 0.118
+    },
+    {
+      "case": "cut",
+      "cues": 70,
+      "beforeMeanSeconds": 10.0,
+      "afterMeanSeconds": 0.000277,
+      "overlapAfter": 0.999752,
+      "accepted": true,
+      "elapsedSeconds": 0.18
+    },
+    {
+      "case": "incompatible",
+      "cues": 70,
+      "beforeMeanSeconds": 89.69648,
+      "afterMeanSeconds": 17.276468,
+      "overlapAfter": 0.437898,
+      "accepted": false,
+      "elapsedSeconds": 0.146
+    }
+  ]
+}

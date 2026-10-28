@@ -1,0 +1,52 @@
+@startuml
+!include theme.iuml
+title Séquence proposée — épisode, pistes et fichier final
+actor Utilisateur as U
+participant "Vue / API" as UI
+participant "Coordinateur" as C
+participant "SourceResolver" as R
+participant "Sous-titres" as S
+participant "Backend choisi" as B
+participant "Relais / SourceHTTP" as H
+participant "FFmpeg / ffprobe" as F
+database "État et artefacts privés" as DB
+U -> UI : épisode + langues + MKV ou MP4 hardsub
+UI -> C : créer plan autorisé
+C -> R : résoudre l’épisode
+R --> C : média + pistes + référence de session
+C -> S : collecter source / manifeste / API / import
+S --> UI : choix, provenance et correspondance
+U -> UI : confirmer pistes et décalage
+UI -> C : figer le plan
+C -> DB : plan + empreinte + backend
+C -> B : démarrer(plan)
+loop manifestes et fragments
+ B -> H : ressource autorisée
+ alt vérification du site nécessaire
+  H --> C : VerificationRequired
+  C -> DB : état vérification nécessaire
+  C --> UI : demander vérification sur client compatible
+  U -> UI : vérification terminée
+  UI -> H : synchroniser session, selon capacités
+  C -> R : renouveler URL, comparer empreinte
+ else contenu disponible
+  H --> B : octets / progression
+ end
+end
+B --> C : fichiers de pistes validables
+C -> S : récupérer / normaliser les pistes choisies
+S --> C : SRT / VTT / ASS + métadonnées
+alt mode MKV multipiste
+ C -> F : mux sans réencodage vidéo si compatible
+else mode MP4 hardsub
+ C -> F : rendre une piste de texte + réencoder vidéo
+end
+F --> C : fichier temporaire + inventaire ffprobe
+C -> DB : publier atomiquement après validation
+C --> UI : téléchargement prêt / export réussi
+note over C,B
+Échec de sortie : reprendre la finalisation locale,
+sans télécharger de nouveau la vidéo.
+end note
+
+@enduml

@@ -96,7 +96,7 @@ dependencies {
     // Keep the runtime ABI aligned with AndroidX Test (including tracing on API 30+).
     implementation("androidx.tracing:tracing:1.1.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-    implementation("dev.ffmpegkit-maintained:ffmpeg-kit-min:6.0.4")
+    implementation("dev.ffmpegkit-maintained:ffmpeg-kit-full-gpl:6.0.4")
     // The maintained AAR still references these original exception helpers but
     // does not declare them in its published dependency metadata.
     implementation("com.arthenica:smart-exception-java:0.2.1")

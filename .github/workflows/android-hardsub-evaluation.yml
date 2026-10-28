@@ -1,0 +1,79 @@
+name: Android hardsub JNI evaluation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        abi: [x86_64, arm64-v8a]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platforms;android-35 build-tools;35.0.0
+      - name: Build JNI probes without building the application or signing a release
+        working-directory: android
+        run: ./gradlew :media-probe:assembleDebug :media-probe:assembleDebugAndroidTest -PmediaProbeAbi=${{ matrix.abi }} --no-daemon --max-workers=2
+      - name: Check ABI, ELF page alignment and installed native payload size
+        run: python scripts/android_hardsub_audit.py android/media-probe/build/outputs/apk/debug/media-probe-debug.apk --abi ${{ matrix.abi }} --output android/media-probe/build/outputs/apk/native-audit.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Android-hardsub-JNI-probes-${{ matrix.abi }}
+          path: |
+            android/media-probe/build/outputs/apk/debug/*.apk
+            android/media-probe/build/outputs/apk/androidTest/debug/*.apk
+            android/media-probe/build/outputs/apk/native-audit.json
+          if-no-files-found: error
+  evaluate:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [29, 30, 35]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v4
+        with:
+          name: Android-hardsub-JNI-probes-x86_64
+          path: hardsub-apks
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: python scripts/android_instrumentation.py hardsub-apks/debug/media-probe-debug.apk hardsub-apks/androidTest/debug/media-probe-debug-androidTest.apk hardsub-results --package com.animan.nativeprobe --require-hardsub
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Android-hardsub-API-${{ matrix.api }}-results
+          path: hardsub-results/*

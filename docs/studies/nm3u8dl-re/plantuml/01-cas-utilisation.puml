@@ -1,0 +1,43 @@
+@startuml
+!include theme.iuml
+title Cas d’utilisation — cible proposée
+left to right direction
+actor Utilisateur as U
+actor "Administrateur\nserveur partagé" as A
+actor "Extension / hébergeur" as X
+actor "Site de sous-titres\nAPI officielle" as S
+rectangle "AnimeLab — évolution proposée" {
+ usecase "Choisir épisode, qualité\net langues audio" as episode
+ usecase "Découvrir les pistes\nde l’extension / du manifeste" as discover
+ usecase "Rechercher des sous-titres\npar série, saison et épisode" as search
+ usecase "Importer un SRT / VTT / ASS" as local
+ usecase "Prévisualiser et régler\nle décalage temporel" as sync
+ usecase "Télécharger avec\npause et reprise" as dl
+ usecase "Produire MP4 hardsub\n1 vidéo + audio choisi" as hard
+ usecase "Produire MKV multipiste\nlangues activables" as soft
+ usecase "Valider puis exporter\nle fichier final" as verify
+ usecase "Configurer moteur optionnel,\nfournisseurs et domaines" as config
+}
+U --> episode
+U --> search
+U --> local
+U --> sync
+U --> dl
+U --> hard
+U --> soft
+A --> config
+episode ..> discover : <<include>>
+discover --> X
+search --> S
+hard ..> verify : <<include>>
+soft ..> verify : <<include>>
+note bottom of hard
+Une seule langue de sous-titres incrustée ;
+aucune piste de sous-titres séparée.
+end note
+note bottom of dl
+Permissions, état et quota restent dans AnimeLab.
+N_m3u8DL-RE est un moteur interne facultatif.
+end note
+
+@enduml

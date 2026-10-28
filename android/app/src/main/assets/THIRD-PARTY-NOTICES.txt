@@ -8,10 +8,13 @@ Use the source commit recorded in the release's Android-build-info.json.
 Third-party components below retain their own licenses.
 
 AnimeLab Android includes dynamically loaded FFmpeg/FFprobe libraries.
-Package: dev.ffmpegkit-maintained:ffmpeg-kit-min:6.0.4 (LGPL-3.0).
+Package: dev.ffmpegkit-maintained:ffmpeg-kit-full-gpl:6.0.4 (GPL-3.0).
+This variant includes libass (ISC), FreeType (FreeType License/GPL),
+FriBidi (LGPL) and x264 (GPL), among other upstream components.
+Android system fonts are used locally and are not redistributed in this APK.
 Corresponding source and build instructions:
 https://github.com/ffmpegkit-maintained/ffmpeg
-License: https://www.gnu.org/licenses/lgpl-3.0.txt
+License: https://www.gnu.org/licenses/gpl-3.0.txt
 Copies of LGPL-3.0 and its referenced GPL-3.0 are bundled in assets/licenses.
 
 Python SDK: Chaquopy 17.1.0, https://github.com/chaquo/chaquopy (MIT).

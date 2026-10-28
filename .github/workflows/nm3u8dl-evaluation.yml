@@ -1,0 +1,39 @@
+name: Optional N_m3u8DL-RE offline evaluation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: '0.13.1'
+          python-version: '3.13'
+      - name: Install evaluation prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg iproute2 util-linux strace
+          uv sync --locked
+      - name: Fetch and verify the optional upstream binary
+        run: uv run --locked python scripts/fetch_nm3u8dl_eval.py --directory build/nm3u8dl-evaluation
+      - name: Test policy, isolation and known upstream failures
+        env:
+          ANIMELAB_NM3U8DL_EVAL_PATH: ${{ github.workspace }}/build/nm3u8dl-evaluation/N_m3u8DL-RE
+        run: uv run --locked python -m pytest tests/test_nm3u8dl_p10_p13.py -q
+      - name: Record reproducible metrics without a production release
+        run: uv run --locked python scripts/evaluate_nm3u8dl.py --tool build/nm3u8dl-evaluation/N_m3u8DL-RE --output build/nm3u8dl-evaluation-proof.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nm3u8dl-study-results
+          path: |
+            build/nm3u8dl-evaluation-proof.json
+            build/nm3u8dl-evaluation/receipt.json
+          if-no-files-found: error
+          retention-days: 14

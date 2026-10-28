@@ -317,3 +317,27 @@ def test_browser_sync_preserves_http_only_same_site_and_path(transport):
         secure=True, httpOnly=True, sameSite='Strict')], {}, {}, (None, state.generation))
     item = next(iter(snapshot(transport, URL).values()))
     assert item['httpOnly'] and item['sameSite'] == 'Strict' and item['path'] == '/episode'
+
+
+@pytest.mark.asyncio
+async def test_completion_remains_readable_while_browser_closes(transport, tmp_path, monkeypatch):
+    service = BrowserVerificationService(transport, VerificationSettings(tmp_path / 'browser.json'))
+    state = transport.state(URL)
+    state.blocked_url = URL
+    initial = snapshot(transport, URL)
+    closing, release = asyncio.Event(), asyncio.Event()
+    async def slow_close(job):
+        closing.set()
+        await release.wait()
+    service.mechanisms['test'] = SimpleNamespace(cookies=AsyncMock(return_value=[]), push=AsyncMock(), close=slow_close)
+    service.jobs['test'] = dict(id='test', domain='source.example', url=URL, mode='test', created=time.monotonic(),
+        routeProxy=None, routeGeneration=state.generation, browserCookies=initial, engineCookies=initial)
+    monkeypatch.setattr(transport, 'request', lambda method, url, **kw: httpx.Response(200, request=httpx.Request(method, url)))
+    job = asyncio.create_task(service.complete('test'))
+    try:
+        await asyncio.wait_for(closing.wait(), 3)
+        assert service.status('test')['status'] == 'completed'
+    finally:
+        release.set()
+        assert (await job)['success']
+        await service.close()

@@ -6,6 +6,7 @@ if TYPE_CHECKING:
 
 from animelab.services.download_stages.state import transition
 import asyncio
+from contextlib import asynccontextmanager
 from animelab.services.background import spawn
 import logging
 from datetime import datetime, timezone
@@ -25,6 +26,34 @@ class DownloadScheduler:
         self.workers = {}
         self.network_tasks = set()
         self.closing = False
+        self.resource_waiters = []
+
+    def active_network(self):
+        return self.network_tasks | {task.id for task in self.manager.tasks.values()
+            if task.status in (DownloadStatus.DOWNLOADING, DownloadStatus.RETRYING)
+            and task.phase not in ('verifying', 'muxing', 'exporting', 'preparing_output', 'waiting_resources')}
+
+    @asynccontextmanager
+    async def resource_network(self, task):
+        from animelab.services.media_execution import MediaInterrupted
+        self.resource_waiters.append(task.id)
+        task.phase = 'waiting_resources'
+        try:
+            while True:
+                if self.closing or task.paused or task.cancelled:
+                    raise MediaInterrupted('Récupération de piste interrompue')
+                async with self.lock:
+                    if self.resource_waiters[0] == task.id and len(self.active_network()) < self.manager.max_concurrent_downloads:
+                        self.resource_waiters.remove(task.id)
+                        self.network_tasks.add(task.id)
+                        break
+                await asyncio.sleep(.05)
+            yield
+        finally:
+            if task.id in self.resource_waiters:
+                self.resource_waiters.remove(task.id)
+            task.phase = 'preparing_output'
+            self.release_network(task.id)
 
     def move_task_to_top(self, task_id: str):
         ctx = self.manager
@@ -73,10 +102,8 @@ class DownloadScheduler:
         if self.closing:
             return
         async with self.lock:
-            active = self.network_tasks | {task.id for task in ctx.tasks.values()
-                if task.status in (DownloadStatus.DOWNLOADING, DownloadStatus.RETRYING)
-                and task.phase not in ('verifying', 'muxing', 'exporting')}
-            slots = max(0, ctx.max_concurrent_downloads - len(active))
+            active = self.active_network()
+            slots = max(0, ctx.max_concurrent_downloads - len(active) - len(self.resource_waiters))
             for task_id in list(ctx.task_order):
                 if slots <= 0:
                     break

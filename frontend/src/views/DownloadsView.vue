@@ -480,6 +480,14 @@
           </div>
 
           <!-- Barre de progression intelligente -->
+          <p
+            v-for="warning in task.outputWarnings || []"
+            :key="warning"
+            class="task-phase-description"
+            role="status"
+          >
+            {{ tx(warning) }}
+          </p>
           <p v-if="phaseDescription(task)" class="task-phase-description">
             {{ tx(phaseDescription(task)) }}
           </p>
@@ -632,6 +640,14 @@
 
         <!-- Boutons d'Action Contextuels -->
         <div class="task-col-actions">
+          <button
+            v-if="task.savePath && ['completed', 'error', 'failed', 'paused'].includes(task.status)"
+            type="button"
+            class="btn btn-sm"
+            @click="outputTask = task"
+          >
+            {{ tx('Pistes et format') }}
+          </button>
           <!-- Actif : Pause & Annuler -->
           <template
             v-if="
@@ -953,6 +969,12 @@
       </div>
     </div>
 
+    <OutputTracksDialog
+      v-if="outputTask"
+      :task="outputTask"
+      @close="outputTask = null"
+      @saved="outputSaved"
+    />
     <!-- Modale Réglage Plafond Débit Tâche Individuelle -->
     <ConfirmDialog
       :open="Boolean(speedModalTask)"
@@ -1004,6 +1026,7 @@ import ProxyRotationButton from '@/components/ProxyRotationButton.vue'
 import VerificationPrompt from '@/components/VerificationPrompt.vue'
 import ExportStatusNotice from '@/components/ExportStatusNotice.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import OutputTracksDialog from '@/components/OutputTracksDialog.vue'
 import { ref, computed, onMounted, onActivated } from 'vue'
 import { useDownloadStore } from '@/stores/downloads'
 import { useLibraryStore } from '@/stores/library'
@@ -1015,6 +1038,12 @@ import { api } from '@/api/client'
 defineOptions({ name: 'DownloadsView' })
 const notifications = useNotifications()
 const downloadStore = useDownloadStore()
+const outputTask = ref<DownloadTask | null>(null)
+async function outputSaved() {
+  outputTask.value = null
+  await downloadStore.fetchTasks()
+  notifications.notify(tx('Traitement local ajouté à la file'), 'success')
+}
 const downloadChallenges = computed(() =>
   filteredTasks.value
     .filter((t) => t.status === 'verification_required' && t.verificationDomain)
@@ -1241,6 +1270,8 @@ function getQueueIndex(taskId: string | number): number {
 function getVisualProgress(task: DownloadTask): number {
   const s = (task.status || '').toLowerCase()
   if (s === 'completed') return 100
+  if (task.phase === 'burning' && task.videoDuration && task.mediaProgressSeconds != null)
+    return Math.min(99, Math.max(0, (task.mediaProgressSeconds / task.videoDuration) * 100))
   return Math.min(99, Math.max(0, task.progress || 0))
 }
 
@@ -1269,6 +1300,10 @@ function getStatusLabel(task: DownloadTask): string {
             subtitles: 'Sous-titres',
             assembling: 'Assemblage',
             muxing: 'Fusion des sous-titres',
+            burning: 'Incrustation des sous-titres',
+            audio: 'Récupération des pistes audio',
+            preparing_output: 'Préparation du master local',
+            waiting_resources: 'Attente d’un créneau réseau',
             verifying: 'Vérification du fichier',
           } as Record<string, string>
         )[task.phase || 'video'] || 'En cours'
@@ -1297,6 +1332,11 @@ function getStatusLabel(task: DownloadTask): string {
 }
 
 function progressText(task: DownloadTask): string {
+  if (
+    ['assembling', 'muxing', 'burning'].includes(task.phase || '') &&
+    task.mediaProgressSeconds != null
+  )
+    return `${task.mediaProgressSeconds.toFixed(1)} s · ${tx('de vidéo traitée')}`
   const downloaded = formatBytes(task.bytesDownloaded)
   if (!task.totalBytes || task.totalBytes <= 0)
     return `${downloaded} téléchargés — taille totale inconnue`
@@ -1311,6 +1351,10 @@ function phaseDescription(task: DownloadTask): string {
         subtitles: 'La vidéo est récupérée. Téléchargement des pistes de sous-titres…',
         assembling: 'Assemblage des segments vidéo…',
         muxing: 'Intégration des sous-titres dans la vidéo…',
+        burning: 'Réencodage de la vidéo avec les sous-titres incrustés…',
+        audio: 'Téléchargement des pistes audio sélectionnées…',
+        preparing_output: 'Préparation des fichiers locaux pour le traitement…',
+        waiting_resources: 'Les pistes attendent un créneau du gestionnaire de téléchargements…',
         verifying: 'Contrôle du fichier vidéo et de ses pistes audio…',
       } as Record<string, string>
     )[task.phase || ''] || ''

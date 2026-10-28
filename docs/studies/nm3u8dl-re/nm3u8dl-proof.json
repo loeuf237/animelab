@@ -1,0 +1,232 @@
+{
+  "schemaVersion": 1,
+  "tool": "0.6.0+df70f0b3da0c630bd413bf617e758051f6b64757",
+  "archiveSha256": "2ebcd450594a08c0de0bcd502a80c5d3f89a702a0fa6604199527bb8d6eee4db",
+  "binarySha256": "87e5bf963d9c1a72aee8eb5a75edbe398de2b00ec209b595f621ac6a9c344186",
+  "platform": "linux",
+  "synthetic": true,
+  "network": "mock SourceHTTP-compatible acquisition; external tool in private network namespace",
+  "headlessWorkaround": "--force-ansi-console; COLUMNS=160; LINES=50",
+  "cases": [
+    {
+      "case": "simple",
+      "success": true,
+      "assembled": true,
+      "nativeCapability": true,
+      "durationSeconds": 4.032,
+      "negativeClockProbe": false,
+      "elapsedSeconds": 1.288,
+      "cpuSeconds": 0.764,
+      "syntheticPipelineKiBPerSecond": 45.78,
+      "peakChildRssKiB": 98036,
+      "workspaceBytes": 225498,
+      "upstreamBytes": 60360,
+      "upstreamRequests": 5,
+      "networkObservation": {
+        "returncode": 0,
+        "networkIsolated": true,
+        "connectTraceAvailable": true,
+        "observedIPv4": [],
+        "observedIPv6": [
+          "::ffff:127.0.0.1"
+        ],
+        "peakWorkerChildRssKiB": 56788,
+        "workerChildCpuSeconds": 0.4448
+      },
+      "streamTypes": [
+        "video",
+        "audio"
+      ],
+      "videoFramesMatchReference": true
+    },
+    {
+      "case": "aes",
+      "success": true,
+      "assembled": true,
+      "nativeCapability": true,
+      "durationSeconds": 4.032,
+      "negativeClockProbe": false,
+      "elapsedSeconds": 1.249,
+      "cpuSeconds": 0.745,
+      "syntheticPipelineKiBPerSecond": 47.29,
+      "peakChildRssKiB": 98256,
+      "workspaceBytes": 226213,
+      "upstreamBytes": 60502,
+      "upstreamRequests": 6,
+      "networkObservation": {
+        "returncode": 0,
+        "networkIsolated": true,
+        "connectTraceAvailable": true,
+        "observedIPv4": [],
+        "observedIPv6": [
+          "::ffff:127.0.0.1"
+        ],
+        "peakWorkerChildRssKiB": 57556,
+        "workerChildCpuSeconds": 0.4319
+      },
+      "streamTypes": [
+        "video",
+        "audio"
+      ],
+      "videoFramesMatchReference": true
+    },
+    {
+      "case": "fmp4",
+      "success": true,
+      "assembled": true,
+      "nativeCapability": false,
+      "durationSeconds": 4.022,
+      "negativeClockProbe": false,
+      "elapsedSeconds": 1.107,
+      "cpuSeconds": 0.671,
+      "syntheticPipelineKiBPerSecond": 36.21,
+      "peakChildRssKiB": 98436,
+      "workspaceBytes": 166838,
+      "upstreamBytes": 41045,
+      "upstreamRequests": 6,
+      "networkObservation": {
+        "returncode": 0,
+        "networkIsolated": true,
+        "connectTraceAvailable": true,
+        "observedIPv4": [],
+        "observedIPv6": [
+          "::ffff:127.0.0.1"
+        ],
+        "peakWorkerChildRssKiB": 56264,
+        "workerChildCpuSeconds": 0.3732
+      },
+      "streamTypes": [
+        "video",
+        "audio"
+      ],
+      "videoFramesMatchReference": true
+    },
+    {
+      "case": "dash",
+      "success": true,
+      "assembled": true,
+      "nativeCapability": false,
+      "durationSeconds": 4.021,
+      "negativeClockProbe": false,
+      "elapsedSeconds": 1.275,
+      "cpuSeconds": 0.839,
+      "syntheticPipelineKiBPerSecond": 33.07,
+      "peakChildRssKiB": 98436,
+      "workspaceBytes": 215156,
+      "upstreamBytes": 43168,
+      "upstreamRequests": 12,
+      "networkObservation": {
+        "returncode": 0,
+        "networkIsolated": true,
+        "connectTraceAvailable": true,
+        "observedIPv4": [],
+        "observedIPv6": [
+          "::ffff:127.0.0.1"
+        ],
+        "peakWorkerChildRssKiB": 56832,
+        "workerChildCpuSeconds": 0.5508
+      },
+      "streamTypes": [
+        "video",
+        "audio"
+      ],
+      "videoFramesMatchReference": true
+    },
+    {
+      "case": "subtitle",
+      "success": true,
+      "assembled": true,
+      "nativeCapability": false,
+      "durationSeconds": 4.032,
+      "negativeClockProbe": false,
+      "elapsedSeconds": 1.229,
+      "cpuSeconds": 0.81,
+      "syntheticPipelineKiBPerSecond": 48.35,
+      "peakChildRssKiB": 98564,
+      "workspaceBytes": 228847,
+      "upstreamBytes": 60858,
+      "upstreamRequests": 9,
+      "networkObservation": {
+        "returncode": 0,
+        "networkIsolated": true,
+        "connectTraceAvailable": true,
+        "observedIPv4": [],
+        "observedIPv6": [
+          "::ffff:127.0.0.1"
+        ],
+        "peakWorkerChildRssKiB": 57108,
+        "workerChildCpuSeconds": 0.5254
+      },
+      "streamTypes": [
+        "video",
+        "audio",
+        "subtitle"
+      ],
+      "videoFramesMatchReference": true,
+      "subtitleTimes": [
+        [
+          0.2,
+          0.8
+        ],
+        [
+          2.2,
+          2.8
+        ]
+      ],
+      "subtitleClockCorrect": true
+    },
+    {
+      "case": "discontinuity",
+      "success": false,
+      "assembled": true,
+      "nativeCapability": false,
+      "durationSeconds": 4.032,
+      "negativeClockProbe": true,
+      "elapsedSeconds": 1.814,
+      "cpuSeconds": 1.049,
+      "syntheticPipelineKiBPerSecond": 32.81,
+      "peakChildRssKiB": 98564,
+      "workspaceBytes": 228782,
+      "upstreamBytes": 60930,
+      "upstreamRequests": 9,
+      "networkObservation": {
+        "returncode": 0,
+        "networkIsolated": true,
+        "connectTraceAvailable": true,
+        "observedIPv4": [],
+        "observedIPv6": [
+          "::ffff:127.0.0.1"
+        ],
+        "peakWorkerChildRssKiB": 57516,
+        "workerChildCpuSeconds": 0.6604
+      },
+      "streamTypes": [
+        "video",
+        "audio",
+        "subtitle"
+      ],
+      "videoFramesMatchReference": true,
+      "subtitleTimes": [
+        [
+          0.2,
+          0.8
+        ],
+        [
+          0.2,
+          0.8
+        ]
+      ],
+      "subtitleClockCorrect": false
+    }
+  ],
+  "corruptToolCache": {
+    "accepted": false,
+    "reason": "UnsupportedMedia: Dur\u00e9e assembl\u00e9e diff\u00e9rente du manifeste ; r\u00e9sultat incomplet refus\u00e9",
+    "upstreamReportedSuccess": true,
+    "upstreamFragmentsFetched": 0,
+    "safeRebuildFramesMatchReference": true,
+    "cacheProbeElapsedSeconds": 1.878
+  },
+  "metricsLimit": "4 second synthetic samples; peak RSS is cumulative child high-water mark, not per-case allocation; no Internet throughput claim",
+  "productionBackendEnabled": false
+}

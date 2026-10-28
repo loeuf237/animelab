@@ -1,0 +1,211 @@
+{
+  "analysis_date": "2026-10-27",
+  "analyzed_commit": "1cea1983ec741c502cf5241d3b5ebdfacb38330a",
+  "scope": "P1-P9 implemented locally; P14 JNI implementation awaiting Android validation; P12 not adopted, P13/P15 not retained",
+  "upstream_tag": "v0.6.0-beta",
+  "diagrams": [
+    {
+      "id": "01-cas-utilisation",
+      "title": "Cas d’utilisation — cible proposée",
+      "category": "cas",
+      "proposed": true,
+      "references": [
+        {
+          "path": "animelab/api_contracts.py",
+          "symbol": "SubtitleTrack",
+          "line": 227
+        }
+      ],
+      "source": "plantuml/01-cas-utilisation.puml",
+      "svg": "svg/01-cas-utilisation.svg",
+      "width": 1148,
+      "height": 992
+    },
+    {
+      "id": "02-composants-existants",
+      "title": "Existant vérifié — ce que le code fait aujourd’hui",
+      "category": "classes",
+      "proposed": false,
+      "references": [
+        {
+          "path": "animelab/services/download_manager.py",
+          "symbol": "DownloadManagerService",
+          "line": 67
+        },
+        {
+          "path": "animelab/services/download_stages/transfer.py",
+          "symbol": "TransferWorker._download_single_file",
+          "line": 265
+        },
+        {
+          "path": "animelab/services/download_stages/transfer.py",
+          "symbol": "TransferWorker._download_hls_segments_native",
+          "line": 702
+        },
+        {
+          "path": "animelab/services/download_stages/media.py",
+          "symbol": "MediaPipeline._mux_subtitles_with_ffmpeg",
+          "line": 442
+        },
+        {
+          "path": "animelab/services/extractors/ytdlp_fallback.py",
+          "symbol": "YtDlpFallbackExtractor.extract",
+          "line": 29
+        }
+      ],
+      "source": "plantuml/02-composants-existants.puml",
+      "svg": "svg/02-composants-existants.svg",
+      "width": 1661,
+      "height": 520
+    },
+    {
+      "id": "03-composants-cibles",
+      "title": "Architecture cible — responsabilités séparées",
+      "category": "cible",
+      "proposed": true,
+      "references": [
+        {
+          "path": "animelab/services/source_http.py",
+          "symbol": "SourceHTTPService",
+          "line": 97
+        },
+        {
+          "path": "animelab/media_policy.py",
+          "symbol": "validate_media_url",
+          "line": 22
+        },
+        {
+          "path": "animelab/services/download_stages/scheduler.py",
+          "symbol": "DownloadScheduler",
+          "line": 22
+        }
+      ],
+      "source": "plantuml/03-composants-cibles.puml",
+      "svg": "svg/03-composants-cibles.svg",
+      "width": 1191,
+      "height": 1070
+    },
+    {
+      "id": "04-classes-cibles",
+      "title": "Diagramme de classes — contrats proposés, non implémentés",
+      "category": "classes",
+      "proposed": true,
+      "references": [
+        {
+          "path": "animelab/models/download_task.py",
+          "symbol": "DownloadTask",
+          "line": 225
+        },
+        {
+          "path": "animelab/services/subtitle_service.py",
+          "symbol": "normalize_subtitles",
+          "line": 8
+        },
+        {
+          "path": "animelab/services/recipe_runtime.py",
+          "symbol": "RecipeRuntime.stream",
+          "line": 276
+        }
+      ],
+      "source": "plantuml/04-classes-cibles.puml",
+      "svg": "svg/04-classes-cibles.svg",
+      "width": 1438,
+      "height": 1109
+    },
+    {
+      "id": "05-sequence-episode",
+      "title": "Séquence proposée — épisode, pistes et fichier final",
+      "category": "sequence",
+      "proposed": true,
+      "references": [
+        {
+          "path": "animelab/services/aniyomi_container.py",
+          "symbol": "AniyomiContainerSource.get_episode_sources",
+          "line": 502
+        },
+        {
+          "path": "animelab/services/download_stages/media.py",
+          "symbol": "MediaPipeline._download_subtitles",
+          "line": 300
+        }
+      ],
+      "source": "plantuml/05-sequence-episode.puml",
+      "svg": "svg/05-sequence-episode.svg",
+      "width": 1820,
+      "height": 1197
+    },
+    {
+      "id": "06-activite-sortie",
+      "title": "Activité proposée — choisir le transfert et la sortie",
+      "category": "cible",
+      "proposed": true,
+      "references": [
+        {
+          "path": "animelab/services/download_stages/media.py",
+          "symbol": "MediaPipeline._prepare",
+          "line": 73
+        }
+      ],
+      "source": "plantuml/06-activite-sortie.puml",
+      "svg": "svg/06-activite-sortie.svg",
+      "width": 1487,
+      "height": 883
+    },
+    {
+      "id": "07-etats-reprise",
+      "title": "États proposés — pas de reprise aveugle entre moteurs",
+      "category": "cible",
+      "proposed": true,
+      "references": [
+        {
+          "path": "animelab/services/download_stages/state.py",
+          "symbol": "transition",
+          "line": 19
+        }
+      ],
+      "source": "plantuml/07-etats-reprise.puml",
+      "svg": "svg/07-etats-reprise.svg",
+      "width": 2214,
+      "height": 1143
+    },
+    {
+      "id": "08-merise-mcd",
+      "title": "MCD de type Merise — modèle conceptuel proposé",
+      "category": "classes",
+      "proposed": true,
+      "references": [
+        {
+          "path": "animelab/models/download_task.py",
+          "symbol": "DownloadTaskEntity",
+          "line": 137
+        }
+      ],
+      "source": "plantuml/08-merise-mcd.puml",
+      "svg": "svg/08-merise-mcd.svg",
+      "width": 1326,
+      "height": 716
+    },
+    {
+      "id": "09-deploiement",
+      "title": "Déploiement proposé — desktop d’abord, Android sous conditions",
+      "category": "deploiement",
+      "proposed": true,
+      "references": [
+        {
+          "path": "animelab/media_tools.py",
+          "symbol": "run",
+          "line": 48
+        },
+        {
+          "path": "android/app/src/main/java/com/animan/app/MediaBridge.kt",
+          "symbol": "MediaBridge",
+          "line": 17
+        }
+      ],
+      "source": "plantuml/09-deploiement.puml",
+      "svg": "svg/09-deploiement.svg",
+      "width": 1366,
+      "height": 714
+    }
+  ]
+}

@@ -38,6 +38,8 @@ from animelab.services.voiranime_service import voiranime_service
 from animelab.services.verification_service import verification_service, VerificationResult
 from animelab.services.extractors import extractor_registry
 from animelab.services.subtitle_service import normalize_subtitles, subtitle_extension, subtitle_language
+from animelab.services.media_contracts import merge_stream_metadata
+from animelab.services.output_profiles import snapshot, require_available
 from animelab.services.download_resume import (RESUME_OVERLAP, ResumeMismatch, read_metadata,
     valid_cached_segment, commit_segment, publish_file, media_resource,
                                             write_metadata, representation, response_range, prepare_hls_cache)
@@ -50,6 +52,8 @@ class ResolvedVideoInfo:
         self.direct_url: str = ""
         self.subtitle_url: str = ""
         self.subtitles_json: str = "[]"
+        self.media_json: str = "{}"
+        self.headers: dict = {}
         self.size: int = -1
         self.formatted_size: str = "Taille inconnue"
         self.server_type: str = "unknown"
@@ -510,6 +514,7 @@ class DownloadManagerService:
         url: str,
         referer: Optional[str] = None,
         preferred_quality: Optional[str] = None,
+        source_info: Optional[Dict[str, Any]] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Résout l'URL directe (m3u8 ou mp4) pour les sources importées et hébergeurs vidéo
@@ -526,19 +531,20 @@ class DownloadManagerService:
             headers = self.get_headers_for_url(clean_url, "imported")
             if referer:
                 headers["Referer"] = referer
+            headers.update((source_info or {}).get('headers') or {})
             sz = (
                 await self.estimate_hls_size(clean_url, headers=headers)
                 if is_hls
                 else await self.get_remote_file_size(clean_url, headers=headers, server_type="imported")
             )
-            return {
+            return merge_stream_metadata({
                 "videoUrl": clean_url,
                 "serverType": "direct",
                 "selectedQuality": preferred_quality or "HD",
                 "videoQualities": json.dumps({"HD": clean_url}),
                 "size": sz,
                 "headers": headers,
-            }
+            }, source_info, referer or clean_url)
 
         # 2. Délégation aux extracteurs dédiés
         res = await extractor_registry.extract(clean_url, referer=referer, preferred_quality=preferred_quality)
@@ -553,7 +559,7 @@ class DownloadManagerService:
                     else await self.get_remote_file_size(info["videoUrl"], headers=headers, server_type=info["serverType"])
                 )
                 info["size"] = sz
-            return info
+            return merge_stream_metadata(info, source_info, referer or clean_url)
 
         return None
 
@@ -660,7 +666,8 @@ class DownloadManagerService:
                                 cand_u, preferred_quality=preferred_quality
                             )
                             if cand_res and cand_res.get("videoUrl"):
-                                resolved = cand_res
+                                candidate = target if target and target.get('url') == cand_u else next((row for row in video_sources if row.get("url") == cand_u), {})
+                                resolved = merge_stream_metadata(cand_res, candidate, download_page_url)
                                 break
                         except VerificationRequired:
                             raise
@@ -783,6 +790,8 @@ class DownloadManagerService:
                     dl_info = await asyncio.to_thread(scraping_service.extract_download_info, download_page_url)
                     info.server_type = "vidzy"
 
+                info.media_json = json.dumps({key: dl_info.get(key, default) for key, default in (("audioTracks", []), ("requirements", []))})
+                info.headers = dl_info.get("headers") or {}
                 info.direct_url = dl_info.get("videoUrl", "")
                 info.subtitle_url = dl_info.get("subtitleUrl", "")
                 info.subtitles_json = json.dumps(normalize_subtitles(dl_info.get("subtitles", []), download_page_url))
@@ -830,12 +839,16 @@ class DownloadManagerService:
         source: str = "french-manga",
         version: str = "",
         anime_url: str = "",
+        output_profile: Optional[dict] = None,
     ) -> DownloadTask:
+        profile_json = snapshot(output_profile, legacy_subtitles=download_subtitles)
+        profile = require_available(profile_json)
+        download_subtitles = profile.mode != "ORIGINAL"
         existing_task = self._active_episode_task(download_page_url, source, version)
         if existing_task:
             return existing_task
         file_name = self._versioned_filename(file_name, version)
-        cache_key = f"{download_page_url}::{source}::{selected_server or ''}::{selected_quality or ''}"
+        cache_key = f"{download_page_url}::{source}::{selected_server or self.voiranime_default_server}::{selected_quality or ''}"
         cached = self.resolved_info_cache.get(cache_key)
         if not cached and not (selected_server or selected_quality):
             cached = self.resolved_info_cache.get(download_page_url)
@@ -872,6 +885,8 @@ class DownloadManagerService:
             downloadPageUrl=download_page_url,
             subtitleUrl=subtitle_url,
             subtitlesJson=resolved_subs,
+            mediaJson=cached.media_json if cached else "{}",
+            outputProfileJson=profile_json,
             downloadSubtitles=download_subtitles,
             status=status,
             scheduledStartTime=scheduled_start_time,
@@ -885,6 +900,7 @@ class DownloadManagerService:
             exportStatus=ExportStatus.PENDING if platform_events.completed_handler is not None else ExportStatus.NOT_REQUESTED,
         )
 
+        task.requestHeaders = dict(cached.headers) if cached else {}
         library_service.save_task(task)
         self.tasks[task.id] = task
         self.task_order.append(task.id)
@@ -896,6 +912,10 @@ class DownloadManagerService:
         return task
 
     def start_batch_download(self, anime_name: str, episodes: List[Dict[str, Any]], source: str = "french-manga") -> List[DownloadTask]:
+        # Validate the whole batch before allocating paths or queue entries.
+        profiles = [snapshot(ep.get("outputProfile"), legacy_subtitles=str(ep.get("downloadSubtitles", "false")).lower() == "true") for ep in episodes]
+        for profile in profiles:
+            require_available(profile)
         started = []
         new_tasks = []
 
@@ -906,7 +926,7 @@ class DownloadManagerService:
             anime_dir = Path(self.download_dir) / clean_anime
         anime_dir.mkdir(parents=True, exist_ok=True)
 
-        for ep in episodes:
+        for ep, profile_json in zip(episodes, profiles):
             ep_num = int(ep.get("number", 0))
             url = ep.get("url", "")
             if not url:
@@ -917,7 +937,7 @@ class DownloadManagerService:
                 continue
             name = self._versioned_filename(ep.get("fileName", f"{anime_name} - Episode {ep_num}.mp4"), version)
             sub_url = ep.get("subtitleUrl")
-            dl_subs = str(ep.get("downloadSubtitles", "false")).lower() == "true"
+            dl_subs = require_available(profile_json).mode != "ORIGINAL"
             sel_server = ep.get("selectedServer")
             sel_quality = ep.get("selectedQuality")
 
@@ -932,7 +952,7 @@ class DownloadManagerService:
                     continue
 
             if existing:
-                cache_key = f"{url}::{ep_source}::{sel_server or ''}::{sel_quality or ''}"
+                cache_key = f"{url}::{ep_source}::{sel_server or self.voiranime_default_server}::{sel_quality or ''}"
                 cached = self.resolved_info_cache.get(cache_key)
                 if not cached and not (sel_server or sel_quality):
                     cached = self.resolved_info_cache.get(url)
@@ -954,7 +974,7 @@ class DownloadManagerService:
                 except Exception:
                     pass
 
-            cache_key = f"{url}::{ep_source}::{sel_server or ''}::{sel_quality or ''}"
+            cache_key = f"{url}::{ep_source}::{sel_server or self.voiranime_default_server}::{sel_quality or ''}"
             cached = self.resolved_info_cache.get(cache_key)
             if not cached and not (sel_server or sel_quality):
                 cached = self.resolved_info_cache.get(url)
@@ -983,6 +1003,8 @@ class DownloadManagerService:
                 downloadPageUrl=url,
                 subtitleUrl=sub_url,
                 subtitlesJson=resolved_subs,
+                mediaJson=cached.media_json if cached else "{}",
+                outputProfileJson=profile_json,
                 downloadSubtitles=dl_subs,
                 status=status,
                 scheduledStartTime=sched_time,
@@ -996,6 +1018,7 @@ class DownloadManagerService:
                 exportStatus=ExportStatus.PENDING if platform_events.completed_handler is not None else ExportStatus.NOT_REQUESTED,
             )
 
+            task.requestHeaders = dict(cached.headers) if cached else {}
             self.tasks[task.id] = task
             self.task_order.append(task.id)
             new_tasks.append(task)
@@ -1027,6 +1050,70 @@ class DownloadManagerService:
         entity = library_service.get_task_entity(task_id)
         return entity.to_task() if entity else None
 
+    async def output_inventory(self, task_id: str):
+        task = self.get_task(task_id)
+        if task is None:
+            raise KeyError(task_id)
+        if self._export_in_progress(task_id) or task.status in (DownloadStatus.DOWNLOADING, DownloadStatus.MUXING, DownloadStatus.RETRYING, DownloadStatus.PENDING):
+            raise ValueError('Attendez la fin ou mettez le téléchargement en pause avant de choisir les pistes')
+        async with self.media_pipeline.inventory_budget:
+            tracks, data = await asyncio.to_thread(self.media_pipeline.output_processor.inventory, task)
+            from animelab.services.output_profiles import available_profiles
+            profiles = await asyncio.to_thread(available_profiles)
+        return dict(tracks=[track.public() for track in tracks], outputProfile=json.loads(task.outputProfileJson),
+                    profiles=profiles, duration=data.get('format', {}).get('duration'),
+                    warnings=self.media_pipeline.output_processor.state(task).get('warnings', []))
+
+    async def reprocess_output(self, task_id: str, value):
+        import copy
+        if task_id in getattr(self, '_subtitle_mutations', set()):
+            raise ValueError('Attendez la fin de l’import de sous-titres')
+        task = self.get_task(task_id)
+        if task is None:
+            raise KeyError(task_id)
+        profile_json = snapshot(value)
+        profile = require_available(profile_json)
+        if profile.mode == 'ORIGINAL':
+            raise ValueError('Choisissez un format de traitement ; le master original reste conservé')
+        await self.output_inventory(task_id)
+        async with self.media_pipeline.inventory_budget:
+            inventory, _ = await asyncio.to_thread(self.media_pipeline.output_processor.inventory, task)
+        proposed = copy.copy(task)
+        proposed.outputProfileJson = profile_json
+        self.media_pipeline.output_processor.select(proposed, inventory)
+        if task_id in getattr(self, '_subtitle_mutations', set()):
+            raise ValueError('Attendez la fin de l’import de sous-titres')
+        task = self.tasks.get(task_id) or task
+        if self._export_in_progress(task_id) or task.status in (DownloadStatus.DOWNLOADING, DownloadStatus.MUXING, DownloadStatus.RETRYING, DownloadStatus.PENDING):
+            raise ValueError('Un traitement est déjà en cours pour cette tâche')
+        state = self.media_pipeline.output_processor.state(task)
+        master = state.get('master') or task.savePath
+        if not master or not is_safe_path(master, [self.download_dir]) or not Path(master).is_file():
+            raise ValueError('Master local introuvable')
+        task.outputProfileJson = profile_json
+        task.savePath = master
+        task.fileName = Path(state.get('source') or master).name
+        task.totalBytes = task.downloadedBytes = Path(master).stat().st_size
+        task.downloadSubtitles = True
+        task.paused = task.cancelled = False
+        task.error = None
+        task.progress = 100
+        task.exportStatus = ExportStatus.PENDING if platform_events.completed_handler else ExportStatus.NOT_REQUESTED
+        task.exportUrisJson = '[]'
+        task.exportError = None
+        task.exportedAt = None
+        task.completedAt = None
+        task.verificationStatus = 'UNVERIFIED'
+        task.verifiedAt = None
+        transition(task, DownloadStatus.PENDING)
+        library_service.save_task(task)
+        self.tasks[task.id] = task
+        if task.id not in self.task_order:
+            self.task_order.append(task.id)
+        self.broadcast_update(task)
+        self._trigger_process_queue()
+        return task
+
     def pause_download(self, task_id: str) -> bool:
         t = self.tasks.get(task_id)
         if t and t.status in [DownloadStatus.DOWNLOADING, DownloadStatus.PENDING, DownloadStatus.RETRYING, DownloadStatus.SCHEDULED, DownloadStatus.MUXING]:
@@ -1048,6 +1135,8 @@ class DownloadManagerService:
         return sum(self.resume_download(task_id) for task_id in ids)
 
     def resume_download(self, task_id: str) -> bool:
+        if task_id in getattr(self, '_subtitle_mutations', set()):
+            return False
         if self._export_in_progress(task_id):
             return False
         t = self.tasks.get(task_id)
@@ -1207,12 +1296,15 @@ class DownloadManagerService:
                     or (native is not None and not native.done()))
 
     def remove_task(self, task_id: str) -> bool:
+        if task_id in getattr(self, '_subtitle_mutations', set()):
+            raise ValueError('Attendez la fin de l’import de sous-titres')
         if self._export_in_progress(task_id):
             raise ValueError("Wait for the current export before removing this download")
-        t = self.tasks.pop(task_id, None)
+        t = self.tasks.pop(task_id, None) or self.get_task(task_id)
         if task_id in self.task_order:
             self.task_order.remove(task_id)
         if t:
+            t._removed = True
             t.cancelled = True
             proc = getattr(t, "activeProcess", None)
             if proc:
@@ -1229,6 +1321,21 @@ class DownloadManagerService:
                 if seg_d.exists():
                     shutil.rmtree(seg_d, ignore_errors=True)
         deleted_from_db = library_service.delete_task_entity(task_id)
+        if t:
+            worker = self.scheduler.workers.get(task_id)
+            def cleanup_media(_=None):
+                media_job = self.media_pipeline.jobs.get(task_id)
+                if media_job and not media_job.done():
+                    media_job.add_done_callback(cleanup_media)
+                    return
+                try:
+                    self.media_pipeline.output_processor.cleanup(t)
+                except OSError:
+                    logger.warning('Unable to clean private media workspace for %s', task_id)
+            if worker and not worker.done():
+                worker.add_done_callback(cleanup_media)
+            else:
+                cleanup_media()
         self._trigger_process_queue()
         return (t is not None) or deleted_from_db
 
@@ -1473,6 +1580,8 @@ class DownloadManagerService:
 
     def redownload_task(self, task_id: str, force: bool = False) -> Optional[DownloadTask]:
         """Relance un téléchargement en reprenant si possible ou en nettoyant si corrompu."""
+        if task_id in getattr(self, '_subtitle_mutations', set()):
+            raise ValueError('Attendez la fin de l’import de sous-titres')
         task = self.get_task(task_id)
         if not task:
             return None
@@ -1513,6 +1622,17 @@ class DownloadManagerService:
             return self.get_task(task_id)
 
         # Sinon, purger tout fichier corrompu ou vide sur le disque
+        output_state = self.media_pipeline.output_processor.state(task)
+        if output_state:
+            # Fresh video transfer must never recover a receipt/master belonging
+            # to the previous representation. Keep already published outputs.
+            self.media_pipeline.output_processor.cleanup(task, keep_imports=True)
+            task.savePath = output_state.get('source') or task.savePath
+            task.fileName = Path(task.savePath).name if task.savePath else task.fileName
+            media = json.loads(task.mediaJson)
+            media.pop('outputState', None)
+            task.mediaJson = json.dumps(media)
+            task.savePathSubtitle = None
         if task.savePath:
             try:
                 p = Path(task.savePath)
@@ -1528,6 +1648,7 @@ class DownloadManagerService:
         # Réinitialiser la tâche pour un nouveau téléchargement complet
         task.progress = 0.0
         task.downloadedBytes = 0
+        task.totalBytes = 0
         task.speed = 0
         task.error = None
         task.cancelled = False

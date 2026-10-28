@@ -141,7 +141,10 @@ async def test_mux_validates_output_and_updates_size(video, monkeypatch, contain
     monkeypatch.setattr(manager, "broadcast_update", lambda item: events.append(item.to_dict()))
     await manager._download_subtitles(episode)
     await manager._finalize_task(episode)
-    assert [event["phase"] for event in events[:3]] == ["subtitles", "muxing", "verifying"]
+    from itertools import groupby
+    phases = [phase for phase, _ in groupby(event['phase'] for event in events)]
+    assert phases[:3] == ["subtitles", "muxing", "verifying"]
+    assert any(event.get('mediaProgressSeconds') is not None for event in events)
     assert events[1]["status"] == "MUXING"
     assert events[-1]["status"] == "COMPLETED"
     assert episode.status == DownloadStatus.COMPLETED
@@ -180,6 +183,8 @@ def test_existing_mkv_is_preserved_and_new_export_gets_unique_name(video, monkey
             # Exercise the real mux/probe pipeline, isolating the storage policy
             # from the Android-only JNI implementation.
             monkeypatch.setattr(media_tools, "run", subprocess.run)
+            monkeypatch.setattr(manager.media_pipeline, '_run_media',
+                                lambda task, args: subprocess.run(args, capture_output=True, text=True, timeout=30))
     target = video.with_suffix(".mkv")
     target.write_bytes(b"existing video")
     sidecar = video.with_suffix(".srt")

@@ -1,0 +1,61 @@
+@startuml
+!include theme.iuml
+title MCD de type Merise — modèle conceptuel proposé
+left to right direction
+entity COMPTE {
+ * identifiantCompte
+}
+entity EPISODE {
+ * identifiantEpisode
+ titre / saison / numéro / numérotationAbsolue
+ imdbId / tmdbId / versionSource
+}
+entity TELECHARGEMENT {
+ * identifiantTache
+ modeSortie / état / backend / versionBackend
+ empreinteReprésentation / reprise
+}
+entity PISTE_MEDIA {
+ * identifiantPiste
+ type / langue / rôle / codec / provenance
+ référenceDistanteRenouvelable
+}
+entity FICHIER_SOUS_TITRES {
+ * identifiantFichier
+ format / cheminPrivé / empreinte
+ fournisseur / fichierExterne / fps
+}
+entity ARTEFACT_SORTIE {
+ * identifiantArtefact
+ format / chemin / taille / empreinte
+ durée / étatValidation
+}
+entity TENTATIVE_TRANSFERT {
+ * identifiantTentative
+ backend / version / espaceTravail
+ résultat / début / fin
+}
+entity SELECTION_PISTE <<association porteuse>> {
+ décalageMs / défaut / forcé
+ conserverStyle / rôleDeSortie
+}
+COMPTE "(0,N)" -- "(1,1)" TELECHARGEMENT : possède
+EPISODE "(0,N)" -- "(1,1)" TELECHARGEMENT : concerne
+EPISODE "(0,N)" -- "(1,1)" PISTE_MEDIA : propose
+PISTE_MEDIA "(0,N)" -- "(1,1)" FICHIER_SOUS_TITRES : matérialise
+TELECHARGEMENT "(0,N)" -- "(1,1)" TENTATIVE_TRANSFERT : exécute
+TELECHARGEMENT "(0,N)" -- "(1,1)" ARTEFACT_SORTIE : produit
+TELECHARGEMENT "(0,N)" -- "(1,1)" SELECTION_PISTE
+PISTE_MEDIA "(0,N)" -- "(1,1)" SELECTION_PISTE
+note bottom of COMPTE
+Conceptuellement propriétaire ; en mode partagé,
+chaque compte garde sa base et ses fichiers privés.
+Pas de fusion des bases privées dans la passerelle.
+end note
+note bottom of SELECTION_PISTE
+MLD : clé (tache_id, piste_id).
+Le décalage appartient à la sélection,
+pas au fichier original réutilisable.
+end note
+
+@enduml

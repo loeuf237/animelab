@@ -273,9 +273,12 @@ class RecipeRuntime:
             synopsis=BeautifulSoup(row.get('description') or '', 'html.parser').get_text(),
             genres=row.get('genres') or [], version=version, episodes=episodes)
 
-    def stream(self, url, name='Player', quality='HD'):
-        return {'url': url, 'server': name, 'name': name, 'quality': quality,
-                'format': 'hls' if '.m3u8' in url else 'mp4' if '.mp4' in url else 'embed'}
+    def stream(self, url, name='Player', quality='HD', metadata=None):
+        from animelab.services.media_contracts import merge_stream_metadata
+        result = merge_stream_metadata({'videoUrl': url}, metadata, self.source.base_url + '/')
+        result.update(url=url, server=name, name=name, quality=quality,
+                      format='hls' if '.m3u8' in url else 'mp4' if '.mp4' in url else 'embed')
+        return result
 
     async def players(self, url):
         config = self.plan.get('players', {})
@@ -303,7 +306,7 @@ class RecipeRuntime:
             return sources
         if response == 'streams':
             data = json.loads(await self.source._fetch_html(self.url(config['url'], slug=urlparse(url).path.rstrip('/').split('/')[-1])))
-            return [self.stream(s['url'], server.get('name', 'Player'), str(s.get(config['quality'], 'HD')) + ('p' if str(s.get(config['quality'], '')).isdigit() else ''))
+            return [self.stream(s['url'], server.get('name', 'Player'), str(s.get(config['quality'], 'HD')) + ('p' if str(s.get(config['quality'], '')).isdigit() else ''), metadata=s)
                 for server in field(data, config['servers'], []) for s in field(server, config['streams'], []) if s.get('url')]
         if response in ('redirects', 'json_html'):
             raw = await self.source._fetch_html(url)

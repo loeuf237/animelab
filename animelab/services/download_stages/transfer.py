@@ -29,6 +29,7 @@ from animelab.services.voiranime_service import voiranime_service
 from animelab.services.verification_service import verification_service
 from animelab.services.extractors import extractor_registry
 from animelab.services.download_errors import SubtitleError
+from animelab.services.media_contracts import merge_stream_metadata, UnsupportedMedia, validate_hls_capabilities
 from animelab.services.download_resume import (RESUME_OVERLAP, ResumeMismatch, read_metadata,
     valid_cached_segment, commit_segment, publish_file, media_resource,
                                             write_metadata, representation, response_range, prepare_hls_cache)
@@ -39,6 +40,10 @@ logger = logging.getLogger("animelab.download.transfer")
 class TransferWorker:
     def __init__(self, manager: DownloadManagerService):
         self.manager = manager
+        from animelab.services.source_resolvers import SourceResolverRegistry
+        from animelab.services.transfer_backends import TransferPlanner
+        self.resolvers = SourceResolverRegistry()
+        self.planner = TransferPlanner(manager)
 
     async def _execute_download(self, task: DownloadTask):
         ctx = self.manager
@@ -77,212 +82,11 @@ class TransferWorker:
                             return
                     task.phase = "resolving"
                     ctx.broadcast_update(task)
-                    direct_url = task.fileUrl
-                    clean_direct = (direct_url or "").split("#")[0].strip()
-                    parsed_u = urlparse(clean_direct)
-                    u_host = (parsed_u.hostname or "").lower()
-                    is_known_embed = extractor_registry.is_known_embed(clean_direct)
-                    is_imported = (
-                        (task.source and (task.source not in ("french-manga", "voir-anime", "animepahe"))) or
-                        is_known_embed
-                    )
-                    is_voir_anime = not is_imported and (("voir-anime" in (direct_url or "").lower()) or ("voiranime" in (direct_url or "").lower()) or task.source == "voir-anime")
-                    is_animepahe = not is_imported and (any(k in (direct_url or "").lower() for k in ["animepahe", "kwik.", "pahe."]) or task.source == "animepahe")
-                    server_type = "vidzy"
-                    chunks_json = "[]"
-
-                    # Réutiliser l'URL directe déjà résolue si disponible et valide (reprise)
-                    # S'assurer qu'elle n'est PAS une page HTML (ne contient pas /d/vidzy ou similaire)
-                    is_cached_valid = bool(
-                        task.directDownloadUrl and
-                        not ctx._needs_scraping_resolution(task.directDownloadUrl) and
-                        not re.search(r"vidzy\.[a-z]+/d/", task.directDownloadUrl)
-                    )
-
-                    if is_cached_valid and not need_resolve:
-                        direct_url = task.directDownloadUrl
-                        logger.info("Reusing cached direct URL for %s", task.fileName)
-                    elif is_imported:
-                        matched_container = None
-                        try:
-                            from animelab.services.extension_service import extension_service
-                            if task.source and task.source not in ("french-manga", "voir-anime", "animepahe"):
-                                matched_container = extension_service.get_container_source_by_id(task.source)
-                            if not matched_container and u_host:
-                                for cs in extension_service.get_enabled_container_sources():
-                                    if cs.base_url and u_host in cs.base_url.lower():
-                                        matched_container = cs
-                                        break
-                        except VerificationRequired:
-                            raise
-                        except Exception:
-                            pass
-
-                        target_url = direct_url
-                        video_sources = []
-                        target = None
-                        if matched_container and not is_known_embed:
-                            video_sources = await matched_container.get_episode_sources(direct_url)
-                            target = None
-                            if task.selectedServer and task.selectedServer != "auto":
-                                for s in video_sources:
-                                    s_srv = s.get("server") or s.get("name") or ""
-                                    if task.selectedServer.lower() in s_srv.lower():
-                                        target = s
-                                        break
-                            if not target and task.selectedQuality and task.selectedQuality != "auto":
-                                for s in video_sources:
-                                    q_name = s.get("quality") or s.get("server") or ""
-                                    if task.selectedQuality.lower() in q_name.lower():
-                                        target = s
-                                        break
-                            if not target and video_sources:
-                                target = video_sources[0]
-                            if target and target.get("url"):
-                                target_url = target.get("url", "")
-
-                        resolved = None
-                        candidate_urls = []
-                        if target and target.get("url"):
-                            candidate_urls.append(target.get("url"))
-                        if video_sources:
-                            for vs in video_sources:
-                                v_u = vs.get("url")
-                                if v_u and v_u not in candidate_urls:
-                                    candidate_urls.append(v_u)
-
-                        for cand_u in (candidate_urls or [target_url]):
-                            try:
-                                cand_res = await ctx.resolve_imported_video_stream(
-                                    cand_u, preferred_quality=task.selectedQuality
-                                )
-                                if cand_res and cand_res.get("videoUrl"):
-                                    resolved = cand_res
-                                    break
-                            except VerificationRequired:
-                                raise
-                            except Exception:
-                                pass
-
-                        if not resolved or not resolved.get("videoUrl"):
-                            clean_t = target_url.split("#")[0].strip()
-                            if re.search(r"\.(mp4|m3u8|webm|mkv)(\?.*)?$", clean_t, re.IGNORECASE):
-                                resolved = {
-                                    "videoUrl": clean_t,
-                                    "serverType": "direct",
-                                    "selectedQuality": task.selectedQuality or "HD",
-                                }
-                            else:
-                                raise ValueError(f"Impossible de résoudre le flux vidéo de la source importée pour {task.fileName}")
-
-                        direct_url = resolved["videoUrl"]
-                        server_type = resolved.get("serverType", "imported")
-                        task.selectedServer = server_type
-                        task.directDownloadUrl = direct_url
-                        ctx._update_resolved_subtitles(task, resolved.get("subtitles", []), target_url)
-                        task.subtitleUrl = resolved.get("subtitleUrl") or task.subtitleUrl
-                        if resolved.get("size") and task.totalBytes <= 0:
-                            task.totalBytes = resolved["size"]
-                    elif is_voir_anime:
-                        from animelab.services.source_settings_service import source_settings_service
-                        va_settings = source_settings_service.get_source_settings("voir-anime")
-                        va_strategy = va_settings.get("quality_strategy", "highest")
-                        pref_srv = task.selectedServer or ctx.voiranime_default_server
-                        # Si échec répété du serveur distant (client confirmé en ligne) ou erreur HTML, repli sur serveurs alternatifs
-                        consec_errs = getattr(task, "consecutiveServerErrors", 0)
-                        client_offline = getattr(task, "clientOffline", False)
-                        has_html_err = "html" in (task.error or "").lower()
-                        # Le basculement vers d'autres hébergeurs n'intervient que sur pannes serveur avérées répétées ou page HTML d'erreur
-                        if not client_offline and (consec_errs >= 2 or has_html_err):
-                            logger.info("[download_manager] Falling back to alternative servers for %s after confirmed failures on %s", task.fileName, pref_srv)
-                            if pref_srv:
-                                part_clean = Path(task.savePath + ".part")
-                                if part_clean.exists():
-                                    part_clean.unlink(missing_ok=True)
-                                segments_clean = Path(task.savePath).parent / f".{Path(task.savePath).stem}_segments"
-                                if segments_clean.exists():
-                                    shutil.rmtree(segments_clean, ignore_errors=True)
-                                task.downloadedBytes = 0
-                                task.progress = 0.0
-                            pref_srv = None
-                            task.selectedServer = None
-                            task.selectedQuality = None
-
-                        info = await asyncio.to_thread(
-                            voiranime_service.extract_download_info,
-                            direct_url,
-                            preferred_server=pref_srv,
-                            preferred_quality=task.selectedQuality,
-                            quality_strategy=va_strategy,
-                        )
-                        direct_url = info.get("videoUrl", "")
-                        if not direct_url:
-                            raise ValueError(f"Impossible d'extraire l'URL vidéo pour {task.fileName}")
-                        server_type = info.get("serverType", "unknown")
-                        chunks_json = info.get("videoChunks", "[]")
-                        task.directDownloadUrl = direct_url
-                        if (skip_local or not task.subtitleUrl) and info.get("subtitleUrl"):
-                            task.subtitleUrl = info["subtitleUrl"]
-                        ctx._update_resolved_subtitles(task, info.get("subtitles", []), task.fileUrl)
-                    elif is_animepahe:
-                        from animelab.services.animepahe_service import animepahe_service
-                        server_type = "kwik"
-                        if ("kwik." in direct_url or "pahe." in direct_url) and ("/e/" in direct_url or "/d/" in direct_url):
-                            extracted = await animepahe_service.extract_kwik_stream(direct_url)
-                            if not extracted:
-                                raise ValueError(f"Impossible de résoudre le flux Kwik pour {task.fileName}")
-                            direct_url = extracted
-                        elif task.selectedServer and ("kwik." in task.selectedServer or "pahe." in task.selectedServer):
-                            extracted = await animepahe_service.extract_kwik_stream(task.selectedServer)
-                            if not extracted:
-                                raise ValueError(f"Impossible de résoudre le flux Kwik sélectionné pour {task.fileName}")
-                            direct_url = extracted
-                        else:
-                            sources = await animepahe_service.get_episode_sources(direct_url)
-                            target = None
-                            if task.selectedQuality and task.selectedQuality != "auto":
-                                for s in sources:
-                                    q_name = s.get("name") or s.get("quality", "")
-                                    if task.selectedQuality.lower() in q_name.lower() or task.selectedQuality.lower() in s.get("quality", "").lower():
-                                        target = s
-                                        break
-                            if not target and sources:
-                                target = sources[0]
-                            if not target or not target.get("url"):
-                                raise ValueError(f"Aucune source Kwik trouvée pour {task.fileName}")
-                            extracted = await animepahe_service.extract_kwik_stream(target["url"])
-                            if not extracted:
-                                raise ValueError(f"Échec d'extraction du flux vidéo Kwik pour {task.fileName}")
-                            direct_url = extracted
-                        task.directDownloadUrl = direct_url
-                    elif direct_url and ctx._needs_scraping_resolution(direct_url):
-                        info = await asyncio.to_thread(scraping_service.extract_download_info, direct_url)
-                        direct_url = info.get("videoUrl", "")
-                        if not direct_url:
-                            raise ValueError(f"Impossible d'extraire l'URL vidéo directe pour {task.fileName}")
-                        task.directDownloadUrl = direct_url
-                        if (skip_local or not task.subtitleUrl) and info.get("subtitleUrl"):
-                            task.subtitleUrl = info["subtitleUrl"]
-                        if skip_local or not task.subtitlesJson or task.subtitlesJson == "[]":
-                            ctx._update_resolved_subtitles(task, info.get("subtitles", []), task.fileUrl)
-                    else:
-                        task.directDownloadUrl = direct_url
-
+                    media = await self.resolvers.resolve(ctx, task, need_resolve=need_resolve, skip_local=skip_local)
                     need_resolve = False  # Les retries suivants réutiliseront l'URL sauf si déconnexion
 
-                    if server_type == "myTV" and chunks_json != "[]":
-                        chunks = json.loads(chunks_json)
-                        if len(chunks) > 1:
-                            await ctx._download_mytv_chunks(task, chunks)
-                            return
-
                     bytes_before = task.downloadedBytes
-                    is_hls = bool(direct_url and (".m3u8" in direct_url.lower()))
-                    if is_hls:
-                        await ctx._download_hls_stream(task, direct_url)
-                        return
-
-                    await ctx._download_single_file(task, direct_url)
+                    await self.planner.transfer(task, media)
                     break
 
                 except VerificationRequired as exc:
@@ -314,7 +118,13 @@ class TransferWorker:
                         ctx.broadcast_update(task)
                         library_service.save_task(task)
                         return
-                    if isinstance(e, SubtitleError):
+                    if isinstance(e, (SubtitleError, UnsupportedMedia)):
+                        if isinstance(e, UnsupportedMedia):
+                            transition(task, DownloadStatus.FAILED)
+                            task.error = str(e)
+                            ctx.broadcast_update(task)
+                            library_service.save_task(task)
+                            return
                         if local_finalization and e.refresh_required:
                             skip_local = True
                             need_resolve = True
@@ -525,7 +335,7 @@ class TransferWorker:
             if part_path.exists():
                 existing_len = part_path.stat().st_size
 
-        headers = ctx.get_headers_for_url(direct_url, getattr(task, "selectedServer", None))
+        headers = {**ctx.get_headers_for_url(direct_url, getattr(task, "selectedServer", None)), **task.requestHeaders}
         proxy = proxy_service.get_random_proxy()
 
         timeout = httpx.Timeout(connect=20.0, read=60.0, write=30.0, pool=None)
@@ -899,7 +709,7 @@ class TransferWorker:
         segments_dir = output_path.parent / f".{output_path.stem}_segments"
         segments_dir.mkdir(parents=True, exist_ok=True)
 
-        headers = ctx.get_headers_for_url(m3u8_url, getattr(task, "selectedServer", None))
+        headers = {**ctx.get_headers_for_url(m3u8_url, getattr(task, "selectedServer", None)), **task.requestHeaders}
         proxy = proxy_service.get_random_proxy()
 
         timeout = httpx.Timeout(connect=20.0, read=45.0, write=30.0, pool=30.0)
@@ -909,6 +719,7 @@ class TransferWorker:
                 raise ConnectionError(f"HTTP {resp.status_code} on m3u8 playlist")
 
             playlist_text = resp.text
+            validate_hls_capabilities(playlist_text)
             sub_url = m3u8_url
             # Si le m3u8 ne contient pas directement de tags #EXTINF, c'est une master playlist
             if "#EXTINF" not in playlist_text:
@@ -923,6 +734,7 @@ class TransferWorker:
                     if sub_resp.status_code != 200:
                         raise ConnectionError(f"HTTP {sub_resp.status_code} on HLS sub-playlist")
                     playlist_text = sub_resp.text
+                    validate_hls_capabilities(playlist_text)
 
             segments = []
             encryption = []

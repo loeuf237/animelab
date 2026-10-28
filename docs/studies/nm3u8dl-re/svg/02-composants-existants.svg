@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentScriptType="application/ecmascript" contentStyleType="text/css" height="520px" preserveAspectRatio="none" style="width:1661px;height:520px;" version="1.1" viewBox="0 0 1661 520" width="1661px" zoomAndPan="magnify"><defs/><g><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="328" x="669.5" y="12.9951">Existant vérifié — ce que le code fait aujourd’hui</text><!--MD5=[c42ed81cef7fdd2e33758127945b9a5b]
+entity UI--><rect fill="#F5F3FF" height="62.5938" rx="4" ry="4" style="stroke: #059669; stroke-width: 1.5;" width="228" x="6" y="283.7069"/><rect fill="#F5F3FF" height="10" style="stroke: #059669; stroke-width: 1.5;" width="15" x="214" y="288.7069"/><rect fill="#F5F3FF" height="2" style="stroke: #059669; stroke-width: 1.5;" width="4" x="212" y="290.7069"/><rect fill="#F5F3FF" height="2" style="stroke: #059669; stroke-width: 1.5;" width="4" x="212" y="294.7069"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="61" x="21" y="316.702">Vue / API</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="188" x="21" y="332.9989">options de téléchargement</text><!--MD5=[c72e14692f063a08d1023b5b76acc947]
+entity M--><rect fill="#F5F3FF" height="62.5938" rx="4" ry="4" style="stroke: #059669; stroke-width: 1.5;" width="219" x="294" y="283.7069"/><rect fill="#F5F3FF" height="10" style="stroke: #059669; stroke-width: 1.5;" width="15" x="493" y="288.7069"/><rect fill="#F5F3FF" height="2" style="stroke: #059669; stroke-width: 1.5;" width="4" x="491" y="290.7069"/><rect fill="#F5F3FF" height="2" style="stroke: #059669; stroke-width: 1.5;" width="4" x="491" y="294.7069"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="179" x="309" y="316.702">DownloadManagerService</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="85" x="309" y="332.9989">1 688 lignes</text><!--MD5=[1daea32f23ea6c81361d0f13801d7efd]
+entity T--><rect fill="#F5F3FF" height="62.5938" rx="4" ry="4" style="stroke: #059669; stroke-width: 1.5;" width="146" x="660" y="105.7069"/><rect fill="#F5F3FF" height="10" style="stroke: #059669; stroke-width: 1.5;" width="15" x="786" y="110.7069"/><rect fill="#F5F3FF" height="2" style="stroke: #059669; stroke-width: 1.5;" width="4" x="784" y="112.7069"/><rect fill="#F5F3FF" height="2" style="stroke: #059669; stroke-width: 1.5;" width="4" x="784" y="116.7069"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="106" x="675" y="138.702">TransferWorker</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="85" x="675" y="154.9989">1 154 lignes</text><!--MD5=[ca4fca654d8994778fee589c6b3ae58e]
+entity R--><rect fill="#F5F3FF" height="62.5938" rx="4" ry="4" style="stroke: #059669; stroke-width: 1.5;" width="204" x="631" y="367.7069"/><rect fill="#F5F3FF" height="10" style="stroke: #059669; stroke-width: 1.5;" width="15" x="815" y="372.7069"/><rect fill="#F5F3FF" height="2" style="stroke: #059669; stroke-width: 1.5;" width="4" x="813" y="374.7069"/><rect fill="#F5F3FF" height="2" style="stroke: #059669; stroke-width: 1.5;" width="4" x="813" y="378.7069"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="147" x="646" y="400.702">Extensions / recettes</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="164" x="646" y="416.9989">+ registre d’extracteurs</text><!--MD5=[36d09f02135c818e77ea4d3594352c2a]
+entity Y--><rect fill="#F5F3FF" height="62.5938" rx="4" ry="4" style="stroke: #059669; stroke-width: 1.5;" width="205" x="1009" y="367.7069"/><rect fill="#F5F3FF" height="10" style="stroke: #059669; stroke-width: 1.5;" width="15" x="1194" y="372.7069"/><rect fill="#F5F3FF" height="2" style="stroke: #059669; stroke-width: 1.5;" width="4" x="1192" y="374.7069"/><rect fill="#F5F3FF" height="2" style="stroke: #059669; stroke-width: 1.5;" width="4" x="1192" y="378.7069"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="165" x="1024" y="400.702">yt-dlp : repli d’extraction</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="146" x="1024" y="416.9989">skip_download=True</text><!--MD5=[30c15ae2333db8fd07d0271e38118188]
+entity H--><rect fill="#F5F3FF" height="62.5938" rx="4" ry="4" style="stroke: #059669; stroke-width: 1.5;" width="228" x="997.5" y="24.7069"/><rect fill="#F5F3FF" height="10" style="stroke: #059669; stroke-width: 1.5;" width="15" x="1205.5" y="29.7069"/><rect fill="#F5F3FF" height="2" style="stroke: #059669; stroke-width: 1.5;" width="4" x="1203.5" y="31.7069"/><rect fill="#F5F3FF" height="2" style="stroke: #059669; stroke-width: 1.5;" width="4" x="1203.5" y="35.7069"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="136" x="1012.5" y="57.702">SourceHTTPService</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="188" x="1012.5" y="73.9989">sessions, proxy, vérification</text><!--MD5=[626ad08abde0879284d52f51a0eb42aa]
+entity P--><rect fill="#F5F3FF" height="62.5938" rx="4" ry="4" style="stroke: #059669; stroke-width: 1.5;" width="197" x="1013" y="122.7069"/><rect fill="#F5F3FF" height="10" style="stroke: #059669; stroke-width: 1.5;" width="15" x="1190" y="127.7069"/><rect fill="#F5F3FF" height="2" style="stroke: #059669; stroke-width: 1.5;" width="4" x="1188" y="129.7069"/><rect fill="#F5F3FF" height="2" style="stroke: #059669; stroke-width: 1.5;" width="4" x="1188" y="133.7069"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="95" x="1028" y="155.702">MediaPipeline</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="157" x="1028" y="171.9989">sous-titres + mux MKV</text><!--MD5=[22029b2902cbfefb11350e8ee6e306b3]
+entity F--><rect fill="#F5F3FF" height="62.5938" rx="4" ry="4" style="stroke: #059669; stroke-width: 1.5;" width="158" x="1410.5" y="122.7069"/><rect fill="#F5F3FF" height="10" style="stroke: #059669; stroke-width: 1.5;" width="15" x="1548.5" y="127.7069"/><rect fill="#F5F3FF" height="2" style="stroke: #059669; stroke-width: 1.5;" width="4" x="1546.5" y="129.7069"/><rect fill="#F5F3FF" height="2" style="stroke: #059669; stroke-width: 1.5;" width="4" x="1546.5" y="133.7069"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="83" x="1425.5" y="155.702">media_tools</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="118" x="1425.5" y="171.9989">FFmpeg / ffprobe</text><!--MD5=[f9ba5bf973e7832d2ce5ed59077b93f7]
+entity DB--><path d="M1027.5,247.2069 C1027.5,237.2069 1111.5,237.2069 1111.5,237.2069 C1111.5,237.2069 1195.5,237.2069 1195.5,247.2069 L1195.5,288.8006 C1195.5,298.8006 1111.5,298.8006 1111.5,298.8006 C1111.5,298.8006 1027.5,298.8006 1027.5,288.8006 L1027.5,247.2069 " fill="#FEFECE" style="stroke: #000000; stroke-width: 1.5;"/><path d="M1027.5,247.2069 C1027.5,257.2069 1111.5,257.2069 1111.5,257.2069 C1111.5,257.2069 1195.5,257.2069 1195.5,247.2069 " fill="none" style="stroke: #000000; stroke-width: 1.5;"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="121" x="1037.5" y="274.202">Tâches et reprise</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="148" x="1037.5" y="290.4989">SQLite + fichiers .part</text><path d="M573,207.5569 L573,258.4475 A4,4 0 0 0 577,262.4475 L889,262.4475 A4,4 0 0 0 893,258.4475 L893,213.5569 L883,203.5569 L737,203.5569 L733,168.6269 L729,203.5569 L577,203.5569 A4,4 0 0 0 573,207.5569 " fill="#FFF7ED" style="stroke: #D97706; stroke-width: 1.0;"/><path d="M883,203.5569 L883,211.5569 A2,2 0 0 0 885,213.5569 L893,213.5569 L883,203.5569 " fill="#FFF7ED" style="stroke: #D97706; stroke-width: 1.0;"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="299" x="579" y="221.552">HTTP Range, HLS natif, chunks spécifiques.</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="274" x="579" y="237.8489">HLS : BYTERANGE / EXT-X-MAP refusés.</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="249" x="579" y="254.1457">Pas de moteur DASH dédié identifié.</text><path d="M953,469.7069 L953,504.3006 A4,4 0 0 0 957,508.3006 L1266,508.3006 A4,4 0 0 0 1270,504.3006 L1270,475.7069 L1260,465.7069 L1115.5,465.7069 L1111.5,430.6169 L1107.5,465.7069 L957,465.7069 A4,4 0 0 0 953,469.7069 " fill="#FFF7ED" style="stroke: #D97706; stroke-width: 1.0;"/><path d="M1260,465.7069 L1260,473.7069 A2,2 0 0 0 1262,475.7069 L1270,475.7069 L1260,465.7069 " fill="#FFF7ED" style="stroke: #D97706; stroke-width: 1.0;"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="296" x="959" y="483.702">Les champs sous-titres renvoyés par yt-dlp</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="283" x="959" y="499.9989">ne sont pas copiés dans ExtractorResult.</text><path d="M1330,224.7069 L1330,259.3006 A4,4 0 0 0 1334,263.3006 L1645,263.3006 A4,4 0 0 0 1649,259.3006 L1649,230.7069 L1639,220.7069 L1493.5,220.7069 L1489.5,185.6169 L1485.5,220.7069 L1334,220.7069 A4,4 0 0 0 1330,224.7069 " fill="#FFF7ED" style="stroke: #D97706; stroke-width: 1.0;"/><path d="M1639,220.7069 L1639,228.7069 A2,2 0 0 0 1641,230.7069 L1649,230.7069 L1639,220.7069 " fill="#FFF7ED" style="stroke: #D97706; stroke-width: 1.0;"/><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="188" x="1336" y="238.702">Desktop : sous-processus.</text><text fill="#000000" font-family="DejaVu Sans" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="298" x="1336" y="254.9989">Android : MediaBridge JNI + FFmpegKit min.</text><!--MD5=[e909589611b7ba4c18353c13ed7ceedf]
+link UI to M--><path d="M234.28,314.9969 C251.7,314.9969 269.7,314.9969 287.16,314.9969 " fill="none" id="UI-&gt;M" style="stroke: #475569; stroke-width: 1.0;"/><polygon fill="#475569" points="292.05,314.9969,283.05,310.9969,287.05,314.9969,283.05,318.9969,292.05,314.9969" style="stroke: #475569; stroke-width: 1.0;"/><!--MD5=[09351d95883eeea595a6815d43efa653]
+link M to R--><path d="M513.1,342.8569 C548.92,352.0369 588.72,362.2469 624.46,371.4169 " fill="none" id="M-&gt;R" style="stroke: #475569; stroke-width: 1.0;"/><polygon fill="#475569" points="629.16,372.6169,621.4368,366.5052,624.3169,371.374,619.4482,374.2541,629.16,372.6169" style="stroke: #475569; stroke-width: 1.0;"/><!--MD5=[11ff8158939d66cef0c5082f9aee8eea]
+link R to Y--><path d="M835.39,398.9969 C886.98,398.9969 949.72,398.9969 1002.25,398.9969 " fill="none" id="R-&gt;Y" style="stroke: #475569; stroke-width: 1.0;"/><polygon fill="#475569" points="1007.09,398.9969,998.09,394.9969,1002.09,398.9969,998.09,402.9969,1007.09,398.9969" style="stroke: #475569; stroke-width: 1.0;"/><!--MD5=[32151ae619670ae684c59b45ce7a93cd]
+link M to T--><path d="M438.16,283.3869 C470.52,254.4869 521.92,212.3469 573,185.9969 C598.18,173.0169 627.4,162.7869 653.88,155.1069 " fill="none" id="M-&gt;T" style="stroke: #475569; stroke-width: 1.0;"/><polygon fill="#475569" points="658.38,153.8269,648.6274,152.4533,653.5724,155.2005,650.8252,160.1455,658.38,153.8269" style="stroke: #475569; stroke-width: 1.0;"/><!--MD5=[45a1eaa12f52b6ad9059a7d7c8f85bce]
+link T to H--><path d="M806.15,121.4769 C858.37,110.2469 930.16,94.7969 990.9,81.7269 " fill="none" id="T-&gt;H" style="stroke: #475569; stroke-width: 1.0;"/><polygon fill="#475569" points="995.64,80.7069,985.9988,78.6949,990.7525,81.7613,987.686,86.5149,995.64,80.7069" style="stroke: #475569; stroke-width: 1.0;"/><!--MD5=[62dc9696b8d6a5893e92cb28b962b15d]
+link T to P--><path d="M806.15,140.2569 C862.81,142.8169 942.51,146.4169 1006.13,149.2869 " fill="none" id="T-&gt;P" style="stroke: #475569; stroke-width: 1.0;"/><polygon fill="#475569" points="1011.11,149.5169,1002.3021,145.11,1006.1152,149.2885,1001.9367,153.1017,1011.11,149.5169" style="stroke: #475569; stroke-width: 1.0;"/><!--MD5=[402eeb972a9d0190b958e470e3c29b4d]
+link P to F--><path d="M1210.31,153.9969 C1270.35,153.9969 1346.48,153.9969 1403.92,153.9969 " fill="none" id="P-&gt;F" style="stroke: #475569; stroke-width: 1.0;"/><polygon fill="#475569" points="1408.6,153.9969,1399.6,149.9969,1403.6,153.9969,1399.6,157.9969,1408.6,153.9969" style="stroke: #475569; stroke-width: 1.0;"/><!--MD5=[ac116173c8dc0052863b69836dc48cf9]
+link M to DB--><path d="M513.27,307.7569 C652.48,298.4869 891.11,282.6069 1020.58,273.9869 " fill="none" id="M-&gt;DB" style="stroke: #475569; stroke-width: 1.0;"/><polygon fill="#475569" points="1025.53,273.6569,1016.2768,270.2838,1020.5418,273.9999,1016.8256,278.2649,1025.53,273.6569" style="stroke: #475569; stroke-width: 1.0;"/><!--MD5=[77f8d049af1773dc74ce4c0942e01b03]
+link T to DB--><path d="M806.33,158.2669 C833.61,166.5569 864.85,176.3669 893,185.9969 C936.94,201.0369 985.33,219.1269 1025.29,234.4869 " fill="none" id="T-&gt;DB" style="stroke: #475569; stroke-width: 1.0;"/><polygon fill="#475569" points="1029.71,236.1869,1022.7501,229.2184,1025.0444,234.3891,1019.8737,236.6834,1029.71,236.1869" style="stroke: #475569; stroke-width: 1.0;"/><!--MD5=[555efa2dea9bdffba2738d88608b192c]
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName DejaVu Sans
+skinparam defaultFontSize 14
+skinparam shadowing false
+skinparam ArrowColor #475569
+skinparam roundcorner 8
+skinparam packageStyle rectangle
+skinparam classAttributeIconSize 0
+skinparam classBackgroundColor #ECFDF5
+skinparam classBorderColor #059669
+skinparam componentBackgroundColor #ECFDF5
+skinparam componentBorderColor #059669
+skinparam usecaseBackgroundColor #ECFDF5
+skinparam usecaseBorderColor #059669
+skinparam noteBackgroundColor #FFF7ED
+skinparam noteBorderColor #D97706
+skinparam participantBackgroundColor #ECFDF5
+skinparam participantBorderColor #059669
+skinparam componentStyle uml2
+hide empty members
+title Existant vérifié — ce que le code fait aujourd’hui
+left to right direction
+component "Vue / API\noptions de téléchargement" as UI #F5F3FF
+component "DownloadManagerService\n1 688 lignes" as M #F5F3FF
+component "TransferWorker\n1 154 lignes" as T #F5F3FF
+component "Extensions / recettes\n+ registre d’extracteurs" as R #F5F3FF
+component "yt-dlp : repli d’extraction\nskip_download=True" as Y #F5F3FF
+component "SourceHTTPService\nsessions, proxy, vérification" as H #F5F3FF
+component "MediaPipeline\nsous-titres + mux MKV" as P #F5F3FF
+component "media_tools\nFFmpeg / ffprobe" as F #F5F3FF
+database "Tâches et reprise\nSQLite + fichiers .part" as DB
+UI - -> M
+M - -> R
+R - -> Y
+M - -> T
+T - -> H
+T - -> P
+P - -> F
+M - -> DB
+T - -> DB
+note bottom of T
+HTTP Range, HLS natif, chunks spécifiques.
+HLS : BYTERANGE / EXT-X-MAP refusés.
+Pas de moteur DASH dédié identifié.
+end note
+note bottom of Y
+Les champs sous-titres renvoyés par yt-dlp
+ne sont pas copiés dans ExtractorResult.
+end note
+note bottom of F
+Desktop : sous-processus.
+Android : MediaBridge JNI + FFmpegKit min.
+end note
+
+@enduml
+
+PlantUML version 1.2020.02(Sun Mar 01 11:22:07 WAT 2020)
+(GPL source distribution)
+Java Runtime: OpenJDK Runtime Environment
+JVM: OpenJDK 64-Bit Server VM
+Java Version: 25.0.4.1+1-1-26.04.4-Ubuntu
+Operating System: Linux
+Default Encoding: UTF-8
+Language: en
+Country: null
+--></g></svg>

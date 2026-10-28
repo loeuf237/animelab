@@ -13,6 +13,7 @@ from fastapi.routing import APIRoute
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, TypeAdapter, ValidationError
 from animelab.models.anime import AnimeResult, AnimeDetail, Episode
 from animelab.api_errors import Problem, problem_for
+from animelab.services.output_profiles import OutputProfile
 
 
 class WireModel(BaseModel):
@@ -37,6 +38,7 @@ class DownloadRequest(URLRequest):
     selectedQuality: str | None = Field(default=None, max_length=100)
     scheduledTime: str | None = None
     speedLimit: int | None = Field(default=None, ge=0)
+    outputProfile: OutputProfile | None = None
 
 
 class BatchEpisode(URLRequest):
@@ -50,6 +52,7 @@ class BatchEpisode(URLRequest):
     source: str | None = None
     selectedServer: str | None = None
     selectedQuality: str | None = None
+    outputProfile: OutputProfile | None = None
 
 
 class BatchRequest(WireModel):
