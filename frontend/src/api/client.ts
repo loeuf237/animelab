@@ -906,7 +906,7 @@ export const api = {
   async toggleExtension(
     extId: number | string,
     enabled: boolean,
-  ): Promise<{ success: boolean; is_enabled?: boolean }> {
+  ): Promise<{ success: boolean; is_enabled?: boolean; pending?: boolean }> {
     const numId = typeof extId === 'number' ? extId : parseInt(String(extId), 10)
     return request(`/api/extensions/${isNaN(numId) ? extId : numId}/toggle`, {
       method: 'POST',

@@ -70,7 +70,7 @@
       </div>
     </header>
 
-    <AndroidExtensionsPanel @changed="fetchExtensions" />
+    <AndroidExtensionsPanel ref="androidPanel" @changed="fetchExtensions" />
     <ExtensionRepositoriesPanel ref="repositoryPanel" @changed="fetchExtensions" />
 
     <!-- Carte d'importation d'un magasin -->
@@ -644,6 +644,7 @@ import { api } from '@/api/client'
 import AndroidExtensionsPanel from '@/components/AndroidExtensionsPanel.vue'
 import ExtensionRepositoriesPanel from '@/components/ExtensionRepositoriesPanel.vue'
 const repositoryPanel = ref<InstanceType<typeof ExtensionRepositoriesPanel> | null>(null)
+const androidPanel = ref<InstanceType<typeof AndroidExtensionsPanel> | null>(null)
 import { useAnimeStore } from '@/stores/anime'
 const animeStore = useAnimeStore()
 import type { ExtensionSource } from '@/types'
@@ -872,7 +873,7 @@ async function fetchExtensions() {
     if (res) {
       activeRepo.value = res.active_repo || null
       extensions.value = res.extensions || res.installed || []
-      await repositoryPanel.value?.reload()
+      await Promise.all([repositoryPanel.value?.reload(), androidPanel.value?.reload()])
     }
   } catch (e: any) {
     showToast(e.message || 'Erreur lors du chargement des extensions.', 'error')
@@ -913,12 +914,10 @@ async function handleImportRepo() {
 async function handleToggleExtension(ext: ExtensionSource, enabled: boolean) {
   busyExtensions.value.add(ext.id)
   try {
-    await api.toggleExtension(ext.id, enabled)
+    const result = await api.toggleExtension(ext.id, enabled)
     animeStore.homeFeed = null
     await fetchExtensions()
-    ext.enabled = enabled
-    ext.is_enabled = enabled
-    showToast(`${ext.name} ${enabled ? 'activée' : 'désactivée'}.`, 'success')
+    showToast(result.pending ? 'Confirmez l’installation dans Android, puis approuvez le paquet installé.' : `${ext.name} ${enabled ? 'activée' : 'désactivée'}.`, 'success')
   } catch (e: any) {
     showToast(e.message || "Erreur lors de l'activation/désactivation de l'extension.", 'error')
     await fetchExtensions()

@@ -13,6 +13,7 @@ import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import com.animan.app.ExtensionPackages
 import com.animan.extensions.IExtensionRuntime
+import com.animan.extensions.ExtensionHostClient
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.*
@@ -60,7 +61,7 @@ class ExtensionAPKTest {
                     val deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(60)
                     var state=""
                     while (System.nanoTime()<deadline) {
-                        device.wait(Until.findObject(By.text(Pattern.compile("(?i)^install$"))),500)?.click()
+                        device.wait(Until.findObject(By.text(Pattern.compile("(?i)^(install|installer|installieren|instalar)$"))),500)?.click()
                         val ops=ExtensionPackages.operations(context)
                         state=(0 until ops.length()).map { ops.getJSONObject(it) }.single { it.getString("id")==installation.getString("id") }.getString("state")
                         if (state in listOf("installed","failed","cancelled")) break
@@ -107,7 +108,28 @@ class ExtensionAPKTest {
                         .put("unchangedSigner",inspection.getString("signer")==descriptor.getString("signer"))
                         .put("sources",2).put("executesComputedCode",true).put("javaScript",true).put("preferencesScoped",true))
                 }
+                ExtensionHostClient(context,timeoutMillis=8_000).use { client ->
+                    fun selected(): JSONObject {
+                        val packages=decoded(client.discover()) as JSONArray
+                        return (0 until packages.length()).map { packages.getJSONObject(it) }.single { it.getString("pkg").endsWith(".api17") }
+                    }
+                    val descriptor=selected()
+                    val sources=descriptor.getJSONArray("sources")
+                    val fr=(0 until sources.length()).map { sources.getJSONObject(it) }.single { it.getString("lang")=="fr" }.getString("id")
+                    fun request(query: String) = JSONObject().put("operationId",UUID.randomUUID().toString())
+                        .put("pkg",descriptor.getString("pkg")).put("sourceId",fr).put("operation","search")
+                        .put("payload",JSONObject().put("query",query)).toString()
+                    val blocked=JSONObject(client.invoke(request("__block_worker__")))
+                    assertFalse(blocked.getBoolean("ok"))
+                    assertEquals("extension_runtime_timeout",blocked.getString("code"))
+                    // A fresh process must rebind and reload without retaining dead Binder/classes.
+                    Thread.sleep(1500)
+                    assertEquals("loaded",selected().getString("state"))
+                    val restored=decoded(client.invoke(request("after-restart"))) as JSONObject
+                    assertTrue(restored.getJSONArray("results").getJSONObject(0).getString("title").contains(":1080:"))
+                }
                 val proof=JSONObject().put("androidApi",android.os.Build.VERSION.SDK_INT).put("abis",JSONArray(android.os.Build.SUPPORTED_ABIS.toList()))
+                    .put("blockedWorkerTerminated",true).put("workerRestarted",true).put("preferencesSurviveRestart",true)
                     .put("cases",proofs).put("realAniyomiAnikkuHostsTested",false)
                 android.util.Log.i("ANIMELAB_APK_PROOF",proof.toString())
                 assertEquals(6,proofs.length())

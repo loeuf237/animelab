@@ -11,7 +11,7 @@
           }}
         </p>
       </div>
-      <button class="btn btn-secondary" :disabled="busy" @click="reload">
+      <button class="btn btn-secondary" :disabled="busy" @click="run(() => Promise.resolve())">
         {{ tx('Actualiser les APK') }}
       </button>
     </header>
@@ -198,7 +198,6 @@ const status = (value: string) =>
 
 async function reload() {
   state.value = await api.androidExtensions()
-  emit('changed')
 }
 async function run(work: () => Promise<unknown>) {
   if (busy.value) return
@@ -207,6 +206,7 @@ async function run(work: () => Promise<unknown>) {
   try {
     await work()
     await reload()
+    emit('changed')
   } catch (failure) {
     error.value = failure instanceof Error ? failure.message : tx('Échec de l’opération.')
   } finally {
@@ -278,6 +278,7 @@ onMounted(async () => {
   }, 4000)
 })
 onUnmounted(() => clearInterval(timer))
+defineExpose({ reload })
 </script>
 
 <style scoped>
