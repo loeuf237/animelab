@@ -70,6 +70,9 @@
       </div>
     </header>
 
+    <AndroidExtensionsPanel @changed="fetchExtensions" />
+    <ExtensionRepositoriesPanel ref="repositoryPanel" @changed="fetchExtensions" />
+
     <!-- Carte d'importation d'un magasin -->
     <section class="settings-card-pro extension-repo-card">
       <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px">
@@ -186,9 +189,11 @@
         "
       >
         ℹ️ <strong>{{ tx('Règle de visibilité :') }}</strong>
-        {{ tx('Seules les sources présentes dans le') }}
-        <strong>{{ tx('dernier magasin ajouté') }}</strong>
-        {{ tx('sont affichées ci-dessous. Par défaut, toutes les sources importées sont') }}
+        {{
+          tx(
+            'Les dépôts activés sont regroupés ici. Les extensions installées restent disponibles même si leur dépôt est désactivé ou les retire. Les nouvelles extensions sont',
+          )
+        }}
         <strong>{{ tx('désactivées') }}</strong>
         {{
           tx(
@@ -233,7 +238,7 @@
               letter-spacing: 0.05em;
               color: var(--muted);
             "
-            >{{ tx('Dépôt actif :') }}</span
+            >{{ tx('Dernier dépôt consulté :') }}</span
           >
           <strong style="color: var(--text); margin-left: 6px; font-size: 0.95rem">{{
             tx(activeRepo.name)
@@ -515,7 +520,7 @@
             {{ tx('Mettre à jour') }} (v{{ tx(ext.available_version) }})
           </button>
           <router-link
-            v-if="isExtensionActive(ext)"
+            v-if="isExtensionActive(ext) && ext.runtime !== 'android-apk'"
             :to="{ name: 'sources', params: { sourceId: ext.pkg } }"
             class="btn btn-sm"
           >
@@ -525,13 +530,16 @@
             {{ tx('Tester') }}
           </button>
           <button
+            v-if="ext.runtime !== 'android-apk'"
             class="btn btn-sm"
             :disabled="busyExtensions.has(ext.id)"
             @click="handleRecompileExtension(ext)"
           >
             {{ tx('Recompiler') }}
           </button>
-          <button class="btn btn-sm" @click="editRecipe(ext)">{{ tx('Configurer') }}</button>
+          <button v-if="ext.runtime !== 'android-apk'" class="btn btn-sm" @click="editRecipe(ext)">
+            {{ tx('Configurer') }}
+          </button>
           <label class="toggle-switch">
             <input
               type="checkbox"
@@ -633,6 +641,9 @@ import { tx } from '@/utils/locale'
 import { useNotifications } from '@/stores/notifications'
 import { ref, computed, onMounted } from 'vue'
 import { api } from '@/api/client'
+import AndroidExtensionsPanel from '@/components/AndroidExtensionsPanel.vue'
+import ExtensionRepositoriesPanel from '@/components/ExtensionRepositoriesPanel.vue'
+const repositoryPanel = ref<InstanceType<typeof ExtensionRepositoriesPanel> | null>(null)
 import { useAnimeStore } from '@/stores/anime'
 const animeStore = useAnimeStore()
 import type { ExtensionSource } from '@/types'
@@ -771,7 +782,13 @@ async function handleUpdateAll() {
     const res = await api.updateAllExtensions()
     animeStore.homeFeed = null
     await fetchExtensions()
-    showToast(res.message || 'Extensions mises à jour.', 'success')
+    const failed = res.failed?.length || 0
+    const pending = res.pending_ids?.length || 0
+    showToast(
+      res.message ||
+        `${res.count || 0} mise(s) à jour terminée(s), ${pending} en attente Android, ${failed} échec(s).`,
+      failed ? 'error' : 'success',
+    )
   } catch (e: any) {
     showToast(e.message || 'Erreur lors de la mise à jour globale.', 'error')
   } finally {
@@ -855,6 +872,7 @@ async function fetchExtensions() {
     if (res) {
       activeRepo.value = res.active_repo || null
       extensions.value = res.extensions || res.installed || []
+      await repositoryPanel.value?.reload()
     }
   } catch (e: any) {
     showToast(e.message || 'Erreur lors du chargement des extensions.', 'error')

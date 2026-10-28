@@ -17,12 +17,61 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: android-extensions-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  full-app:
+    name: Optimized AnimeLab Android integration build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build current interface
+        working-directory: frontend
+        run: npm ci && npm run build
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/cache@v4
+        id: wheels
+        with:
+          path: android/wheels
+          key: android-native-arm64-${{ hashFiles('scripts/android_native_wheels.py') }}
+      - name: Prepare native dependency tools
+        run: sudo apt-get update && sudo apt-get install -y llvm patchelf
+      - name: Build missing native wheels
+        if: steps.wheels.outputs.cache-hit != 'true'
+        run: python scripts/android_native_wheels.py
+      - name: Build optimized application with the real Python and native bridges
+        working-directory: android
+        run: ./gradlew :app:assembleValidation :app:assembleValidationAndroidTest -Panimelab.isolatedValidation=true --no-daemon --max-workers=2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension-animelab-integration-arm64
+          path: |
+            android/app/build/outputs/apk/validation/*.apk
+            android/app/build/outputs/apk/androidTest/validation/*.apk
+            android/app/build/outputs/mapping/validation/missing_rules.txt
+          if-no-files-found: error
+          retention-days: 7
+
   runtime-compile:
     name: Compile original APK host API
     runs-on: ubuntu-22.04

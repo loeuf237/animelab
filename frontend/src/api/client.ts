@@ -23,6 +23,12 @@ import type {
   VerificationResult,
 } from '@/types/api'
 import { language, tx } from '@/utils/locale'
+import type {
+  AndroidExtensionState,
+  NativeExtension,
+  NativePreference,
+  ExtensionOperation,
+} from '@/types/extensions'
 
 export interface AndroidStorageState {
   android: boolean
@@ -288,11 +294,20 @@ export const api = {
   },
   browseCatalogue(
     source: string,
-    params: { mode: string; q: string; tags: string[]; order: string; cursor?: string },
+    params: {
+      mode: string
+      q: string
+      tags: string[]
+      order: string
+      cursor?: string
+      nativeFilters?: import('@/types/extensions').NativeFilter[]
+    },
   ) {
     const query = new URLSearchParams({ mode: params.mode, q: params.q, order: params.order })
     params.tags.forEach((tag) => query.append('tags', tag))
     if (params.cursor) query.set('cursor', params.cursor)
+    if (params.nativeFilters?.length)
+      query.set('nativeFilters', JSON.stringify(params.nativeFilters))
     return request<CataloguePage>(`/api/sources/${encodeURIComponent(source)}/catalogue?${query}`)
   },
 
@@ -820,6 +835,57 @@ export const api = {
   },
 
   // --- Extensions ---
+  async androidExtensions(): Promise<AndroidExtensionState> {
+    return request('/api/extensions/android')
+  },
+  async trustAndroidExtension(extension: NativeExtension): Promise<unknown> {
+    return request(`/api/extensions/android/${encodeURIComponent(extension.pkg)}/trust`, {
+      method: 'POST',
+      body: JSON.stringify({
+        approved: true,
+        signer: extension.signer,
+        versionCode: extension.versionCode,
+      }),
+    })
+  },
+  async revokeAndroidExtension(pkg: string): Promise<unknown> {
+    return request(`/api/extensions/android/${encodeURIComponent(pkg)}/revoke`, { method: 'POST' })
+  },
+  async uninstallAndroidExtension(pkg: string): Promise<unknown> {
+    return request(`/api/extensions/android/${encodeURIComponent(pkg)}`, { method: 'DELETE' })
+  },
+  async importAndroidAPK(file: File): Promise<{ operation: ExtensionOperation }> {
+    return request('/api/extensions/android/install-apk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: file,
+    })
+  },
+  async androidSource<T = NativePreference[]>(
+    id: string,
+    operation: string,
+    payload: unknown = {},
+  ): Promise<{ result: T }> {
+    return request(
+      `/api/extensions/android/sources/${encodeURIComponent(id)}/${encodeURIComponent(operation)}`,
+      { method: 'POST', body: JSON.stringify(payload) },
+    )
+  },
+  async extensionRepositories(): Promise<{ repositories: ExtensionRepository[] }> {
+    return request('/api/extensions/repositories')
+  },
+  async setExtensionRepository(id: number, enabled: boolean): Promise<unknown> {
+    return request(`/api/extensions/repositories/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ enabled }),
+    })
+  },
+  async approveExtensionRepositoryKey(id: number, fingerprint: string): Promise<unknown> {
+    return request(`/api/extensions/repositories/${id}/approve-key`, {
+      method: 'POST',
+      body: JSON.stringify({ approved: true, fingerprint }),
+    })
+  },
   async getExtensions(
     q?: string,
     lang?: string,
@@ -891,6 +957,8 @@ export const api = {
     success: boolean
     count?: number
     updated_ids?: (number | string)[]
+    pending_ids?: (number | string)[]
+    failed?: { id: number | string; code: string }[]
     message?: string
   }> {
     return request('/api/extensions/update-all', { method: 'POST' })

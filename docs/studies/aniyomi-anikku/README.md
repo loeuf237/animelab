@@ -17,6 +17,8 @@ L'étude identifie aussi des corrections indépendantes du moteur : coexistence 
 - [Rapport détaillé et comparaison](RAPPORT.md).
 - [Plan d'implémentation, dépendances et critères de validation](PLAN_IMPLEMENTATION.md).
 - [Exigence Android : installation réelle et compatibilité des APK partagés](EXIGENCES_ANDROID_APK.md).
+- [Utilisation, nouveaux parcours et limites actuelles](UTILISATION.md).
+- [Registre d'implémentation et preuves](IMPLEMENTATION_STATUS.md).
 - [Registre des sources primaires](SOURCES.md) et [inventaire JSON des références figées](sources.json).
 - [Résultats des vérifications locales](validation.json).
 - [Reproduction isolée des six constats AnimeLab](verify_current.py), avec [cas d'audit](audit_current_cases.py).
@@ -36,7 +38,11 @@ L'étude identifie aussi des corrections indépendantes du moteur : coexistence 
 
 La couverture locale existante sélectionnée passe : **79 tests**. Six cas d'audit supplémentaires reproduisent des comportements problématiques actuels : **6 constats reproduits**. Ce dernier résultat confirme les défauts décrits ; il ne signifie pas qu'ils sont corrigés.
 
-Depuis la racine du dépôt :
+Ces cas d'audit sont historiques : ils attendent les défauts au commit `75c84ec`.
+Leur échec après correction est attendu. Pour vérifier l'implémentation courante,
+exécuter la suite `uv run --locked python scripts/check.py python` après avoir
+compilé l'interface. Les commandes ci-dessous servent à reproduire l'étude sur
+son commit initial, depuis la racine du dépôt :
 
 ```bash
 uv run --locked python docs/studies/aniyomi-anikku/verify_current.py

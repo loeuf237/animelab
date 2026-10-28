@@ -662,11 +662,14 @@ class DownloadManagerService:
 
                     for cand_u in (candidate_urls or [target_url]):
                         try:
-                            cand_res = await self.resolve_imported_video_stream(
-                                cand_u, preferred_quality=preferred_quality
-                            )
+                            candidate = target if target and target.get('url') == cand_u else next((row for row in video_sources if row.get('url') == cand_u), {})
+                            if matched_container and getattr(matched_container, 'runtime', '') == 'android-apk':
+                                cand_res = await matched_container.resolve_candidate(candidate)
+                            else:
+                                cand_res = await self.resolve_imported_video_stream(
+                                    cand_u, preferred_quality=preferred_quality
+                                )
                             if cand_res and cand_res.get("videoUrl"):
-                                candidate = target if target and target.get('url') == cand_u else next((row for row in video_sources if row.get("url") == cand_u), {})
                                 resolved = merge_stream_metadata(cand_res, candidate, download_page_url)
                                 break
                         except VerificationRequired:

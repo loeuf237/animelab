@@ -38,9 +38,7 @@ internal object ExtensionPackages {
     }
 
     private fun signer(info: PackageInfo): String {
-        val signing = requireNotNull(info.signingInfo)
-        val signatures = if (signing.hasMultipleSigners()) signing.apkContentsSigners else signing.signingCertificateHistory
-        return MessageDigest.getInstance("SHA-256").digest(signatures.last().toByteArray()).joinToString("") { "%02x".format(it) }
+        return com.animan.extensions.APKSignatures.current(info)
     }
 
     fun inspect(context: Context, path: String): JSONObject {

@@ -145,7 +145,10 @@ class SourceRegistry:
         native_names = {'french-manga': 'French-Manga', 'voir-anime': 'VoirAnime', 'animepahe': 'AnimePahe'}
         imported = source_id not in self.natives()
         recipe = getattr(service, 'recipe', None)
-        if imported and isinstance(recipe, SourceRecipe):
+        if imported and getattr(service, 'runtime', '') == 'android-apk':
+            capabilities = SourceCapabilities(search=True, detail=True, latest=service.supports_latest,
+                                              popular=True, catalogue=True, multi_tags=True)
+        elif imported and isinstance(recipe, SourceRecipe):
             api_catalogue = bool(recipe.runtime.get('catalogue'))
             popular = bool(
                 (recipe.popular_request_path and recipe.popular_selector)

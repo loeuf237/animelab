@@ -77,6 +77,9 @@ export interface ExtensionRepository {
   url: string
   is_active: number | boolean
   created_at: string
+  last_error?: string | null
+  signing_key?: string | null
+  pending_signing_key?: string | null
 }
 export interface SourcePreferences {
   quality_strategy?: string

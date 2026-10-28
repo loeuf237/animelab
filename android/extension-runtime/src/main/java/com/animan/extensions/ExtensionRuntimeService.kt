@@ -20,7 +20,6 @@ import kotlinx.coroutines.*
 import kotlinx.serialization.json.Json
 import org.json.JSONArray
 import org.json.JSONObject
-import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.*
@@ -104,9 +103,7 @@ class ExtensionRuntimeService : Service() {
         PackageManager.GET_META_DATA or PackageManager.GET_CONFIGURATIONS or PackageManager.GET_SIGNING_CERTIFICATES)
 
     private fun fingerprints(info: PackageInfo): List<String> {
-        val signing = requireNotNull(info.signingInfo) { "Unsigned package" }
-        val signatures = if (signing.hasMultipleSigners()) signing.apkContentsSigners else signing.signingCertificateHistory
-        return signatures.map { signature -> MessageDigest.getInstance("SHA-256").digest(signature.toByteArray()).joinToString("") { "%02x".format(it) } }
+        return APKSignatures.history(info)
     }
 
     private fun api(info: PackageInfo): Int {
@@ -118,7 +115,7 @@ class ExtensionRuntimeService : Service() {
         return if (value in 1.2..1.7) (value*10 + .01).toInt() else value.toInt()
     }
 
-    private fun identity(info: PackageInfo): String = "${info.packageName}:${info.longVersionCode}:${fingerprints(info).last()}"
+    private fun identity(info: PackageInfo): String = "${info.packageName}:${info.longVersionCode}:${APKSignatures.current(info)}"
     private fun isExtension(info: PackageInfo): Boolean = info.reqFeatures.orEmpty().any { it.name == "tachiyomi.animeextension" }
 
     private fun discoverPackages(): JSONArray {
@@ -135,7 +132,7 @@ class ExtensionRuntimeService : Service() {
                 .put("name", metadata?.getString("aniyomix.name") ?: packageManager.getApplicationLabel(info.applicationInfo!!).toString())
                 .put("version", info.versionName).put("versionCode", info.longVersionCode.toString())
                 .put("api", api(info)).put("signatures", JSONArray(fingerprints(info)))
-                .put("signer", fingerprints(info).last()).put("trusted", trusted).put("is_installed", true)
+                .put("signer", APKSignatures.current(info)).put("trusted", trusted).put("is_installed", true)
                 .put("location", "shared").put("runtime", "android-apk").put("compatible", compatible)
             if (trusted && compatible) {
                 try {
@@ -197,7 +194,7 @@ class ExtensionRuntimeService : Service() {
         val info = packageInfo(request.getString("pkg"))
         require(isExtension(info)) { "This is not an anime extension" }
         if (operation == "trust") {
-            require(request.getString("signer") == fingerprints(info).last()) { "Signer changed" }
+            require(request.getString("signer") == APKSignatures.current(info)) { "Signer changed" }
             require(request.getString("versionCode") == info.longVersionCode.toString()) { "Version changed" }
             trust.edit().putBoolean(identity(info), true).commit()
             loaded.remove(info.packageName)

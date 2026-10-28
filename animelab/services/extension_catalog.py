@@ -15,7 +15,10 @@ MAX_REFERENCES = 6
 def canonical_url(value):
     if not isinstance(value, str) or len(value) > 4096:
         raise ValueError('URL de dépôt invalide.')
-    parsed = urlsplit(value.strip())
+    value = value.strip()
+    if any(ord(c) < 32 for c in value):
+        raise ValueError('URL de dépôt invalide.')
+    parsed = urlsplit(value)
     if parsed.scheme not in ('https', 'http') or not parsed.hostname or parsed.username or parsed.password or parsed.fragment:
         raise ValueError('URL de dépôt invalide.')
     path = parsed.path
@@ -140,8 +143,13 @@ def normalize_entries(entries, base):
             raise ValueError('Package dupliqué dans le même index.')
         seen.add(pkg)
         resources = entry.get('resources') or {}
+        if not isinstance(resources, dict):
+            raise ValueError('Ressources d’extension invalides.')
         apk = resources.get('apkUrl') or entry.get('apk') or ''
         icon = resources.get('iconUrl') or entry.get('icon') or ''
+        if any(not isinstance(value, str) or len(value) > 4096 or any(ord(c) < 32 for c in value)
+               for value in (apk, icon)):
+            raise ValueError('URL de ressource invalide.')
         sources = entry.get('sources') or []
         if not isinstance(sources, list) or len(sources) > 1000:
             raise ValueError('Liste de sources invalide.')
@@ -157,6 +165,11 @@ def normalize_entries(entries, base):
                                   'baseUrl': str(source.get('homeUrl', source.get('baseUrl', '')))})
         languages = {s['lang'] for s in clean_sources}
         warning = entry.get('contentWarning', 0)
+        if not isinstance(warning,(int,str)) or isinstance(warning,bool):
+            raise ValueError('Catégorie de contenu invalide.')
+        raw_code = entry.get('versionCode',entry.get('code'))
+        if raw_code is not None and version_code(raw_code) is None:
+            raise ValueError('Code de version invalide.')
         nsfw = warning in (2, 3, 'MIXED', 'NSFW', 'CONTENT_WARNING_MIXED', 'CONTENT_WARNING_NSFW')
         normalized.append({**entry, 'pkg': pkg, 'version': str(entry.get('versionName', entry.get('version', entry.get('code', '1.0')))),
                            'code': version_code(entry.get('versionCode', entry.get('code'))),
@@ -179,15 +192,16 @@ async def read_catalog(url, fetch):
         base = current.rsplit('/', 1)[0]
         if isinstance(data, list):
             # Legacy indexes without metadata remain readable but untrusted.
+            meta = None
             try:
                 meta = decode_index(await fetch(base + '/repo.json'))
-                if isinstance(meta, dict) and isinstance(meta.get('meta'), dict):
-                    metadata = meta['meta']
-                    if meta.get('index_v2'):
-                        current = canonical_url(urljoin(current, meta['index_v2']))
-                        continue
             except (ValueError, OSError):
                 pass
+            if isinstance(meta, dict) and isinstance(meta.get('meta'), dict):
+                metadata = meta['meta']
+                if meta.get('index_v2'):
+                    current = canonical_url(urljoin(current, meta['index_v2']))
+                    continue
             return Catalog(original, metadata, normalize_entries(data, base))
         if not isinstance(data, dict):
             raise ValueError('Format de store invalide.')

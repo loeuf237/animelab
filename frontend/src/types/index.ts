@@ -62,6 +62,7 @@ export interface CatalogueSource {
   multiTags: boolean
 }
 export interface CatalogueFilters {
+  nativeFilters?: import('./extensions').NativeFilter[]
   tags: { id: string; label: string; group: string; param?: string; value?: string }[]
   groups?: { name: string; param?: string; single?: boolean }[]
   orders: { id: string; label: string; value?: string }[]
@@ -255,6 +256,8 @@ export interface ExtensionCapabilitiesSummary {
 }
 
 export interface ExtensionSource {
+  runtime?: 'recipe' | 'android-apk'
+  native_state?: string
   health?: import('./api').ExtensionHealth[]
   recipe_revision?: number
   supportsLatest?: boolean
