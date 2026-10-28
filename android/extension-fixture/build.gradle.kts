@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "org.animelab.extensionfixture"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         applicationId = "eu.kanade.tachiyomi.animeextension.all.animelabfixture"
         minSdk = 29

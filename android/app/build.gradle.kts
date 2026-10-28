@@ -14,7 +14,7 @@ val isolatedValidation = providers.gradleProperty("animelab.isolatedValidation")
 
 android {
     namespace = "com.animan.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.animan.app"

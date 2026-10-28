@@ -17,7 +17,7 @@ val installerSource = tasks.register<Copy>("stagePackageInstaller") {
 }
 android {
     namespace = "com.animan.extensions.probe"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         applicationId = "com.animan.extensions.probe"
         minSdk = 29

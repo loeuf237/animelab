@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.animan.extensions"
-    compileSdk = 35
+    compileSdk = 36
     buildFeatures { aidl = true }
     defaultConfig {
         minSdk = 29
