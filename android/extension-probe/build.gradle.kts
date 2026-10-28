@@ -24,6 +24,16 @@ android {
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
+    buildTypes {
+        create("validation") {
+            initWith(getByName("release"))
+            isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName("debug")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            matchingFallbacks += listOf("release")
+        }
+    }
+    testBuildType = "validation"
     sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/fixture-assets"))
     sourceSets["main"].java.srcDir(layout.buildDirectory.dir("generated/package-installer"))
     compileOptions {

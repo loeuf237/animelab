@@ -31,7 +31,7 @@ internal object ExtensionPackages {
     @Suppress("DEPRECATION")
     private fun archive(context: Context, value: File): PackageInfo {
         val info = requireNotNull(context.packageManager.getPackageArchiveInfo(value.path,
-            PackageManager.GET_META_DATA or PackageManager.GET_CONFIGURATIONS or PackageManager.GET_SIGNING_CERTIFICATES)) { "Invalid APK" }
+            PackageManager.GET_META_DATA or PackageManager.GET_CONFIGURATIONS or PackageManager.GET_SIGNING_CERTIFICATES or PackageManager.GET_SIGNATURES)) { "Invalid APK" }
         require(info.reqFeatures.orEmpty().any { it.name == "tachiyomi.animeextension" }) { "Not an anime extension" }
         requireNotNull(info.signingInfo) { "APK has no signatures" }
         return info

@@ -41,7 +41,7 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew :extension-runtime:assembleDebug :extension-probe:assembleDebug :extension-probe:assembleDebugAndroidTest --no-daemon --max-workers=2
+          ./gradlew :extension-runtime:assembleDebug :extension-probe:assembleValidation :extension-probe:assembleValidationAndroidTest --no-daemon --max-workers=2
       - uses: actions/upload-artifact@v4
         if: success()
         with:
@@ -81,8 +81,8 @@ jobs:
           profile: pixel_2
           disable-animations: true
           script: |
-            adb install -r artifacts/extension-probe/build/outputs/apk/debug/extension-probe-debug.apk
-            adb install -r artifacts/extension-probe/build/outputs/apk/androidTest/debug/extension-probe-debug-androidTest.apk
+            adb install -r artifacts/extension-probe/build/outputs/apk/validation/extension-probe-validation.apk
+            adb install -r artifacts/extension-probe/build/outputs/apk/androidTest/validation/extension-probe-validation-androidTest.apk
             adb shell am instrument -w -r com.animan.extensions.probe.test/androidx.test.runner.AndroidJUnitRunner | tee instrumentation.txt
             adb logcat -d -s ANIMELAB_APK_PROOF:I > proof.txt
             grep -q 'OK (' instrumentation.txt
