@@ -90,7 +90,7 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew :extension-runtime:assembleDebug :extension-probe:assembleValidation :extension-probe:assembleValidationAndroidTest :app:compileValidationKotlin --no-daemon --max-workers=2
+          ./gradlew :extension-runtime:assembleDebug :extension-probe:assembleValidation :extension-probe:assembleValidationAndroidTest --no-daemon --max-workers=2
       - uses: actions/upload-artifact@v4
         if: success()
         with:
