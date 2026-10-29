@@ -23,6 +23,10 @@ def validate(app, tests, output, skip_native_media=False, package="com.animan.ap
     subprocess.run(["adb", "shell", "wm", "dismiss-keyguard"], check=True, timeout=15)
     time.sleep(2)
     command = ["adb", "shell", "am", "instrument", "-w", "-r"]
+    if is_engine:
+        # Physical original-APK tests require a separate validation package and
+        # explicit fixture arguments. They are not production-package smoke tests.
+        command += ["-e", "class", "com.animan.app.EmbeddedEngineTest"]
     if skip_native_media: command += ["-e", "skip_native_media", "true"]
     command += [package + ".test/androidx.test.runner.AndroidJUnitRunner"]
     result = subprocess.run(command,

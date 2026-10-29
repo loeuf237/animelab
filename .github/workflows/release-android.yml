@@ -31,7 +31,7 @@ on:
         default: false
       tag_name:
         description: Android release tag
-        default: android-v0.1.6-beta.1
+        default: android-v0.1.6-beta.2
         required: true
       source_ref:
         description: Optional branch or SHA for a non-publishing test build

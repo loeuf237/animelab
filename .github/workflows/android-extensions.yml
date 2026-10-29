@@ -2,9 +2,12 @@ name: Android extension APK runtime
 
 on:
   push:
+    branches: ['**']
     paths:
       - 'android/**'
       - 'android_runtime.py'
+      - 'scripts/prepare_quickjs.py'
+      - 'scripts/android_release.py'
       - 'animelab/migrations.py'
       - 'animelab/api_errors.py'
       - 'animelab/routers/extensions.py'
@@ -18,6 +21,8 @@ on:
     paths:
       - 'android/**'
       - 'android_runtime.py'
+      - 'scripts/prepare_quickjs.py'
+      - 'scripts/android_release.py'
       - 'animelab/migrations.py'
       - 'animelab/api_errors.py'
       - 'animelab/routers/extensions.py'
@@ -76,6 +81,8 @@ jobs:
       - name: Build optimized application with the real Python and native bridges
         working-directory: android
         run: ./gradlew :app:assembleValidation :app:assembleValidationAndroidTest -Panimelab.isolatedValidation=true --no-daemon --max-workers=2
+      - name: Check every packaged native library for 16 KiB alignment
+        run: python scripts/android_release.py android/app/build/outputs/apk/validation/app-validation.apk android-validation --validation --optimized
       - uses: actions/upload-artifact@v4
         with:
           name: extension-animelab-integration-arm64

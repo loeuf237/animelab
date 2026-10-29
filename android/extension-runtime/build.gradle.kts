@@ -36,7 +36,7 @@ dependencies {
     api("org.jetbrains.kotlinx:kotlinx-serialization-json-okio:1.9.0")
     api("com.github.mihonapp:injekt:91edab2317")
     api("androidx.preference:preference-ktx:1.2.1")
-    api("app.cash.quickjs:quickjs-android:0.9.2")
+    api(project(":quickjs-compat"))
     api("org.nanohttpd:nanohttpd:2.3.1")
     implementation("com.squareup.logcat:logcat:0.1")
 }

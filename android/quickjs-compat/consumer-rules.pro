@@ -1,0 +1,1 @@
+-keep class app.cash.quickjs.** { *; }

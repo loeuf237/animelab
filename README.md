@@ -12,7 +12,7 @@
 
 Choose a build from [GitHub Releases](https://github.com/loeuf237/animelab/releases). Android and desktop downloads are grouped in the same release.
 
-**All current releases are beta/pre-release.** The new [v0.1.6-beta.1 notes](docs/releases/v0.1.6-beta.1.md)
+**All current releases are beta/pre-release.** The new [v0.1.6-beta.2 notes](docs/releases/v0.1.6-beta.2.md)
 describe the experimental Android APK extension runtime, WebView session changes and remaining limitations.
 
 | Platform | Package | Getting started |
@@ -27,7 +27,7 @@ Desktop packages include Python, the compiled interface, FFmpeg and ffprobe. Win
 
 Desktop builds open a native tabbed launcher. Choose your interface, port, folders and download settings, then click **Launch**. It also provides diagnostics, proxy settings, backups and graceful shutdown. See the [0.1.4 release notes](docs/releases/v0.1.4.md) and [desktop tools and recovery](docs/desktop-distribution.md).
 
-Android device coverage remains **beta**. The [0.1.6-beta.1 release notes](docs/releases/v0.1.6-beta.1.md) explain the experimental APK runtime, emulator coverage and pending physical-device validation. Release assets include checksums and build information.
+Android device coverage remains **beta**. The [0.1.6-beta.1 release notes](docs/releases/v0.1.6-beta.2.md) explain the experimental APK runtime, emulator coverage and pending physical-device validation. Release assets include checksums and build information.
 
 In supporting browsers, install the web interface as a PWA using the browser's install or **Add to Home Screen** option. The AnimeLab server must remain available.
 
