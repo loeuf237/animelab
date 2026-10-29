@@ -123,9 +123,14 @@ class NativeMediaTest {
         assertTrue("JNI encoding statistics must reach the managed job", progressObserved)
         MediaBridge.releaseManaged(job)
         File(root, "cancel.mp4").delete()
-        println("ANIMAN_NATIVE_MEDIA_PROBE=" + JSONObject().put("abi", android.os.Build.SUPPORTED_ABIS[0])
+        val receipt = "ANIMAN_NATIVE_MEDIA_PROBE=" + JSONObject().put("abi", android.os.Build.SUPPORTED_ABIS[0])
+            .put("probeRunId", InstrumentationRegistry.getArguments().getString("probe_run_id"))
             .put("hardsub", hardsub).put("managed_cancellation", true).put("managed_progress", true)
             .put("encode", true).put("subtitle_mux", true).put("hls_remux", true).put("decode", true).put("errors_reported", true)
-            .put("storage_export", true).put("storage_permission_required", false).put("paused_export_rejected", true))
+            .put("storage_export", true).put("storage_permission_required", false).put("paused_export_rejected", true)
+        // Instrumentation may terminate its process before the host asks pidof.
+        // A dedicated tag plus a run nonce preserves only this test's receipt.
+        android.util.Log.i("ANIMAN_MEDIA_PROOF", receipt)
+        println(receipt)
     }
 }
