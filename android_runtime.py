@@ -16,7 +16,9 @@ _loop = None
 def extension_http(payload):
     """Native default OkHttp gateway: keep the shared URL/cookie/proxy policy."""
     import base64
-    from animelab.services.source_http import source_http, VerificationRequired, RateLimited
+    from animelab.services.source_http import source_http, VerificationRequired, RateLimited, USER_AGENT
+    if json.loads(payload).get('action') == 'user_agent':
+        return json.dumps({'userAgent':USER_AGENT})
     async def request():
         data = json.loads(payload)
         body = base64.b64decode(data.get('body', ''), validate=True)

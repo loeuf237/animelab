@@ -131,6 +131,12 @@ def test_native_network_verification_is_not_hidden():
     assert error.value.domain=='fixture.example'
 
 
+def test_native_default_user_agent_matches_the_verification_session():
+    import android_runtime
+    from animelab.services.source_http import USER_AGENT
+    assert json.loads(android_runtime.extension_http('{"action":"user_agent"}'))=={'userAgent':USER_AGENT}
+
+
 @pytest.mark.asyncio
 async def test_catalogue_and_episode_memos_survive_callbacks(monkeypatch):
     source=native.AndroidAPKSource(package(),package()['sources'][0])

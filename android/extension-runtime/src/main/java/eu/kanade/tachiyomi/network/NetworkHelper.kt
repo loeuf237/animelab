@@ -43,20 +43,7 @@ class NetworkHelper(context: Context) {
             val payload = JSONObject().put("url", original.url.toString()).put("method", original.method)
                 .put("headers", JSONArray(original.headers.map { JSONArray(listOf(it.first, it.second)) }))
                 .put("body", Base64.encodeToString(body.readByteArray(), Base64.NO_WRAP))
-            val bridge = gateway ?: throw IOException("The source network gateway is unavailable")
-            val descriptor = bridge.request(payload.toString()) ?: throw IOException("The source request failed")
-            val bytes = android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { input ->
-                val output = java.io.ByteArrayOutputStream()
-                val buffer = ByteArray(65536)
-                while (true) {
-                    val n = input.read(buffer)
-                    if (n < 0) break
-                    if (output.size() + n > 16_000_000) throw IOException("Response exceeds budget")
-                    output.write(buffer, 0, n)
-                }
-                output.toByteArray()
-            }
-            val response = JSONObject(String(bytes, Charsets.UTF_8))
+            val response = exchange(payload)
             if (response.has("error")) throw SourceGatewayException(response.getString("error"),response.optString("url",original.url.toString()))
             val headers = Headers.Builder()
             val pairs = response.optJSONArray("headers") ?: JSONArray()
@@ -74,7 +61,23 @@ class NetworkHelper(context: Context) {
         }.build()
 
     val cloudflareClient: OkHttpClient get() = client
-    fun defaultUserAgentProvider(): String = "AnimeLab/0.1.5"
+    fun defaultUserAgentProvider(): String = if(gateway==null) "AnimeLab/0.1.5"
+        else exchange(JSONObject().put("action","user_agent"),65536).getString("userAgent")
+
+    private fun exchange(payload: JSONObject, maximum: Int=16_000_000): JSONObject {
+        val bridge = gateway ?: throw IOException("The source network gateway is unavailable")
+        val descriptor = bridge.request(payload.toString()) ?: throw IOException("The source request failed")
+        val bytes = android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { input ->
+            val output=java.io.ByteArrayOutputStream(); val buffer=ByteArray(65536)
+            while(true) {
+                val n=input.read(buffer); if(n<0) break
+                if(output.size()+n>maximum) throw IOException("Response exceeds budget")
+                output.write(buffer,0,n)
+            }
+            output.toByteArray()
+        }
+        return JSONObject(String(bytes,Charsets.UTF_8))
+    }
 
     companion object {
         @Volatile var gateway: IExtensionHttp? = null
