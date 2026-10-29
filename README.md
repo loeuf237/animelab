@@ -217,10 +217,13 @@ Contributions in French and English are welcome.
 update detection and downloads, duplicate-download fixes (French-Manga and other
 affected sources), Aniyomi/Anikku extension validation, a new **Tools** tab for
 subtitles and multi-audio MKV workflows, Extensions page design and documentation.
+We also welcome themes, first-launch Android folder selection, video-player
+improvements, better library management and reliable offline playback on Android.
 These are contribution opportunities; see the goals and validation criteria in
 the call for contributors ([English](docs/contribution-priorities.en.md) /
 [Français](docs/contribution-priorities.md)). Feature and architecture proposals
 are welcome. Contact the maintainer on [Telegram — @loeuf237](https://t.me/loeuf237).
+Find published tasks in the [contribution tracker #12](https://github.com/loeuf237/animelab/issues/12).
 
 The Python engine lives in `animelab/`; desktop packaging uses `animelab.spec`.
 See the [package namespace and compatibility notes](docs/package-namespace.md).

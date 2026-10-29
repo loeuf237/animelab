@@ -180,6 +180,99 @@ plateformes annoncées et distinction explicite entre fonctions disponibles,
 expérimentales et envisagées. Un tutoriel suivi et corrigé par une personne
 découvrant le projet est particulièrement utile.
 
+## 9. Créer des thèmes pour l’application
+
+**Objectif :** permettre aux contributeurs de proposer des thèmes et aux
+utilisateurs de choisir l’apparence d’AnimeLab, au-delà des modes clair/sombre.
+
+Définir un format de palette réutilisant les variables de style existantes,
+des aperçus et un sélecteur de thèmes. Les premiers livrables peuvent être une
+palette documentée et des maquettes, puis un thème intégré. Prévoir le choix
+persistant, le retour au thème par défaut et la cohérence des écrans Android,
+desktop et web. Un éventuel import de thèmes doit utiliser des données
+déclaratives validées, avec des ressources disponibles hors ligne.
+
+**Validation attendue :** captures du lecteur, de la bibliothèque, des
+extensions et des paramètres ; contraste, focus, états d’erreur et texte lisibles
+sur mobile et bureau. Vérifier la conservation du choix après redémarrage, le
+repli sur le thème par défaut en cas de palette invalide et l’absence de
+régression des thèmes existants.
+
+## 10. Choisir un dossier externe au premier démarrage Android
+
+**Objectif :** proposer dès le premier lancement un dossier AnimeLab choisi par
+l’utilisateur pour ses médias, sous-titres et exports, en réutilisant le choix
+de dossier déjà disponible dans les paramètres Android.
+
+Intégrer cette étape à l’accueil initial : expliquer le dossier utilisé,
+ouvrir le sélecteur système, confirmer le choix ou conserver la destination
+par défaut. Préserver l’autorisation persistante et permettre de modifier le
+choix plus tard. Définir clairement quelles données sont exportées ; les bases,
+cookies et secrets restent dans le stockage privé de l’application.
+
+**Validation attendue :** premier démarrage, annulation du sélecteur, dossier
+autorisé, non inscriptible ou devenu indisponible, redémarrage et autorisation
+révoquée. Respecter les restrictions du sélecteur Android et proposer un dossier
+valide ou la destination par défaut. Un changement ne doit pas déplacer ou
+supprimer silencieusement les médias existants ; toute migration éventuelle
+doit avoir son parcours explicite et vérifié.
+
+## 11. Améliorer le lecteur vidéo Android
+
+**Objectif :** rendre la lecture plus confortable sur téléphone, pour le
+streaming et les fichiers téléchargés, avec des commandes tactiles accessibles.
+
+Proposer puis tester une meilleure disposition des contrôles : lecture/pause,
+recherche temporelle, plein écran, orientation, vitesse, audio, sous-titres et
+passage à l’épisode suivant. Les gestes supplémentaires peuvent faire l’objet
+de petites propositions séparées. Réutiliser le suivi de progression et les
+contrats média existants ; justifier toute évolution du moteur de lecture.
+
+**Validation attendue :** petits écrans, portrait/paysage, commandes et menus
+utilisables, reprise de position après fermeture ou recréation de l’activité,
+erreur de décodage et média local indisponible. Vérifier les pistes réellement
+prises en charge et annoncer explicitement les limites de formats/codecs.
+Inclure une lecture locale sans réseau et préserver le comportement desktop/web.
+
+## 12. Améliorer la gestion de la bibliothèque
+
+**Objectif :** faciliter la recherche et l’organisation des séries, des épisodes
+et des médias téléchargés dans une bibliothèque qui grandit.
+
+Les propositions peuvent couvrir tri, recherche, filtres par source ou état de
+lecture, catégories, actions groupées et affichage de la disponibilité locale.
+Distinguer un favori, une entrée de bibliothèque et un fichier réellement
+disponible. Conserver les identités de source, épisode et édition ainsi que les
+progressions et préférences existantes.
+
+**Validation attendue :** bibliothèque vide ou volumineuse, séries homonymes de
+sources différentes, VF/VOSTFR/VO, recherche accentuée, redémarrage et opérations
+groupées avec confirmation adaptée. Retirer une série de la bibliothèque et
+supprimer ses fichiers doivent rester deux actions clairement distinguées.
+Toute évolution du schéma doit prévoir une migration sans perte ; les médias
+locaux doivent rester repérables en mode hors ligne.
+
+## 13. Adapter Android à la lecture vidéo hors ligne
+
+**Objectif :** permettre d’ouvrir AnimeLab, parcourir les épisodes disponibles et
+les lire sans accès Internet, avec les métadonnées utiles conservées localement.
+
+Identifier les dépendances réseau du démarrage, de la bibliothèque et du
+lecteur. La lecture locale ne doit pas attendre un catalogue, une mise à jour ou
+une résolution distante. Rendre visibles les épisodes réellement disponibles,
+leur progression, leurs pistes audio et leurs sous-titres locaux. Prévoir la
+reprise après fermeture et le retour au réseau sans doubler les tâches.
+
+**Validation attendue :** téléchargement préalable, fermeture complète de
+l’application, mode avion, redémarrage, navigation et lecture locale avec
+recherche temporelle et reprise de position. Tester aussi un fichier supprimé,
+un dossier externe indisponible et un média partiellement téléchargé, sans les
+présenter comme disponibles. Distinguer les médias privés, les exports et les
+URI de dossiers autorisés ; ne pas promettre la lecture de tous les formats.
+
+Les issues et premières tâches des treize chantiers sont regroupées dans le
+[suivi des contributions #12](https://github.com/loeuf237/animelab/issues/12).
+
 ## Proposer une autre idée
 
 Ces chantiers n’excluent aucune proposition pertinente. Décrivez le besoin,
