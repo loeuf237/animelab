@@ -8,7 +8,7 @@ on:
       tag_name:
         description: Existing release tag
         required: true
-        default: v0.1.6-beta.2
+        default: v0.1.6-beta.3
 
 permissions:
   contents: read

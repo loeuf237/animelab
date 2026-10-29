@@ -30,7 +30,7 @@ android {
         applicationId = "com.animan.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 219
+        versionCode = 220
         versionName = "0.1.6"
         manifestPlaceholders["appLabel"] = "@string/app_name"
 
