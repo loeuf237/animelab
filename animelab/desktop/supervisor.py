@@ -35,6 +35,10 @@ def launcher_command():
 
 def choose_port(preferred):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        if os.name != 'nt':
+            # Match asyncio's Unix listener: a stopped engine may leave accepted
+            # connections in TIME_WAIT, which must not force a new application URL.
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             sock.bind(('127.0.0.1', preferred))
         except OSError:

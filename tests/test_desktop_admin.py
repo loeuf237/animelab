@@ -20,6 +20,31 @@ from animelab.desktop import window
 ROOT = Path(__file__).resolve().parents[1]
 
 
+@pytest.mark.skipif(os.name == 'nt', reason='Unix listener reuse semantics')
+def test_port_is_preserved_after_server_closes_an_accepted_connection():
+    with socket.socket() as listener:
+        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        listener.bind(('127.0.0.1', 0))
+        port = listener.getsockname()[1]
+        listener.listen()
+        with socket.create_connection(('127.0.0.1', port), timeout=5) as client:
+            connection, _ = listener.accept()
+            connection.close()  # The server's accepted connection enters TIME_WAIT.
+            assert client.recv(1) == b''
+    assert choose_port(port) == port
+
+
+def test_port_selection_preserves_another_running_server():
+    with socket.socket() as listener:
+        listener.bind(('127.0.0.1', 0))
+        listener.listen()
+        port = listener.getsockname()[1]
+        assert choose_port(port) != port
+        with socket.create_connection(('127.0.0.1', port), timeout=5):
+            connection, _ = listener.accept()
+            connection.close()
+
+
 @pytest.fixture
 def supervisor(tmp_path):
     owner = Supervisor(tmp_path, {'port': 8080, 'browser': False}, headless=True)
