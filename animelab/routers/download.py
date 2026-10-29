@@ -1,4 +1,5 @@
 from animelab.api_contracts import ContractRoute
+from animelab.api_errors import APIProblem
 from animelab.services.source_http import VerificationRequired
 import asyncio
 import json
@@ -349,8 +350,15 @@ async def test_proxy(request: Request):
         return {"success": False, "error": str(e)}
 
 @router.get("/api/episode/servers")
-async def get_episode_servers(url: str = Query(...)):
+async def get_episode_servers(url: str = Query(...), source: Optional[str] = Query(None)):
     try:
+        from animelab.services.extension_service import extension_service
+        from animelab.services.android_extensions import AndroidAPKSource
+        selected=extension_service.get_container_source_by_id(source) if source else None
+        if isinstance(selected,AndroidAPKSource):
+            candidates=await selected.get_episode_sources(url)
+            return {'success':True,'servers':list(dict.fromkeys(item['server'] for item in candidates)),
+                    'qualities':list(dict.fromkeys(item['quality'] for item in candidates)), 'defaultServer':'auto'}
         is_voir_anime = ("voir-anime" in url) or ("voiranime" in url)
         if is_voir_anime:
             data = await asyncio.to_thread(voiranime_service.get_episode_servers, url)
@@ -365,7 +373,7 @@ async def get_episode_servers(url: str = Query(...)):
             "servers": [],
             "defaultServer": "auto",
         }
-    except VerificationRequired:
+    except (VerificationRequired, APIProblem):
         raise
     except Exception as e:
         logger.error("Error get_episode_servers: %s", e)

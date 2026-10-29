@@ -1,4 +1,5 @@
 from animelab.api_contracts import ContractRoute
+from animelab.api_errors import APIProblem
 from animelab.services.source_http import source_http, VerificationRequired
 import asyncio
 import json
@@ -360,7 +361,7 @@ async def resolve_stream(
     if container_source:
         try:
             container_sources = await container_source.get_episode_sources(episodeUrl)
-        except VerificationRequired:
+        except (VerificationRequired, APIProblem):
             raise
         except Exception as e:
             logger.warning("[media] Error getting episode sources from container: %s", e)
@@ -386,6 +387,7 @@ async def resolve_stream(
                 if matched:
                     candidates = matched + [cs for cs in container_sources if cs not in matched]
 
+            candidate_failures = []
             for cand in candidates:
                 cand_url = cand.get("url") if isinstance(cand, dict) else getattr(cand, "url", "")
                 cand_srv = cand.get("server") if isinstance(cand, dict) else getattr(cand, "server", "imported")
@@ -409,8 +411,12 @@ async def resolve_stream(
                         break
                 except VerificationRequired:
                     raise
+                except APIProblem as ex:
+                    candidate_failures.append(ex)
                 except Exception as ex:
                     logger.debug("[media] Error resolving candidate %s: %s", cand_url, ex)
+            if not video_url and candidate_failures:
+                raise candidate_failures[0]
 
         # Si toujours non résolu, tenter directement sur episodeUrl
         if not video_url and episodeUrl and getattr(container_source, 'runtime', '') != 'android-apk':

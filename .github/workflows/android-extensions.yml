@@ -5,6 +5,11 @@ on:
     paths:
       - 'android/**'
       - 'android_runtime.py'
+      - 'animelab/migrations.py'
+      - 'animelab/api_errors.py'
+      - 'animelab/routers/extensions.py'
+      - 'animelab/routers/download.py'
+      - 'animelab/routers/media.py'
       - 'animelab/services/source_http.py'
       - 'animelab/services/*extension*'
       - 'animelab/services/android_extension*'
@@ -13,6 +18,11 @@ on:
     paths:
       - 'android/**'
       - 'android_runtime.py'
+      - 'animelab/migrations.py'
+      - 'animelab/api_errors.py'
+      - 'animelab/routers/extensions.py'
+      - 'animelab/routers/download.py'
+      - 'animelab/routers/media.py'
       - 'animelab/services/source_http.py'
       - 'animelab/services/*extension*'
       - 'animelab/services/android_extension*'

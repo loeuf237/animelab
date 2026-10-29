@@ -160,6 +160,10 @@ class ExtensionAPKTest {
                     val other=call("search",en,JSONObject().put("query","x")) as JSONObject
                     assertTrue(other.getJSONArray("results").getJSONObject(0).getString("title").contains(":720:"))
                     val detail=call("detail",fr,JSONObject().put("url","/anime/fixture")) as JSONObject
+                    assertEquals("/anime/fixture",detail.getJSONObject("anime").getString("url"))
+                    assertEquals("/anime/fixture",detail.getJSONObject("anime").getString("title"))
+                    assertFalse(detail.getJSONObject("anime").has("thumbnail_url"))
+                    assertEquals("APK code executed",detail.getJSONObject("anime").getString("description"))
                     assertEquals(1,detail.getJSONArray("episodes").length())
                     val hosters=call("hosters",fr,detail.getJSONArray("episodes").getJSONObject(0)) as JSONArray
                     val videos=call("videos",fr,hosters.getJSONObject(0)) as JSONArray

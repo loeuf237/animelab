@@ -37,9 +37,13 @@ class Fixture(override val lang: String) : AnimeHttpSource(), ConfigurableAnimeS
         val quality = getSourcePreferences().getString("quality", "720")
         return Observable.just(resultPage("${query.reversed()}:$computed:$quality:$suffix"))
     }
-    override fun fetchAnimeDetails(anime: SAnime): Observable<SAnime> = Observable.just(SAnime.create().apply {
-        url = anime.url; title = "$name details"; description = "APK code executed"; initialized = true
-    })
+    override fun fetchAnimeDetails(anime: SAnime): Observable<SAnime> {
+        require(anime.thumbnail_url == null && anime.author == null && anime.description == null)
+        return Observable.just(SAnime.create().apply {
+            // Exercise real legacy parsers which only return enriched metadata.
+            description = "APK code executed"; initialized = true
+        })
+    }
     override fun fetchEpisodeList(anime: SAnime): Observable<List<SEpisode>> = Observable.just(listOf(SEpisode.create().apply {
         url = "/episode/1"; name = "Computed episode"; episode_number = 1f
     }))

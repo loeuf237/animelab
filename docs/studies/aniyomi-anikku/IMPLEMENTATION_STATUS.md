@@ -12,7 +12,7 @@ applications/paquets réellement distribués. Il ne certifie pas une release.
 | E03–E04 | Dépôts coexistants, activation indépendante, récupération avec erreurs partielles ; JSON/Protobuf/gzip et listes externes/index_v2 bornés. | Tests des formats, migrations circulaires et limites ; liens applicatifs restant à raccorder. |
 | E05–E06 | VersionCode numérique ; clé annoncée/pending et approbation explicite ; inspection native des APK et confiance par package/version/signataires actuels. | Signataire multiple lié à tout son ensemble ; aucune authentification cryptographique d'index annoncée. Anciennes ABI réelles restant à tester. |
 | E07 | Sérialisation par package ; lots avec succès/échecs/attentes séparés ; PackageInstaller, autorisations, confirmation, résultat système et annulation. | Régressions Python ; reçu Android vérifiant version/signataire. |
-| E08–E10 | Fabriques multi-sources, stubs conservés, activations et préférences natives par source ; filtres et groupes récursifs. | Collisions, mémos et UI testés ; migration des anciennes références encore incomplète. |
+| E08–E10 | Fabriques multi-sources, stubs conservés, activations et préférences natives par source ; filtres et groupes récursifs. Migration 13 : références originales/mémos privés persistants, quota transactionnel sans éviction silencieuse. | Reprise après redémarrage et désinstallation/réinstallation testée en Python ; anciennes références non enregistrées avant cette migration encore incomplètes. |
 | E11 | OkHttp par défaut relayé vers SourceHTTP, budgets corps/IPC, défis typés, annulation et délai du parent. | Même UID : séparation de crash, **aucun bac à sable**. Sockets/accès directs possibles pour du code approuvé. Isolation hostile non validée. |
 | E12 | Détails/épisodes, saisons/relations, hébergeurs/vidéos ; métadonnées/mémos ; en-têtes privés, ressources HLS et sous-titres via capacités temporaires. | DASH avec en-têtes, audio externe et rendu ASS incomplets ; options de lecteur non admises ; pas d'admission implicite des torrents/serveurs locaux. |
 | E13 | Panneaux dépôts et APK, états réels, import, approbation/révocation, désinstallation partagée, préférences et activation des sources. | Tests navigateur ; nettoyage ciblé et parcours avancés restant à compléter. |
@@ -99,12 +99,56 @@ les extensions communautaires et les données des autres hôtes sont conservées
 L'analyse statique du véritable APK AnimeSama constate un client dérivé avec
 `followRedirects(false)` et un intercepteur d'application qui suit les redirections
 et met à jour l'adresse de base. Le premier broker court-circuitait ces callbacks.
-Un adaptateur de chaîne OkHttp 5.4 les conserve désormais dans le code ; les essais
-Android et communautaires du correctif doivent encore être enregistrés.
+Un adaptateur de chaîne OkHttp 5.4 les conserve désormais. Les cinq jobs du
+[workflow Android de `64c591a`](https://github.com/loeuf237/animelab/actions/runs/40805875973)
+réussissent, y compris le test dédié des clients dérivés sur API 29/30/35.
+Le premier essai API 35 avait échoué avant installation sur l'autorisation du banc ;
+cet échec ne s'est pas reproduit lors de la réexécution. La
+[CI générale correspondante](https://github.com/loeuf237/animelab/actions/runs/40805875978)
+réussit également.
+
+Le nouveau parcours physique `64c591a` est consigné dans la
+[preuve communautaire après correction des redirections](evidence/android-arm64-community-redirects-2026-10-29.json).
+L'instrumentation réussit, mais **zéro parcours complet métadonnées → vidéo** :
+AnimeSama fournit deux entrées, une fiche sans épisodes puis demande une vérification ;
+FRAnime et AniSama échouent au catalogue par `source_network_error`.
+Le test respecte désormais l'absence de préférences de FRAnime.
+La fenêtre de vérification AnimeSama affiche « You are unable to access anime-sama.to ».
+Ces résultats ne permettent ni d'attribuer tous les échecs au site, ni de valider
+la compatibilité vidéo. Aucun de ces trois APK n'a été réinstallé.
 Les intercepteurs **réseau** nécessitant une connexion/TLS native ne sont pas
 émulés : une erreur d'opération indisponible remplace leur omission silencieuse.
 La gestion commune des cookies après vérification navigateur et les options de
 transport propres aux extensions restent à couvrir avant adoption générale.
+
+## Correctifs de reprise et de contrat en cours de réception
+
+La migration 13 conserve par source/type/URL publique les URL originales et les
+mémos nécessaires aux prochains callbacks, y compris après arrêt du processus.
+Le quota est global (64 Mio et 250 000 références), avec bornes UTF-8/UTF-16 par
+objet ; un lot dépassant le quota est entièrement annulé. Ces données privées
+ne sont pas incluses dans les sauvegardes de métadonnées. Leur portabilité
+inter-appareils reste donc à réaliser pour E14.
+
+Une désinstallation externe conserve l'intention d'activation ; réinstaller
+le paquet ne réactive pas une source explicitement désactivée. Les mémos et
+`internalData` ne sont plus exposés dans les réponses d'animés/épisodes, mais
+restent disponibles pour le moteur. Les opérations catalogue/saisons/relations
+conservent aussi leurs références privées avant de répondre à l'interface.
+
+Le codec accepte les fiches de détail dont les champs `lateinit` URL/titre ne
+sont pas initialisés, en reprenant uniquement ces identités de la requête.
+Les valeurs explicitement fournies restent intactes. Il conserve également les
+champs optionnels nuls et les en-têtes vidéo absents. La fixture exerce un
+véritable parseur de détail sans URL/titre, au lieu de masquer ce cas.
+
+L'API des serveurs d'épisodes accepte l'identité de la source native et renvoie
+uniquement les noms/qualités. Le test communautaire utilise les routes Python
+serveurs/résolution média, plutôt que des appels JNI directs transportant les
+mémos dans le client. Une erreur native typée reste identifiable ; un hébergeur
+fonctionnel peut encore réussir si un autre échoue. Ces nouveaux changements
+nécessitent leur propre CI et leur propre réception physique ; les preuves
+`64c591a` ci-dessus ne les valident pas.
 
 Le contrat final reste [APK01–APK14](EXIGENCES_ANDROID_APK.md). Les lots
 incomplets restent nécessaires ; une limite ou non-adoption provisoire

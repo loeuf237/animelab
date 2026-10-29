@@ -70,7 +70,8 @@ def test_external_uninstall_retains_stub_without_claiming_installation(host):
     assert not service.get_enabled_container_sources()
     with service._get_conn() as conn:
         row=conn.execute('SELECT installed_code,is_enabled,catalog_state FROM imported_extensions').fetchone()
-        assert tuple(row)==(None,0,'missing')
+        assert tuple(row)==(None,1,'missing')  # Remember intent while the source is unavailable.
+    assert service.get_visible_extensions()[0]['is_enabled'] is False
     assert service.retained_source_descriptors()[0]['source_key']=='aniyomi:1152921504606846977'
 
 
@@ -130,6 +131,16 @@ async def test_native_call_cancellation_reaches_worker(monkeypatch):
     with pytest.raises(asyncio.CancelledError):
         await task
     assert release.is_set()
+
+
+@pytest.mark.asyncio
+async def test_native_requests_keep_unicode_within_the_jni_character_budget(monkeypatch):
+    class Bridge:
+        def invoke(self,payload):
+            assert '日本語' in payload and '\\u65e5' not in payload
+            return '{"ok":true,"result":{}}'
+    monkeypatch.setattr(native,'_bridge',Bridge())
+    assert await native.invoke('fixture.one','search','123',{'query':'日本語'})=={}
 
 
 def test_native_network_verification_is_not_hidden():

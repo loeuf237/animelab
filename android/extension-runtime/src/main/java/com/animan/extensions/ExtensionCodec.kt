@@ -8,20 +8,31 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 internal object ExtensionCodec {
-    fun anime(value: SAnime): JSONObject = JSONObject().put("url", value.url).put("title", value.title)
+    private fun JSONObject.optionalString(key: String): String? = if (isNull(key)) null else getString(key)
+    private fun initialized(read: () -> String, fallback: (() -> String)?): String = try { read() }
+        catch (error: UninitializedPropertyAccessException) { fallback?.invoke() ?: throw error }
+
+    fun anime(value: SAnime): JSONObject = anime(value, null)
+    // Legacy detail parsers commonly return metadata without initializing url/title.
+    // Only unset lateinit fields inherit the requested identity; explicit values survive.
+    fun anime(value: SAnime, fallback: SAnime?): JSONObject = JSONObject()
+        .put("url", initialized({ value.url }, fallback?.let { { it.url } }))
+        .put("title", initialized({ value.title }, fallback?.let { { it.title } }))
         .put("thumbnail_url", value.thumbnail_url).put("background_url", value.background_url)
         .put("artist", value.artist).put("author", value.author).put("description", value.description)
         .put("genre", value.genre).put("status", value.status).put("initialized", value.initialized)
         .put("season_number", value.season_number).put("fetch_type", value.fetch_type.name)
+        .put("update_strategy", value.update_strategy.name)
         .put("memo", JSONObject(value.memo.toString()))
 
     fun anime(value: JSONObject): SAnime = SAnime.create().apply {
         url = value.getString("url"); title = value.optString("title", url)
-        thumbnail_url = value.optString("thumbnail_url"); description = value.optString("description")
-        genre = value.optString("genre"); status = value.optInt("status")
-        background_url = value.optString("background_url"); artist = value.optString("artist"); author = value.optString("author")
+        thumbnail_url = value.optionalString("thumbnail_url"); description = value.optionalString("description")
+        genre = value.optionalString("genre"); status = value.optInt("status")
+        background_url = value.optionalString("background_url"); artist = value.optionalString("artist"); author = value.optionalString("author")
         initialized = value.optBoolean("initialized"); season_number = value.optDouble("season_number", -1.0)
         value.optString("fetch_type").takeIf { it.isNotEmpty() }?.let { fetch_type = FetchType.valueOf(it) }
+        value.optString("update_strategy").takeIf { it.isNotEmpty() }?.let { update_strategy = AnimeUpdateStrategy.valueOf(it) }
         value.optJSONObject("memo")?.let { memo = Json.parseToJsonElement(it.toString()) as JsonObject }
     }
 
@@ -33,14 +44,14 @@ internal object ExtensionCodec {
     fun episode(value: JSONObject): SEpisode = SEpisode.create().apply {
         url = value.getString("url"); name = value.optString("name", url)
         episode_number = value.optDouble("episode_number", -1.0).toFloat()
-        date_upload = value.optLong("date_upload"); scanlator = value.optString("scanlator")
-        fillermark = value.optBoolean("fillermark"); summary = value.optString("summary"); preview_url = value.optString("preview_url")
+        date_upload = value.optLong("date_upload"); scanlator = value.optionalString("scanlator")
+        fillermark = value.optBoolean("fillermark"); summary = value.optionalString("summary"); preview_url = value.optionalString("preview_url")
         value.optJSONObject("memo")?.let { memo = Json.parseToJsonElement(it.toString()) as JsonObject }
     }
 
     fun video(value: Video): JSONObject = JSONObject().put("videoUrl", value.videoUrl)
         .put("videoTitle", value.videoTitle).put("resolution", value.resolution).put("bitrate", value.bitrate)
-        .put("headers", JSONArray(value.headers?.map { JSONArray(listOf(it.first, it.second)) } ?: emptyList<Any>()))
+        .put("headers", value.headers?.let { JSONArray(it.map { header -> JSONArray(listOf(header.first, header.second)) }) })
         .put("subtitleTracks", JSONArray(value.subtitleTracks.map { JSONObject().put("url", it.url).put("lang", it.lang) }))
         .put("audioTracks", JSONArray(value.audioTracks.map { JSONObject().put("url", it.url).put("lang", it.lang) }))
         .put("timestamps", JSONArray(value.timestamps.map { JSONObject().put("start", it.start).put("end", it.end).put("name", it.name).put("type", it.type.name) }))
@@ -53,8 +64,9 @@ internal object ExtensionCodec {
 
     fun video(value: JSONObject): Video {
         val headers = Headers.Builder()
-        val pairs = value.optJSONArray("headers") ?: JSONArray()
-        for (i in 0 until pairs.length()) {
+        val pairs = value.optJSONArray("headers")
+        for (i in 0 until (pairs?.length() ?: 0)) {
+            requireNotNull(pairs)
             val pair = pairs.getJSONArray(i); headers.add(pair.getString(0), pair.getString(1))
         }
         fun tracks(key: String): List<Track> {
@@ -67,9 +79,9 @@ internal object ExtensionCodec {
         }
         val chapters = value.optJSONArray("timestamps") ?: JSONArray()
         return Video(videoUrl=value.optString("videoUrl"), videoTitle=value.optString("videoTitle"),
-            resolution=if(value.has("resolution")) value.getInt("resolution") else null,
-            bitrate=if(value.has("bitrate")) value.getInt("bitrate") else null,
-            headers=headers.build(), preferred=value.optBoolean("preferred"), subtitleTracks=tracks("subtitleTracks"),
+            resolution=if(value.isNull("resolution")) null else value.getInt("resolution"),
+            bitrate=if(value.isNull("bitrate")) null else value.getInt("bitrate"),
+            headers=if(pairs==null) null else headers.build(), preferred=value.optBoolean("preferred"), subtitleTracks=tracks("subtitleTracks"),
             timestamps=(0 until chapters.length()).map { chapters.getJSONObject(it).let { row ->
                 TimeStamp(row.getDouble("start"),row.getDouble("end"),row.optString("name"),ChapterType.valueOf(row.optString("type","Other"))) } },
             mpvArgs=args("mpvArgs"), ffmpegStreamArgs=args("ffmpegStreamArgs"), ffmpegVideoArgs=args("ffmpegVideoArgs"),

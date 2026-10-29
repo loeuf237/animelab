@@ -249,6 +249,16 @@ def extension_lifecycle(conn):
         'alias TEXT PRIMARY KEY, source_key TEXT NOT NULL REFERENCES extension_sources(source_key))')
 
 
+def native_extension_references(conn):
+    conn.exec_driver_sql('CREATE TABLE extension_native_references ('
+        'source_key TEXT NOT NULL, kind TEXT NOT NULL, public_url TEXT NOT NULL, native_url TEXT NOT NULL, '
+        'metadata_json TEXT NOT NULL, metadata_size INTEGER NOT NULL, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, '
+        "CHECK(kind IN ('anime','episode')), PRIMARY KEY(source_key,kind,public_url))")
+    conn.exec_driver_sql('CREATE TABLE extension_reference_budget ('
+        'id INTEGER PRIMARY KEY CHECK(id=1), used_bytes INTEGER NOT NULL DEFAULT 0, used_rows INTEGER NOT NULL DEFAULT 0)')
+    conn.exec_driver_sql('INSERT INTO extension_reference_budget(id) VALUES (1)')
+
+
 MIGRATIONS = (
     Migration(1, 'core_tables', bootstrap),
     Migration(2, 'download_identity_and_verification', download_identity),
@@ -262,6 +272,7 @@ MIGRATIONS = (
     Migration(10, 'media_tracks_and_output_profiles', media_profiles),
     Migration(11, 'encrypted_subtitle_provider_credentials', subtitle_provider_secrets),
     Migration(12, 'extension_catalog_installation_and_runtime', extension_lifecycle),
+    Migration(13, 'persistent_native_extension_references', native_extension_references),
 )
 
 

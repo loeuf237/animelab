@@ -135,7 +135,7 @@ async def call_android_source(source_id: str, operation: str, payload: dict = Bo
     source=extension_service.get_container_source_by_id(source_id)
     if source is None or not isinstance(source,android_extensions.AndroidAPKSource):
         raise HTTPException(404,'Source APK non chargée.')
-    return {'result':await source.call(operation,payload)}
+    return {'result':await source.public_call(operation,payload)}
 
 
 @router.post("/api/extensions/import-repo")

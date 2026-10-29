@@ -179,13 +179,6 @@ class NativeExtensionIntegrationTest {
                     val source=sources.getJSONObject(0)
                     val sourceId="aniyomi:"+source.getString("id")
                     proof.put("sourceId",sourceId)
-                    fun native(operation: String,payload: JSONObject): Any {
-                        val result=JSONObject(ExtensionBridge.invoke(JSONObject().put("operationId",UUID.randomUUID().toString())
-                            .put("operation",operation).put("pkg",pkg).put("sourceId",source.getString("id"))
-                            .put("payload",payload).toString()))
-                        if(!result.optBoolean("ok")) throw TrialFailure(result.optString("code","extension_runtime_error"))
-                        return result.get("result")
-                    }
                     phase="filters"
                     request("/api/sources/${encoded(sourceId)}/filters"); steps.put(phase)
                     proof.put("preferencesSupported",source.optBoolean("configurable"))
@@ -202,25 +195,27 @@ class NativeExtensionIntegrationTest {
                     // Catalogues can legitimately start with an upcoming show.
                     // Try at most three entries; do not turn a network/runtime error into a skip.
                     var episodes=JSONArray()
+                    var selectedAnime=results.getJSONObject(0)
                     for(index in 0 until minOf(3,results.length())) {
-                        val detail=JSONObject(request("/api/anime/detail?url=${encoded(results.getJSONObject(index).getString("url"))}&source=${encoded(sourceId)}"))
+                        selectedAnime=results.getJSONObject(index)
+                        val detail=JSONObject(request("/api/anime/detail?url=${encoded(selectedAnime.getString("url"))}&source=${encoded(sourceId)}"))
                         episodes=detail.getJSONObject("anime").getJSONArray("episodes")
                         proof.put("detailCandidatesTried",index+1)
                         if(episodes.length()>0) break
                     }
                     proof.put("episodes",episodes.length()); steps.put(phase)
                     if(episodes.length()==0) throw TrialFailure("empty_episode_list")
-                    phase="hosters"
-                    val hosts=native("hosters",episodes.getJSONObject(0).getJSONObject("nativeMetadata")) as JSONArray
-                    proof.put("hosters",hosts.length()); steps.put(phase)
-                    if(hosts.length()==0) throw TrialFailure("empty_hoster_list")
-                    phase="videos"
-                    val videos=native("videos",hosts.getJSONObject(0)) as JSONArray
-                    proof.put("videos",videos.length()); steps.put(phase)
-                    if(videos.length()==0) throw TrialFailure("empty_video_list")
-                    phase="resolve_video"
-                    val resolved=native("resolve_video",videos.getJSONObject(0)) as JSONObject
-                    if(resolved.optString("videoUrl").isBlank()) throw TrialFailure("empty_video_url")
+                    val episode=episodes.getJSONObject(0)
+                    assertFalse(episode.getJSONObject("nativeMetadata").has("memo"))
+                    val episodeUrl=encoded(episode.getString("playerUrl"))
+                    phase="episode_servers"
+                    val servers=JSONObject(request("/api/episode/servers?url=$episodeUrl&source=${encoded(sourceId)}"))
+                    proof.put("servers",servers.getJSONArray("servers").length()); steps.put(phase)
+                    if(servers.getJSONArray("servers").length()==0) throw TrialFailure("empty_hoster_list")
+                    phase="stream_resolve"
+                    val resolved=JSONObject(request("/api/media/stream/resolve?animeName=${encoded(selectedAnime.getString("title"))}"+
+                        "&episodeNumber=${episode.getInt("number")}&episodeUrl=$episodeUrl&animeUrl=${encoded(selectedAnime.getString("url"))}&source=${encoded(sourceId)}"))
+                    assertTrue(resolved.getString("streamUrl").startsWith("/api/media/extension-resource/"))
                     steps.put(phase); proof.put("state","metadata_path_passed")
                 } catch (failure: TrialFailure) {
                     proof.put("state","verification_needed").put("phase",phase).put("code",failure.code)

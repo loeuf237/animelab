@@ -888,7 +888,8 @@ class ExtensionService:
                 present={package['pkg'] for package in packages}
                 for old in conn.execute("SELECT id,pkg FROM imported_extensions WHERE runtime='android-apk'").fetchall():
                     if old['pkg'] not in present:
-                        conn.execute("UPDATE imported_extensions SET installed_version=NULL,installed_code=NULL,is_enabled=0,catalog_state='missing' WHERE id=?",(old['id'],))
+                        # Keep the user's enable choice; availability comes from PackageManager.
+                        conn.execute("UPDATE imported_extensions SET installed_version=NULL,installed_code=NULL,catalog_state='missing' WHERE id=?",(old['id'],))
                 conn.execute("UPDATE extension_sources SET metadata_json=json_set(metadata_json,'$.installed',0) WHERE runtime='android-apk'")
                 for package in packages:
                     conn.execute("INSERT INTO imported_extensions(repo_id,pkg,name,lang,version,installed_version,installed_code,runtime,is_enabled,catalog_state) "
@@ -901,7 +902,7 @@ class ExtensionService:
                         previous_package = next((p for p in self._native_packages if p['pkg']==package['pkg']),None)
                         same_identity = previous_package and all(previous_package.get(k)==package.get(k) for k in ('versionCode','signer','lastUpdateTime'))
                         source = self._active_container_sources.get(source_key) if same_identity else None
-                        source = source or android_extensions.AndroidAPKSource(package,descriptor)
+                        source = source or android_extensions.AndroidAPKSource(package,descriptor,db_path=self.db_path)
                         if source.base_url != (descriptor.get('baseUrl') or ''):
                             source._episodes.clear(); source._animes.clear()
                         source.base_url=descriptor.get('baseUrl') or ''

@@ -41,6 +41,9 @@ class APIProblem(RuntimeError):
     def __init__(self, code: str, *, status=400, category: Category = 'validation', action: Action | None = None):
         self.status = status
         self.problem = Problem(code=code, category=category, messageKey={
+            'extension_reference_budget': 'Le stockage des références APK a atteint sa limite ; aucune référence de bibliothèque n’a été supprimée.',
+            'extension_reference_invalid': 'La référence interne fournie par cette extension APK est invalide.',
+            'extension_reference_too_large': 'Les données internes de cette extension dépassent la limite du moteur APK.',
             'source_operation_unsupported': 'Cette source ne propose pas cette fonctionnalité.',
             'extension_untrusted': 'Approuvez la version et le signataire de cet APK avant son exécution.',
             'extension_abi_incompatible': 'Les classes ou bibliothèques de cet APK sont incompatibles avec le moteur actuel.',

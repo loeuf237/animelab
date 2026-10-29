@@ -245,12 +245,14 @@ class ExtensionRuntimeService : Service() {
                 JSONObject().put("results", JSONArray(result.animes.map(codec::anime))).put("hasNextPage", result.hasNextPage)
             }
             "detail" -> {
-                val result = source.getAnimeEpisodeUpdate(animeInput(), emptyList(), true, true)
-                JSONObject().put("anime", codec.anime(result.anime)).put("episodes", JSONArray(result.episodes.map(codec::episode)))
+                val input = animeInput()
+                val result = source.getAnimeEpisodeUpdate(input, emptyList(), true, true)
+                JSONObject().put("anime", codec.anime(result.anime, input)).put("episodes", JSONArray(result.episodes.map(codec::episode)))
             }
             "seasons" -> {
-                val result = source.getAnimeSeasonUpdate(animeInput(), emptyList(), true, true)
-                JSONObject().put("anime", codec.anime(result.anime)).put("seasons", JSONArray(result.seasons.map(codec::anime)))
+                val input = animeInput()
+                val result = source.getAnimeSeasonUpdate(input, emptyList(), true, true)
+                JSONObject().put("anime", codec.anime(result.anime, input)).put("seasons", JSONArray(result.seasons.map(codec::anime)))
             }
             "related" -> {
                 require(source.supportsRelatedAnime)
