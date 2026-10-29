@@ -11,6 +11,14 @@ val optimizeApk = providers.gradleProperty("animelab.optimizeApk").orNull != "fa
 val packagingPython = System.getenv("ANIMAN_BUILD_PYTHON") ?: "python3"
 val optimizer = rootProject.file("../scripts/android_optimize.py")
 val isolatedValidation = providers.gradleProperty("animelab.isolatedValidation").orNull == "true"
+val nativeTestFixture = tasks.register<Copy>("stageNativeTestFixture") {
+    dependsOn(":extension-fixture:assembleApi17Debug")
+    from(rootProject.file("extension-fixture/build/outputs/apk/api17/debug")) { include("*.apk") }
+    into(layout.buildDirectory.dir("generated/native-test-fixture"))
+}
+tasks.configureEach {
+    if (name.startsWith("merge") && name.endsWith("AndroidTestAssets")) dependsOn(nativeTestFixture)
+}
 
 android {
     namespace = "com.animan.app"
@@ -70,6 +78,7 @@ android {
     }
     // The temporary validation key is never used by the publication job.
     testBuildType = if (System.getenv("ANIMAN_ANDROID_KEYSTORE").isNullOrBlank()) "validation" else "release"
+    sourceSets["androidTest"].assets.srcDir(layout.buildDirectory.dir("generated/native-test-fixture"))
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -104,6 +113,7 @@ dependencies {
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:rules:1.6.1")
+    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
 }
 
 chaquopy {

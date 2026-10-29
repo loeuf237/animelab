@@ -171,7 +171,9 @@ internal object ExtensionPackages {
         operation.put("installerStatus",status)
         when (status) {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
-                operation.put("state","waiting_user"); save(context,operation)
+                operation.put("state","waiting_user")
+                    .put("confirmationRequest",operation.optInt("confirmationRequest",0)+1)
+                save(context,operation)
                 val confirmation=intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
                 if (confirmation==null) {
                     operation.put("state","failed").put("error","package_installer_confirmation_missing")

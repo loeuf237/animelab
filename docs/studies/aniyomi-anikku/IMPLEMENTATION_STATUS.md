@@ -45,6 +45,19 @@ applications/paquets réellement distribués. Il ne certifie pas une release.
   avec découverte de leurs sources, sans réinstallation ni transformation.
   Voir la [preuve enregistrée](evidence/android-arm64-shared-apks-2026-10-29.json).
   Cela ne prouve pas encore leurs recherches, détails ou vidéos dans AnimeLab.
+- L'application AnimeLab ARM64 optimisée `16c5cac`, installée séparément sous
+  `com.animan.app.a11test`, a réussi le parcours serveur Python → APK API17 →
+  catalogue calculé, préférences, filtres et QuickJS sur le SCV38.
+  Voir la [preuve Python/Android](evidence/android-arm64-python-integration-2026-10-29.json).
+  Pour ce premier essai, la fixture originale était préinstallée par ADB :
+  l'installation depuis l'API AnimeLab et les sites réels restent à valider.
+- Le correctif `a1c364b` réussit les cinq jobs de la
+  [matrice Android](https://github.com/loeuf237/animelab/actions/runs/40801273325)
+  (dont annulation définitive et corrélation du callback à la session).
+  Dans la [CI générale](https://github.com/loeuf237/animelab/actions/runs/40801273248),
+  les six autres jobs réussissent ; le job Windows échoue par expiration du
+  test d'ouverture WebView2 à 60 secondes, après réussite des tests de régression.
+  Cette exécution n'est donc pas annoncée entièrement verte.
 
 ## Réception restant obligatoire
 

@@ -82,6 +82,8 @@ class ExtensionAPKTest {
         // Changing this AppOp can kill the instrumented process on Android 11.
         // The CI/device driver must grant it before starting instrumentation.
         assertTrue("Grant the test install permission before instrumentation",context.packageManager.canRequestPackageInstalls())
+        val installTimeout=InstrumentationRegistry.getArguments().getString("install_timeout_seconds")
+            ?.toLongOrNull()?.coerceIn(30,300) ?: 60L
         ActivityScenario.launch(ProbeActivity::class.java).use {
             val latch=CountDownLatch(1)
             lateinit var runtime: IExtensionRuntime
@@ -102,23 +104,31 @@ class ExtensionAPKTest {
                     val inspection=ExtensionPackages.inspect(context,apk.path)
                     assertEquals(pkg,inspection.getString("pkg"))
                     val installation=ExtensionPackages.install(context,apk.path,pkg)
-                    val deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(60)
+                    val deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(installTimeout)
                     var state=""
                     var lastOperation=installation
-                    var confirmed=false
+                    var confirmedRequest=0
+                    var confirmationClicks=0
                     while (System.nanoTime()<deadline) {
-                        if(!confirmed && device.currentPackageName.orEmpty().contains("packageinstaller")) {
-                            device.wait(Until.findObject(By.text(Pattern.compile("(?i)^(install|installer|installieren|instalar)$"))),500)?.let {
-                                it.click(); confirmed=true
-                            }
-                        }
                         val ops=ExtensionPackages.operations(context)
                         lastOperation=(0 until ops.length()).map { ops.getJSONObject(it) }.single { it.getString("id")==installation.getString("id") }
                         state=lastOperation.getString("state")
                         if (state in listOf("installed","failed","cancelled")) break
+                        val request=lastOperation.optInt("confirmationRequest",1)
+                        if(state=="waiting_user" && confirmedRequest<request &&
+                            device.currentPackageName.orEmpty().contains("packageinstaller")) {
+                            device.wait(Until.findObject(By.text(Pattern.compile("(?i)^(install|installer|installieren|instalar)$"))),500)?.let {
+                                if(it.isEnabled) { it.click(); confirmedRequest=request; confirmationClicks++ }
+                            }
+                        }
                         Thread.sleep(150)
                     }
-                    assertEquals("PackageInstaller state for $pkg: $lastOperation", "installed",state)
+                    // Only report the controlled fixture's own installer; never dump other UI.
+                    val buttons=if(state!="installed" && device.currentPackageName.orEmpty().contains("packageinstaller") &&
+                        device.hasObject(By.text("AnimeLab extension fixture"))) {
+                        device.findObjects(By.clazz("android.widget.Button")).map { it.text.orEmpty() }.take(6)
+                    } else emptyList()
+                    assertEquals("PackageInstaller state for $pkg: $lastOperation; clicks=$confirmationClicks; fixtureButtons=$buttons", "installed",state)
                     fun discovered(): JSONObject {
                         val packages=decoded(runtime.discover()) as JSONArray
                         return requireNotNull((0 until packages.length()).map { packages.getJSONObject(it) }.singleOrNull { it.getString("pkg")==pkg }) { "Installed $pkg absent from discovery: $packages" }
