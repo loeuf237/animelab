@@ -18,6 +18,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.Before
 import org.junit.Assume.assumeTrue
 import org.junit.runner.RunWith
 import java.io.File
@@ -31,6 +32,16 @@ class ExtensionAPKTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
     private val device = UiDevice.getInstance(instrumentation)
+    @Before fun abandonPreviousControlledFixturePrompts() {
+        val operations=ExtensionPackages.operations(context)
+        for(i in 0 until operations.length()) {
+            val operation=operations.getJSONObject(i)
+            if(operation.optString("pkg").startsWith("eu.kanade.tachiyomi.animeextension.all.animelabfixture.") &&
+                operation.optString("action")=="install" && operation.optString("state") in setOf("preparing","permission_required","waiting_user","installing")) {
+                ExtensionPackages.cancel(context,operation.getString("id"))
+            }
+        }
+    }
     private fun decoded(raw: String): Any {
         val value=JSONObject(raw)
         assertTrue("Native error: $value",value.optBoolean("ok"))
