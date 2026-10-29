@@ -51,6 +51,24 @@ applications/paquets réellement distribués. Il ne certifie pas une release.
   Voir la [preuve Python/Android](evidence/android-arm64-python-integration-2026-10-29.json).
   Pour ce premier essai, la fixture originale était préinstallée par ADB :
   l'installation depuis l'API AnimeLab et les sites réels restent à valider.
+- Sur le build optimisé `6ebb32b`, le SCV38 a ensuite réussi **l'installation
+  depuis l'API Python d'AnimeLab via PackageInstaller**, puis la comparaison des
+  octets réellement installés et l'exécution catalogue/préférences/filtres/QuickJS.
+  Voir la [preuve APK01 sur ARM64](evidence/android-arm64-package-installer-2026-10-29.json).
+  Il s'agit d'un APK synthétique original, pas d'une extension communautaire transformée.
+- Les deux workflows de `6ebb32b` sont entièrement réussis :
+  [7 jobs généraux](https://github.com/loeuf237/animelab/actions/runs/40802379189),
+  [5 jobs Android](https://github.com/loeuf237/animelab/actions/runs/40802379208).
+  Le timeout Windows de l'exécution précédente ne s'est pas reproduit.
+- Premier parcours communautaire dans l'application complète : AnimeSama renvoie
+  deux résultats de catalogue et une fiche, sans épisodes sur la première entrée ;
+  AniSama rencontre une erreur réseau ; FRAnime est arrêté par un appel de
+  préférences que cette source ne déclare pas. Ce dernier est une hypothèse
+  erronée du test, pas une incompatibilité démontrée de FRAnime.
+  Voir la [preuve partielle](evidence/android-arm64-community-initial-2026-10-29.json)
+  et l'[inspection statique FRAnime](evidence/franime-preferences-static-2026-10-29.json).
+  Le test est corrigé pour respecter cette capacité et essayer au maximum trois
+  entrées de catalogue, sans ignorer leurs erreurs réseau/runtime.
 - Le correctif `a1c364b` réussit les cinq jobs de la
   [matrice Android](https://github.com/loeuf237/animelab/actions/runs/40801273325)
   (dont annulation définitive et corrélation du callback à la session).
@@ -77,6 +95,16 @@ fixture `animelabfixture.api12`, identifiée par son SHA-256 comme issue du
 banc `2796d8a`. Il ne démontre pas un blocage d'affichage de la confirmation.
 Seul ce paquet synthétique identifié est supprimé pour reprendre la campagne ;
 les extensions communautaires et les données des autres hôtes sont conservées.
+
+L'analyse statique du véritable APK AnimeSama constate un client dérivé avec
+`followRedirects(false)` et un intercepteur d'application qui suit les redirections
+et met à jour l'adresse de base. Le premier broker court-circuitait ces callbacks.
+Un adaptateur de chaîne OkHttp 5.4 les conserve désormais dans le code ; les essais
+Android et communautaires du correctif doivent encore être enregistrés.
+Les intercepteurs **réseau** nécessitant une connexion/TLS native ne sont pas
+émulés : une erreur d'opération indisponible remplace leur omission silencieuse.
+La gestion commune des cookies après vérification navigateur et les options de
+transport propres aux extensions restent à couvrir avant adoption générale.
 
 Le contrat final reste [APK01–APK14](EXIGENCES_ANDROID_APK.md). Les lots
 incomplets restent nécessaires ; une limite ou non-adoption provisoire

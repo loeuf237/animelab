@@ -125,6 +125,7 @@ class NativeExtensionIntegrationTest {
             assertEquals(id,anime.getString("source"))
             assertTrue(anime.getString("title").endsWith("${nonce.reversed()}:42:1080:through-python"))
             val proof=JSONObject().put("androidApi",android.os.Build.VERSION.SDK_INT).put("abi",android.os.Build.SUPPORTED_ABIS[0])
+                .put("probeRunId",arguments.getString("probe_run_id"))
                 .put("optimizedApplication",true).put("artifactSha256",expected).put("realAPKClassExecution",true)
                 .put("packageInstallerViaPythonAPI",staged!=null)
                 .put("pythonRouter",true).put("nativeFilters",true).put("nativePreferences",true).put("quickJs",true)
@@ -163,7 +164,7 @@ class NativeExtensionIntegrationTest {
                 val before=context.packageManager.getPackageInfo(pkg,0)
                 val descriptor=(0 until packages.length()).map { packages.getJSONObject(it) }.single { it.getString("pkg")==pkg }
                 val proof=JSONObject().put("pkg",pkg).put("versionCode",descriptor.getString("versionCode"))
-                    .put("signer",descriptor.getString("signer")).put("operations",JSONArray())
+                    .put("signer",descriptor.getString("signer")).put("api",descriptor.getInt("api")).put("operations",JSONArray())
                 val steps=proof.getJSONArray("operations")
                 var phase="trust"
                 try {
@@ -177,6 +178,7 @@ class NativeExtensionIntegrationTest {
                     assertTrue(sources.length()>0)
                     val source=sources.getJSONObject(0)
                     val sourceId="aniyomi:"+source.getString("id")
+                    proof.put("sourceId",sourceId)
                     fun native(operation: String,payload: JSONObject): Any {
                         val result=JSONObject(ExtensionBridge.invoke(JSONObject().put("operationId",UUID.randomUUID().toString())
                             .put("operation",operation).put("pkg",pkg).put("sourceId",source.getString("id"))
@@ -186,16 +188,26 @@ class NativeExtensionIntegrationTest {
                     }
                     phase="filters"
                     request("/api/sources/${encoded(sourceId)}/filters"); steps.put(phase)
-                    phase="preferences"
-                    request("/api/extensions/android/sources/${encoded(sourceId)}/preferences",JSONObject()); steps.put(phase)
+                    proof.put("preferencesSupported",source.optBoolean("configurable"))
+                    if(source.optBoolean("configurable")) {
+                        phase="preferences"
+                        request("/api/extensions/android/sources/${encoded(sourceId)}/preferences",JSONObject()); steps.put(phase)
+                    }
                     phase="popular"
                     val catalogue=JSONObject(request("/api/sources/${encoded(sourceId)}/catalogue?mode=popular"))
                     val results=catalogue.getJSONArray("results")
                     proof.put("catalogueResults",results.length()); steps.put(phase)
                     if(results.length()==0) throw TrialFailure("empty_catalogue")
                     phase="detail"
-                    val detail=JSONObject(request("/api/anime/detail?url=${encoded(results.getJSONObject(0).getString("url"))}&source=${encoded(sourceId)}"))
-                    val episodes=detail.getJSONObject("anime").getJSONArray("episodes")
+                    // Catalogues can legitimately start with an upcoming show.
+                    // Try at most three entries; do not turn a network/runtime error into a skip.
+                    var episodes=JSONArray()
+                    for(index in 0 until minOf(3,results.length())) {
+                        val detail=JSONObject(request("/api/anime/detail?url=${encoded(results.getJSONObject(index).getString("url"))}&source=${encoded(sourceId)}"))
+                        episodes=detail.getJSONObject("anime").getJSONArray("episodes")
+                        proof.put("detailCandidatesTried",index+1)
+                        if(episodes.length()>0) break
+                    }
                     proof.put("episodes",episodes.length()); steps.put(phase)
                     if(episodes.length()==0) throw TrialFailure("empty_episode_list")
                     phase="hosters"
@@ -223,6 +235,7 @@ class NativeExtensionIntegrationTest {
                 }
             }
             android.util.Log.i("ANIMELAB_APK_PROOF",JSONObject().put("communityAPKOperations",cases)
+                .put("probeRunId",InstrumentationRegistry.getArguments().getString("probe_run_id"))
                 .put("androidApi",android.os.Build.VERSION.SDK_INT).put("abi",android.os.Build.SUPPORTED_ABIS[0])
                 .put("optimizedApplication",true).put("pythonNetworkGateway",true)
                 .put("mediaPlaybackTested",false).put("mediaDownloadRequested",false).put("otherHostsModified",false).toString())

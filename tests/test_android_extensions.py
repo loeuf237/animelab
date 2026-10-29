@@ -144,9 +144,47 @@ def test_native_default_user_agent_matches_the_verification_session():
     assert json.loads(android_runtime.extension_http('{"action":"user_agent"}'))=={'userAgent':USER_AGENT}
 
 
+@pytest.mark.parametrize('kind,expected',[
+    ('dns','network_dns'),('tls','network_tls'),('timeout','network_timeout'),('network','network_error')])
+def test_android_network_gateway_keeps_the_failure_category(monkeypatch,kind,expected):
+    import android_runtime
+    from animelab.services.source_http import source_http, SourceNetworkError
+    class FailedClient:
+        async def __aenter__(self):
+            raise SourceNetworkError('Private transport details must remain private',kind,'https://fixture.example')
+        async def __aexit__(self,*args):
+            return False
+    monkeypatch.setattr(source_http,'async_client',lambda **kwargs:FailedClient())
+    payload=json.dumps({'method':'GET','url':'https://fixture.example','body':''})
+    assert json.loads(android_runtime.extension_http(payload))=={'error':expected}
+
+
+@pytest.mark.parametrize('options,timeout,follow_ssl',[
+    ({},30,True),({'readTimeoutMillis':4000,'followRedirects':False,'followSslRedirects':False},4,False),
+    ({'readTimeoutMillis':0},30,True),({'readTimeoutMillis':90000},30,True)])
+def test_android_network_gateway_keeps_derived_client_policy_within_parent_budgets(monkeypatch,options,timeout,follow_ssl):
+    import android_runtime
+    import httpx
+    from animelab.services.source_http import source_http
+    class Client:
+        async def __aenter__(self): return self
+        async def __aexit__(self,*args): return False
+        async def request(self,method,url,**kwargs):
+            assert kwargs['_follow_ssl_redirects'] is follow_ssl
+            assert kwargs['max_response_bytes']==8_000_000
+            return httpx.Response(200,text='controlled',request=httpx.Request(method,url))
+    def client(**kwargs):
+        assert kwargs=={'timeout':timeout,'follow_redirects':options.get('followRedirects',True)}
+        return Client()
+    monkeypatch.setattr(source_http,'async_client',client)
+    payload=json.dumps({'method':'GET','url':'https://fixture.example','body':'',**options})
+    assert json.loads(android_runtime.extension_http(payload))['status']==200
+
+
 @pytest.mark.parametrize('code,status,category',[
     ('extension_abi_incompatible',422,'validation'),('rate_limited',429,'rate_limit'),
-    ('extension_untrusted',409,'permission'),('extension_runtime_timeout',504,'internal')])
+    ('extension_untrusted',409,'permission'),('extension_runtime_timeout',504,'internal'),
+    ('source_operation_unsupported',400,'validation'),('network_dns',502,'network')])
 def test_native_failures_keep_their_actual_category(code,status,category):
     from animelab.api_errors import APIProblem
     with pytest.raises(APIProblem) as caught:

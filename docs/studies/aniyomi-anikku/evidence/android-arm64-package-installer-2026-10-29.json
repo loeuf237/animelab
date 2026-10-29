@@ -1,0 +1,34 @@
+{
+  "androidApi": 29,
+  "abi": "arm64-v8a",
+  "optimizedApplication": true,
+  "artifactSha256": "438a3dbb502734974bdec97b5600b2c6e6d8f899938d0ba797af59386bd0a63a",
+  "realAPKClassExecution": true,
+  "packageInstallerViaPythonAPI": true,
+  "pythonRouter": true,
+  "nativeFilters": true,
+  "nativePreferences": true,
+  "quickJs": true,
+  "operations": [
+    "catalogue",
+    "preferences",
+    "filters"
+  ],
+  "sourceIds": [
+    "aniyomi:3194163789378082801",
+    "aniyomi:3082908367532643690"
+  ],
+  "realHostsInteroperabilityTested": false,
+  "date": "2026-10-29",
+  "sourceCommit": "6ebb32b96a3b4afdd77ace4fe35c43cf1efc9787",
+  "hardware": "SCV38",
+  "ciRun": 40802379208,
+  "ciArtifactSha256": "81650b7cb083aa1cba0046f19b797e6725e227d04302ce016a7f308452fa920e",
+  "fixtureInstallationMethod": "AnimeLab Python API and Android PackageInstaller",
+  "communityAPKsExercised": false,
+  "limits": [
+    "Controlled API17 fixture compiled against the current host ABI.",
+    "No community site operations or media playback tested by this case.",
+    "Isolated validation package com.animan.app.a11test."
+  ]
+}

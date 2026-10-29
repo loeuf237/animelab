@@ -56,4 +56,9 @@ uv run --locked python docs/studies/aniyomi-anikku/verify_current.py --baseline
 
 Le lanceur de vérification utilise un HOME, une base et un cache temporaires. Les cas d'audit remplacent le téléchargement des catalogues par des réponses synthétiques. Il ne modifie pas la bibliothèque personnelle.
 
-**Livrable de cette étape : étude et plan.** Les nouvelles fonctions de gestion et les moteurs proposés ne sont pas encore implémentés.
+**Ce document décrit l'étude initiale au commit `75c84ec`.** L'implémentation
+ultérieure et ses preuves sont suivies dans le
+[registre courant](IMPLEMENTATION_STATUS.md), avec les
+[instructions d'utilisation et de validation](UTILISATION.md).
+Les fonctions écrites, les essais réussis et les critères restant à démontrer
+y sont distingués ; cette étude historique ne certifie pas la livraison.

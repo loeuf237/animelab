@@ -16,7 +16,7 @@ _loop = None
 def extension_http(payload):
     """Native default OkHttp gateway: keep the shared URL/cookie/proxy policy."""
     import base64
-    from animelab.services.source_http import source_http, VerificationRequired, RateLimited, USER_AGENT
+    from animelab.services.source_http import source_http, VerificationRequired, RateLimited, SourceNetworkError, USER_AGENT
     if json.loads(payload).get('action') == 'user_agent':
         return json.dumps({'userAgent':USER_AGENT})
     async def request():
@@ -27,9 +27,12 @@ def extension_http(payload):
         method = data['method'].upper()
         if method not in ('GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'):
             raise ValueError('Unsupported HTTP method')
-        async with source_http.async_client(timeout=30, follow_redirects=True) as client:
+        milliseconds = int(data.get('readTimeoutMillis',30000))
+        timeout = 30 if milliseconds<=0 else min(30,max(.1,milliseconds/1000))
+        async with source_http.async_client(timeout=timeout, follow_redirects=data.get('followRedirects',True) is True) as client:
             response = await client.request(method, data['url'], headers=dict(data.get('headers') or []),
-                                            content=body or None, max_response_bytes=8_000_000)
+                                            content=body or None, max_response_bytes=8_000_000,
+                                            _follow_ssl_redirects=data.get('followSslRedirects',True) is True)
             return {'status':response.status_code, 'url':str(response.url),
                     'headers':list(response.headers.multi_items()), 'contentType':response.headers.get('content-type',''),
                     'body':base64.b64encode(response.content).decode()}
@@ -39,6 +42,8 @@ def extension_http(payload):
         return json.dumps({'error':'verification_required','url':error.url})
     except RateLimited:
         return json.dumps({'error':'rate_limited'})
+    except SourceNetworkError as error:
+        return json.dumps({'error':{'dns':'network_dns','tls':'network_tls','timeout':'network_timeout'}.get(error.kind,'network_error')})
     except Exception:
         return json.dumps({'error':'source_network_error'})
 

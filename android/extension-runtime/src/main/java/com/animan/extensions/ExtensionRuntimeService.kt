@@ -92,7 +92,8 @@ class ExtensionRuntimeService : Service() {
     } catch (error: Throwable) {
         val networkError = generateSequence(error) { it.cause }.take(12).filterIsInstance<SourceGatewayException>().firstOrNull()
         if (networkError != null) {
-            val code = networkError.code.takeIf { it in setOf("verification_required","rate_limited","source_network_error") } ?: "source_network_error"
+            val code = networkError.code.takeIf { it in setOf("verification_required","rate_limited","source_network_error",
+                "network_dns","network_tls","network_timeout","network_error") } ?: "source_network_error"
             JSONObject().put("ok",false).put("code",code)
                 .apply { if (code=="verification_required") put("url",networkError.target) }.toString()
         } else {

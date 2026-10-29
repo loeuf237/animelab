@@ -392,6 +392,7 @@ class SourceHTTPService:
 
     def _request(self, method, url, headers, timeout, follow, verifying, kwargs):
         validator = kwargs.pop('_url_validator', None)
+        follow_ssl = kwargs.pop('_follow_ssl_redirects', True)
         for redirect in range(7):
             if validator:
                 validator(url)
@@ -434,7 +435,9 @@ class SourceHTTPService:
             if not follow or response.status_code not in (301, 302, 303, 307, 308) or not response.headers.get("location"):
                 return response
             target = urljoin(url, response.headers["location"])
-            if urlparse(target).netloc != urlparse(url).netloc:
+            if not follow_ssl and urlparse(target).scheme != urlparse(url).scheme:
+                return response
+            if (urlparse(target).scheme,urlparse(target).netloc) != (urlparse(url).scheme,urlparse(url).netloc):
                 headers = {k: v for k, v in headers.items() if k not in ("authorization", "cookie", "origin")}
             if response.status_code == 303 or (method == "POST" and response.status_code in (301, 302)):
                 method = "GET"
@@ -634,8 +637,10 @@ class SourceStream:
     def _open(self):
         service = self.client.service
         url = self.url
+        method = self.method
         kwargs = dict(self.kwargs)
         allow_html = kwargs.pop('_allow_html',False)
+        follow_ssl = kwargs.pop('_follow_ssl_redirects',True)
         verifying = kwargs.pop("verify_challenge", False)
         for _ in range(7):
             if self.client.url_validator:
@@ -649,20 +654,25 @@ class SourceStream:
             self.lease = service.lease(state)
             transport = self.lease.__enter__()
             try:
-                self.raw = transport.request(self.method, url, headers=self.headers, stream=True,
+                self.raw = transport.request(method, url, headers=self.headers, stream=True,
                                              allow_redirects=False, timeout=service.timeout(self.client.timeout), **kwargs)
                 response = httpx.Response(self.raw.status_code, headers=response_headers(self.raw),
-                                          request=httpx.Request(self.method, self.raw.url))
+                                          request=httpx.Request(method, self.raw.url))
                 service.classify(state, response, url, streaming=True)
                 if self.client.follow_redirects and response.status_code in (301, 302, 303, 307, 308) and response.headers.get("location"):
                     target = urljoin(url, response.headers["location"])
-                    if urlparse(target).netloc != urlparse(url).netloc:
-                        self.headers.pop("authorization", None)
-                        self.headers.pop("cookie", None)
-                    self.close()
-                    kwargs.pop("params", None)
-                    url = target
-                    continue
+                    if follow_ssl or urlparse(target).scheme == urlparse(url).scheme:
+                        if (urlparse(target).scheme,urlparse(target).netloc) != (urlparse(url).scheme,urlparse(url).netloc):
+                            self.headers.pop("authorization", None)
+                            self.headers.pop("cookie", None)
+                        if (response.status_code==303 and method.upper()!='HEAD') or (method.upper()=='POST' and response.status_code in (301,302)):
+                            method='GET'
+                            for key in ('content','data','json'): kwargs.pop(key,None)
+                            for key in ('content-type','content-length','transfer-encoding'): self.headers.pop(key,None)
+                        self.close()
+                        kwargs.pop("params", None)
+                        url = target
+                        continue
                 # HTML is never a media stream; inspect its small body for challenge markers.
                 if not allow_html and "text/html" in response.headers.get("content-type", "").lower():
                     body = bytearray()

@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-29",
+  "package": "eu.kanade.tachiyomi.animeextension.fr.franime",
+  "versionCode": "29",
+  "apkSha256": "513e3aac3475c525b28b087603ebf4bf2ffe4580e6d741b9cbbda3aba50b5633",
+  "dexSha256": "90596aa0c65f665afb75d94079ad52e0f97033b8b4090bb125449438b965a1a7",
+  "tool": "Android SDK Build Tools 36.0.0 dexdump -d",
+  "sourceExecutionPerformed": false,
+  "hierarchy": [
+    "eu.kanade.tachiyomi.animeextension.fr.franime.FrAnime",
+    "h",
+    "eu.kanade.tachiyomi.animesource.online.AnimeHttpSource"
+  ],
+  "observations": [
+    "No ConfigurableAnimeSource interface or setupPreferenceScreen implementation in the examined DEX.",
+    "The full-app probe must honor the source configurable capability before requesting preferences."
+  ],
+  "reaEvidenceAvailable": false,
+  "reaLimitation": "JADX provider not configured; ordinary Android SDK static inspection used instead."
+}

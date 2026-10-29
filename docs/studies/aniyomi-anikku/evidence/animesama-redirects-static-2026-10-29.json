@@ -1,0 +1,18 @@
+{
+  "date": "2026-10-29",
+  "package": "eu.kanade.tachiyomi.animeextension.fr.animesama",
+  "versionCode": "33",
+  "apkSha256": "9f46108c63497b59210f8c346244f95b2f96bfb302c3b4408c793d346bea4a73",
+  "tool": "Android SDK Build Tools 36.0.0 dexdump -d",
+  "evidenceType": "static disassembly and host-source inspection",
+  "observations": [
+    "The extension constructor calls OkHttpClient.newBuilder().followRedirects(false).addInterceptor(...).",
+    "The added application interceptor follows Location, updates the base-URL preference and adjusts Origin/Referer.",
+    "The initial AnimeLab broker returned a response before the remaining application interceptors could execute and forced automatic redirects."
+  ],
+  "limitations": [
+    "This identifies a compatibility defect; it does not establish that it is the only cause of the initial empty episode list.",
+    "Corrected runtime and community-site results must be recorded separately."
+  ],
+  "reaEvidenceAvailable": false
+}

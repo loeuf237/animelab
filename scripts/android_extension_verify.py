@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import uuid
 import zipfile
 
 PACKAGE = 'com.animan.app.a11test'
@@ -60,31 +61,44 @@ def validate(args: argparse.Namespace) -> None:
         command += ['-e', 'install_native_fixture', 'true']
         method = 'original_apk_through_python_and_optimized_application'
         key = 'packageInstallerViaPythonAPI'
-    command += ['-e', 'class', 'com.animan.app.NativeExtensionIntegrationTest#' + method,
+    run_id = uuid.uuid4().hex
+    command += ['-e', 'probe_run_id', run_id, '-e', 'class', 'com.animan.app.NativeExtensionIntegrationTest#' + method,
                 PACKAGE + '.test/androidx.test.runner.AndroidJUnitRunner']
     report = adb(*command, timeout=960)
     args.output.mkdir(parents=True, exist_ok=True)
     (args.output / 'instrumentation.txt').write_text(report)
-    logs = adb('logcat', '-d', '-t', '1000', '-s', 'ANIMELAB_APK_PROOF:I', '*:S')
+    # A busy phone can produce >1000 unrelated log lines before this read.
+    # Filter every retained buffer and bind evidence to this exact invocation.
+    logs = adb('logcat', '-d', '-b', 'all', '-s', 'ANIMELAB_APK_PROOF:I', '*:S')
     proofs = []
     for line in logs.splitlines():
         if 'ANIMELAB_APK_PROOF' not in line or '{' not in line:
             continue
-        value = json.loads(line[line.index('{'):])
-        if key not in value:
+        try:
+            value = json.loads(line[line.index('{'):])
+        except ValueError:
+            continue
+        if key not in value or value.get('probeRunId') != run_id:
             continue
         if expected_fixture and (value.get('artifactSha256') != expected_fixture or value[key] is not True):
             continue
         if args.community_package and {case['pkg'] for case in value[key]} != set(args.community_package):
             continue
         proofs.append(value)
-    if not re.search(r'OK \(1 test\)', report) or 'FAILURES' in report or not proofs:
-        raise RuntimeError('Device validation failed; inspect the local instrumentation report')
-    (args.output / 'proof.json').write_text(json.dumps(proofs[-1], ensure_ascii=False, indent=2) + '\n')
-    cases = proofs[-1].get('communityAPKOperations', [])
-    print(json.dumps({'instrumentationPassed': True, 'proofRecorded': True,
-                      'metadataPathsPassed': sum(case['state'] == 'metadata_path_passed' for case in cases),
-                      'casesRequiringVerification': sum(case['state'] != 'metadata_path_passed' for case in cases)}))
+    passed = bool(re.search(r'OK \(1 test\)', report)) and 'FAILURES' not in report and bool(proofs)
+    if proofs:
+        proofs[-1]['instrumentationPassed'] = passed
+        (args.output / 'proof.json').write_text(json.dumps(proofs[-1], ensure_ascii=False, indent=2) + '\n')
+    summary: dict[str, bool | int] = {'instrumentationPassed': passed, 'proofRecorded': bool(proofs)}
+    if args.community_package and proofs:
+        cases = proofs[-1].get('communityAPKOperations', [])
+        summary.update(metadataPathsPassed=sum(case['state'] == 'metadata_path_passed' for case in cases),
+                       casesRequiringVerification=sum(case['state'] != 'metadata_path_passed' for case in cases))
+    elif proofs:
+        summary['packageInstallerViaPythonAPI'] = proofs[-1].get('packageInstallerViaPythonAPI', False)
+    print(json.dumps(summary))
+    if not passed:
+        raise RuntimeError('Device validation failed; inspect the local instrumentation report and partial proof')
 
 
 if __name__ == '__main__':

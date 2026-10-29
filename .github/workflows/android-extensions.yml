@@ -4,12 +4,16 @@ on:
   push:
     paths:
       - 'android/**'
+      - 'android_runtime.py'
+      - 'animelab/services/source_http.py'
       - 'animelab/services/*extension*'
       - 'animelab/services/android_extension*'
       - '.github/workflows/android-extensions.yml'
   pull_request:
     paths:
       - 'android/**'
+      - 'android_runtime.py'
+      - 'animelab/services/source_http.py'
       - 'animelab/services/*extension*'
       - 'animelab/services/android_extension*'
       - '.github/workflows/android-extensions.yml'

@@ -13,7 +13,7 @@ import org.json.JSONObject
 /** Build actual source preference callbacks, then expose supported widgets as data. */
 internal object ExtensionPreferences {
     private fun screen(context: Context, source: AnimeSource): PreferenceScreen {
-        require(source is ConfigurableAnimeSource) { "This source has no preferences" }
+        if(source !is ConfigurableAnimeSource) throw UnsupportedOperationException("This source has no preferences")
         val manager = PreferenceManager(ContextThemeWrapper(context, androidx.appcompat.R.style.Theme_AppCompat))
         manager.sharedPreferencesName = "source_${source.id}"
         return manager.createPreferenceScreen(manager.context).also(source::setupPreferenceScreen)
