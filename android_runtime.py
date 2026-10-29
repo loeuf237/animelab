@@ -1,6 +1,6 @@
 """Android bootstrap. Configure storage and JNI before importing the engine."""
 import asyncio
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from email.utils import formatdate
 from http.cookies import SimpleCookie
 import json
@@ -11,6 +11,41 @@ import time
 from urllib.parse import urlparse
 
 _loop = None
+
+
+def extension_http(payload):
+    """Native default OkHttp gateway: keep the shared URL/cookie/proxy policy."""
+    import base64
+    from animelab.services.source_http import source_http, VerificationRequired, RateLimited, SourceNetworkError, USER_AGENT
+    if json.loads(payload).get('action') == 'user_agent':
+        return json.dumps({'userAgent':USER_AGENT})
+    async def request():
+        data = json.loads(payload)
+        body = base64.b64decode(data.get('body', ''), validate=True)
+        if len(body) > 2_000_000:
+            raise ValueError('Request exceeds budget')
+        method = data['method'].upper()
+        if method not in ('GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'):
+            raise ValueError('Unsupported HTTP method')
+        milliseconds = int(data.get('readTimeoutMillis',30000))
+        timeout = 30 if milliseconds<=0 else min(30,max(.1,milliseconds/1000))
+        async with source_http.async_client(timeout=timeout, follow_redirects=data.get('followRedirects',True) is True) as client:
+            response = await client.request(method, data['url'], headers=dict(data.get('headers') or []),
+                                            content=body or None, max_response_bytes=8_000_000,
+                                            _follow_ssl_redirects=data.get('followSslRedirects',True) is True)
+            return {'status':response.status_code, 'url':str(response.url),
+                    'headers':list(response.headers.multi_items()), 'contentType':response.headers.get('content-type',''),
+                    'body':base64.b64encode(response.content).decode()}
+    try:
+        return json.dumps(asyncio.run(request()))
+    except VerificationRequired as error:
+        return json.dumps({'error':'verification_required','url':error.url})
+    except RateLimited:
+        return json.dumps({'error':'rate_limited'})
+    except SourceNetworkError as error:
+        return json.dumps({'error':{'dns':'network_dns','tls':'network_tls','timeout':'network_timeout'}.get(error.kind,'network_error')})
+    except Exception:
+        return json.dumps({'error':'source_network_error'})
 
 
 class VerificationWindow:
@@ -91,6 +126,9 @@ class VerificationWindow:
     def destroy(self):
         self.bridge.close(self.url)
 
+    def is_closed(self):
+        return not bool(self.bridge.isOpen(self.url))
+
 
 def start(data_dir, cache_dir, port, token, test_mode=False):
     global _loop
@@ -109,6 +147,9 @@ def start(data_dir, cache_dir, port, token, test_mode=False):
     from java import jclass
     from animelab import media_tools, platform_events
     media_tools.configure_android(jclass("com.animan.app.MediaBridge"), jclass("com.animan.app.CryptoBridge"))
+    from animelab.services import android_extensions
+    if jclass('com.animan.app.BuildConfig').EXTENSION_RUNTIME_ENABLED:
+        android_extensions.configure(jclass("com.animan.app.ExtensionBridge"))
     hooks = jclass("com.animan.app.NativeHooks")
     verification = jclass("com.animan.app.VerificationBridge")
     storage = jclass("com.animan.app.StorageAccess")
@@ -152,7 +193,20 @@ def start(data_dir, cache_dir, port, token, test_mode=False):
         _loop = asyncio.get_running_loop()
         async with original_lifespan(app):
             hooks.ready()
-            yield
+            from animelab.services.extension_service import extension_service
+            async def discover_apks():
+                try:
+                    await asyncio.to_thread(extension_service.sync_android_extensions)
+                except Exception as failure:
+                    import logging
+                    logging.getLogger('animelab.extensions').warning('Découverte APK indisponible (%s)',type(failure).__name__)
+            discovery=asyncio.create_task(discover_apks())
+            try:
+                yield
+            finally:
+                discovery.cancel()
+                with suppress(asyncio.CancelledError):
+                    await discovery
         _loop = None
 
     run.app.router.lifespan_context = lifespan

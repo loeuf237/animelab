@@ -1,0 +1,1083 @@
+{
+  "date": "2026-10-28",
+  "timezone": "Africa/Douala",
+  "method": "Static source audit, pinned upstream commits; synthetic local tests only",
+  "animelabCommit": "75c84ecac74454db5f1a95c6dfa81a699e2ffcc9",
+  "upstreams": [
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "sha": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "branch": "main",
+      "release": "v0.18.2.1",
+      "releasePublished": "2026-09-14T18:52:46Z",
+      "releaseCommit": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "aheadOfRelease": 0
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "sha": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "branch": "master",
+      "release": "v0.2.0",
+      "releasePublished": "2026-09-11T16:48:17Z",
+      "releaseCommit": "65bdd7cc158bb198af094aa3526e28289af51113",
+      "aheadOfRelease": 54
+    },
+    {
+      "repository": "aniyomiorg/extensions-lib",
+      "sha": "971ce96e76202bb35432fe71f92553e3ae40d01d",
+      "branch": "main"
+    }
+  ],
+  "files": [
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/anime/AnimeExtensionManager.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/extension/anime/AnimeExtensionManager.kt",
+      "lineCount": 397,
+      "sha256CanonicalText": "361e1cd22349a24beb765caf63b79b7101fa4cf276baac7d0df7a2d70c28829c"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/anime/api/AnimeExtensionApi.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/extension/anime/api/AnimeExtensionApi.kt",
+      "lineCount": 80,
+      "sha256CanonicalText": "48faaac917649d150fc20d05427306ff1cc11acd0783f32764b11d8fec2f2680"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/anime/util/AnimeExtensionLoader.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/extension/anime/util/AnimeExtensionLoader.kt",
+      "lineCount": 442,
+      "sha256CanonicalText": "1208102b9f7b8f1f719893a0e9f457e6166ddd2998ded9084ff6932f659ad56a"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "data/src/main/java/mihon/data/extension/anime/service/AnimeExtensionStoreService.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/data/src/main/java/mihon/data/extension/anime/service/AnimeExtensionStoreService.kt",
+      "lineCount": 122,
+      "sha256CanonicalText": "3606e680b4d8f4fc2510636438eea2ed8f916e9589d054d4313e8180314f79ff"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "data/src/main/java/mihon/data/extension/anime/model/NetworkAnimeExtensionStore.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/data/src/main/java/mihon/data/extension/anime/model/NetworkAnimeExtensionStore.kt",
+      "lineCount": 120,
+      "sha256CanonicalText": "f551bbf538f9203f29cb7fba30d0e44cc79c50845ab4e17f07ffa5898c5cf5e2"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "data/src/main/java/mihon/data/extension/anime/model/NetworkLegacyAnimeExtensionRepo.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/data/src/main/java/mihon/data/extension/anime/model/NetworkLegacyAnimeExtensionRepo.kt",
+      "lineCount": 37,
+      "sha256CanonicalText": "3862792f444b9d4b9a9ef13ae520c6ce5e4f4d044203a35106d0c68abb02ebce"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "data/src/main/java/mihon/data/extension/anime/model/NetworkLegacyAnimeExtension.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/data/src/main/java/mihon/data/extension/anime/model/NetworkLegacyAnimeExtension.kt",
+      "lineCount": 62,
+      "sha256CanonicalText": "97fa3ce0a63109da6e4d1e7cd07b7559d97efaa0633701c23070a2f9a2f31f55"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "domain/src/main/java/mihon/domain/extension/anime/model/AnimeExtensionStore.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/domain/src/main/java/mihon/domain/extension/anime/model/AnimeExtensionStore.kt",
+      "lineCount": 16,
+      "sha256CanonicalText": "6ae764b49cc976d880e9679941fed5fd6fba72ba5d136d1af3cc2b774c880474"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "domain/src/main/java/eu/kanade/tachiyomi/extension/anime/model/AnimeExtension.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/domain/src/main/java/eu/kanade/tachiyomi/extension/anime/model/AnimeExtension.kt",
+      "lineCount": 79,
+      "sha256CanonicalText": "95caeb1f082a5f2df3b1337cde14c030e6a0ca5edd9f2f207b2928f5739b5739"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "domain/src/main/java/mihon/domain/extension/anime/interactor/AddAnimeExtensionStore.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/domain/src/main/java/mihon/domain/extension/anime/interactor/AddAnimeExtensionStore.kt",
+      "lineCount": 11,
+      "sha256CanonicalText": "e84d6f0b80ff65ea8e4d0be17784459d70b54cb39e55c86f4168f2cd76d03243"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "domain/src/main/java/mihon/domain/extension/anime/interactor/UpdateAnimeExtensionStores.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/domain/src/main/java/mihon/domain/extension/anime/interactor/UpdateAnimeExtensionStores.kt",
+      "lineCount": 11,
+      "sha256CanonicalText": "4ecfc0a5008479738cd3974268c4f6c178613b757d929b024708435efc5f76d0"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/ExtensionManager.kt",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/app/src/main/java/eu/kanade/tachiyomi/extension/ExtensionManager.kt",
+      "lineCount": 418,
+      "sha256CanonicalText": "7f9d2fb23070c241a010de1daaf8cb4dfc60383103fe78060bdfbe2f332542c9"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/api/ExtensionApi.kt",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/app/src/main/java/eu/kanade/tachiyomi/extension/api/ExtensionApi.kt",
+      "lineCount": 201,
+      "sha256CanonicalText": "515b5ea10b82ed64d34da706bf550c27e2038ee8c06aa577a5b00665d5b08fcb"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/util/ExtensionLoader.kt",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/app/src/main/java/eu/kanade/tachiyomi/extension/util/ExtensionLoader.kt",
+      "lineCount": 468,
+      "sha256CanonicalText": "52e62e45f727077ee61307a5481b2948864eb3eea13554f51e19043dd8e64a68"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "domain/src/main/java/mihon/domain/extensionrepo/service/ExtensionRepoService.kt",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/domain/src/main/java/mihon/domain/extensionrepo/service/ExtensionRepoService.kt",
+      "lineCount": 36,
+      "sha256CanonicalText": "ae7653b40259a187c10741b1dfa2c6ec5068c67044b1737f29b13bcdcd773123"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "domain/src/main/java/mihon/domain/extensionrepo/interactor/CreateExtensionRepo.kt",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/domain/src/main/java/mihon/domain/extensionrepo/interactor/CreateExtensionRepo.kt",
+      "lineCount": 80,
+      "sha256CanonicalText": "58417325cd854bf91d4fdfc51f76c85400b63b496dadf9413cc821c68d66b249"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "domain/src/main/java/mihon/domain/extensionrepo/interactor/UpdateExtensionRepo.kt",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/domain/src/main/java/mihon/domain/extensionrepo/interactor/UpdateExtensionRepo.kt",
+      "lineCount": 30,
+      "sha256CanonicalText": "c5f14713e81215bff3840ba5e8a1938bdbff0572fd06baf5f667940145eb4eae"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "domain/src/main/java/mihon/domain/extensionrepo/interactor/ReplaceExtensionRepo.kt",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/domain/src/main/java/mihon/domain/extensionrepo/interactor/ReplaceExtensionRepo.kt",
+      "lineCount": 12,
+      "sha256CanonicalText": "c45587b6c00d1120516ad6f7ec6888c8983733fd964a2009b7a286cae7a368c1"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "domain/src/main/java/mihon/domain/extensionrepo/model/ExtensionRepo.kt",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/domain/src/main/java/mihon/domain/extensionrepo/model/ExtensionRepo.kt",
+      "lineCount": 9,
+      "sha256CanonicalText": "adf0f4b3c53e8aad06adb2542da9ee87f631f54c697ff083abc1403b9ac20644"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "domain/src/main/java/mihon/domain/extensionrepo/service/ExtensionRepoDto.kt",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/domain/src/main/java/mihon/domain/extensionrepo/service/ExtensionRepoDto.kt",
+      "lineCount": 27,
+      "sha256CanonicalText": "fdc8fa6ed21bfed53a97d02c1b79aed747afb5d50541567d52697272fc397043"
+    },
+    {
+      "repository": "aniyomiorg/extensions-lib",
+      "path": "index/index.proto",
+      "ref": "971ce96e76202bb35432fe71f92553e3ae40d01d",
+      "url": "https://github.com/aniyomiorg/extensions-lib/blob/971ce96e76202bb35432fe71f92553e3ae40d01d/index/index.proto",
+      "lineCount": 105,
+      "sha256CanonicalText": "891ffb433af5d7dc449d1e38638fc4457609614b029aebdf4ad4f2befd719608"
+    },
+    {
+      "repository": "aniyomiorg/extensions-lib",
+      "path": "index/README.md",
+      "ref": "971ce96e76202bb35432fe71f92553e3ae40d01d",
+      "url": "https://github.com/aniyomiorg/extensions-lib/blob/971ce96e76202bb35432fe71f92553e3ae40d01d/index/README.md",
+      "lineCount": 7,
+      "sha256CanonicalText": "b41eefa0dbb0514d5397311df5ef9cd5352de2d50d6600eb255e33c1ab2af45f"
+    },
+    {
+      "repository": "aniyomiorg/extensions-lib",
+      "path": "library/build.gradle.kts",
+      "ref": "971ce96e76202bb35432fe71f92553e3ae40d01d",
+      "url": "https://github.com/aniyomiorg/extensions-lib/blob/971ce96e76202bb35432fe71f92553e3ae40d01d/library/build.gradle.kts",
+      "lineCount": 107,
+      "sha256CanonicalText": "016732839fa10d0a5022d094ce9b14f7bef44272c10e1b956cf8964dadd4afdf"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "data/src/main/java/mihon/data/extension/anime/repository/AnimeExtensionStoreRepositoryImpl.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/data/src/main/java/mihon/data/extension/anime/repository/AnimeExtensionStoreRepositoryImpl.kt",
+      "lineCount": 127,
+      "sha256CanonicalText": "1258dd1cb7d11a10d39bc76d1e117fbdc5d6bd7c5f438bff791de32ac550987a"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "data/src/main/java/mihon/data/extension/anime/model/BaseNetworkAnimeExtensionStore.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/data/src/main/java/mihon/data/extension/anime/model/BaseNetworkAnimeExtensionStore.kt",
+      "lineCount": 7,
+      "sha256CanonicalText": "66403727154e98840532f12487f913eff4a90d55e62a5034d0925a69d5574936"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "data/src/main/sqldelightanime/dataanime/extension_store.sq",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/data/src/main/sqldelightanime/dataanime/extension_store.sq",
+      "lineCount": 44,
+      "sha256CanonicalText": "25bdafdff439a229163d3c4800637e8e29785606c68778f97d9fb6f194e10b11"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/domain/extension/anime/interactor/TrustAnimeExtension.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/domain/extension/anime/interactor/TrustAnimeExtension.kt",
+      "lineCount": 32,
+      "sha256CanonicalText": "512575e0b65b0736ec50d6657d4d2a956142ef6e65b0cf24b5dd78e5caff245f"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/source/anime/AndroidAnimeSourceManager.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/source/anime/AndroidAnimeSourceManager.kt",
+      "lineCount": 127,
+      "sha256CanonicalText": "de1cc61389165c90b2810caadf9591a751e4c1895d70bd8de1fb034385854be0"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/anime/util/AnimeExtensionInstaller.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/extension/anime/util/AnimeExtensionInstaller.kt",
+      "lineCount": 327,
+      "sha256CanonicalText": "a0edf8b7be40f5c267e0a20c84194c52a16828aeaad1f132148bebf8c26ebf7d"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/anime/util/AnimeExtensionInstallService.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/extension/anime/util/AnimeExtensionInstallService.kt",
+      "lineCount": 88,
+      "sha256CanonicalText": "2541396c309bb8de2fc7b95117a1b49fe3c915e30760318290498cf87ff87eae"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/anime/util/AnimeExtensionInstallReceiver.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/extension/anime/util/AnimeExtensionInstallReceiver.kt",
+      "lineCount": 147,
+      "sha256CanonicalText": "346aa4662f3cc9a8eea8a799e25fbcc0a1dc7ac538f3c27af489d0ca21fedf05"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/anime/installer/InstallerAnime.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/extension/anime/installer/InstallerAnime.kt",
+      "lineCount": 170,
+      "sha256CanonicalText": "7d359208ff15f75dee162211953797e50ce36e1c725d8382509904802ee67945"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/anime/installer/PackageInstallerInstallerAnime.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/extension/anime/installer/PackageInstallerInstallerAnime.kt",
+      "lineCount": 117,
+      "sha256CanonicalText": "6f627184fe990817c4995fc90657b7f1914b6d0ae5bdfc1a80d61635e2aa03e5"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/InstallStep.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/extension/InstallStep.kt",
+      "lineCount": 15,
+      "sha256CanonicalText": "48244c4be2c1922fc222b2557e1f91df30de148d8da6a807dc1fcfdda246489b"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/domain/source/service/SourcePreferences.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/domain/source/service/SourcePreferences.kt",
+      "lineCount": 125,
+      "sha256CanonicalText": "5a4fe00199107d14479eaa8031a13b3d3c109500fe287a9b873cca45d6dcb422"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/util/system/ChildFirstPathClassLoader.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/util/system/ChildFirstPathClassLoader.kt",
+      "lineCount": 86,
+      "sha256CanonicalText": "bcc5de77bbfbcf67915a2aae84933b04ed160781f174300f239dfda05d7dbe8e"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/ui/browse/anime/extension/details/AnimeSourcePreferencesScreen.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/ui/browse/anime/extension/details/AnimeSourcePreferencesScreen.kt",
+      "lineCount": 174,
+      "sha256CanonicalText": "ac3b92ce2748ca27fd5b4fe37fbcd4599038d3ccf5c6fca3a22d8cc911fcc920"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/data/backup/create/creators/AnimeExtensionStoresBackupCreator.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/data/backup/create/creators/AnimeExtensionStoresBackupCreator.kt",
+      "lineCount": 17,
+      "sha256CanonicalText": "4c10fe41be1bdcedb7fbdf76e1d01c5a34078d10e51b87300e477880393bcbee"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/online/AnimeHttpSource.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/online/AnimeHttpSource.kt",
+      "lineCount": 734,
+      "sha256CanonicalText": "52376b53e3ce7486cd0e79d37804af8c089e8b69e4eeca7e430ff8211aec9b75"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/model/Video.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/model/Video.kt",
+      "lineCount": 260,
+      "sha256CanonicalText": "30df08fab0cb13b02c523f62fb7bdb4cd4be5041ae6cbd512146cf85407ebcbf"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/model/Hoster.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/model/Hoster.kt",
+      "lineCount": 109,
+      "sha256CanonicalText": "a13a121f19d11070196cedcfde92ec0710c820938c460f04728eec82b0631d69"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/AnimeSource.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/AnimeSource.kt",
+      "lineCount": 185,
+      "sha256CanonicalText": "e33552ba95f4b319cb71faabbcb786fd9c5d93ab75c2719f631c5a96c8389bc5"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/model/AnimeFilter.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/model/AnimeFilter.kt",
+      "lineCount": 46,
+      "sha256CanonicalText": "0965803cf2ae15a5653c7ec91ce35d8d3f12710c0f4de4250ea364f0853a867a"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/ConfigurableAnimeSource.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/ConfigurableAnimeSource.kt",
+      "lineCount": 29,
+      "sha256CanonicalText": "2039a148a5dbc180022705934d6771cd3c27979b83e8f57d03f66d2016af014b"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/util/ExtensionInstaller.kt",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/app/src/main/java/eu/kanade/tachiyomi/extension/util/ExtensionInstaller.kt",
+      "lineCount": 323,
+      "sha256CanonicalText": "b57c843fea1f26eaa252ab4ea75390d76dc77e9589000a28d7e67eaa689b1d11"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/util/ExtensionInstallService.kt",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/app/src/main/java/eu/kanade/tachiyomi/extension/util/ExtensionInstallService.kt",
+      "lineCount": 88,
+      "sha256CanonicalText": "cfb06cd73366b32d5afe825c75eab7237c7e16581da3028094afd73562a733d6"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/java/eu/kanade/domain/extension/interactor/TrustExtension.kt",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/app/src/main/java/eu/kanade/domain/extension/interactor/TrustExtension.kt",
+      "lineCount": 38,
+      "sha256CanonicalText": "3543504099116570f593f4bc84e837980db1488a3aeb017bc2e53d70bfd48f0b"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/source/AndroidSourceManager.kt",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/app/src/main/java/eu/kanade/tachiyomi/source/AndroidSourceManager.kt",
+      "lineCount": 171,
+      "sha256CanonicalText": "ae0aa35e92055a0cdddaca85d02341eb6b009274674de48e4cdb0c9c07b0ae39"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/java/eu/kanade/domain/source/service/SourcePreferences.kt",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/app/src/main/java/eu/kanade/domain/source/service/SourcePreferences.kt",
+      "lineCount": 116,
+      "sha256CanonicalText": "fb57ba656c8f4e987bcbea9cc2e8c51dcbbfc58a43c5428d77125c324f8745eb"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/installer/PackageInstallerInstaller.kt",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/app/src/main/java/eu/kanade/tachiyomi/extension/installer/PackageInstallerInstaller.kt",
+      "lineCount": 128,
+      "sha256CanonicalText": "8e46ba6d418351e15ff9a0fdd177caae6dd13b05990aa8c5930119dc80822880"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/installer/ShizukuInstaller.kt",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/app/src/main/java/eu/kanade/tachiyomi/extension/installer/ShizukuInstaller.kt",
+      "lineCount": 178,
+      "sha256CanonicalText": "c1b3df88d74485e6cc0f84feaa3b385a77b385f887dde433f86cbe920a7c5c41"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "data/src/main/sqldelight/tachiyomi/data/extension_repos.sq",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/data/src/main/sqldelight/tachiyomi/data/extension_repos.sq",
+      "lineCount": 57,
+      "sha256CanonicalText": "ad325a80cd340ff02b93b81c99519852644d2a67aec88107c16e2a0936f1398d"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/java/eu/kanade/presentation/more/settings/screen/browse/ExtensionReposScreenModel.kt",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/app/src/main/java/eu/kanade/presentation/more/settings/screen/browse/ExtensionReposScreenModel.kt",
+      "lineCount": 205,
+      "sha256CanonicalText": "e77a8754785668bbd5f635ccdf07105b36a860aa6f6a645c726b95c7d1876b5b"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/model/Extension.kt",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/app/src/main/java/eu/kanade/tachiyomi/extension/model/Extension.kt",
+      "lineCount": 96,
+      "sha256CanonicalText": "c84b90dfd22c4b32cb48223dc187d1b4bbbc25202959b0153fb647dc1a990340"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/data/backup/create/creators/ExtensionRepoBackupCreator.kt",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/app/src/main/java/eu/kanade/tachiyomi/data/backup/create/creators/ExtensionRepoBackupCreator.kt",
+      "lineCount": 17,
+      "sha256CanonicalText": "5d53d74620835ebdd77ed05935b33e8892a170a80969f5786ebe0413fdd1d134"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/online/AnimeHttpSource.kt",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/online/AnimeHttpSource.kt",
+      "lineCount": 747,
+      "sha256CanonicalText": "22cf310dbd4ec802592ef98167addb09741a6c040087b09d46d8c86ab653db72"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/model/Video.kt",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/model/Video.kt",
+      "lineCount": 176,
+      "sha256CanonicalText": "0b1cf8374f0ef59d16dba36a1f9a8b3307a1222bdc18536e40b5f5e410dc34a1"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/AnimeSource.kt",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/AnimeSource.kt",
+      "lineCount": 136,
+      "sha256CanonicalText": "5128778db19072457da9d8b79c0beae8e9d7f3c2f173b02972e1f6c239bf8041"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/data/updater/AppUpdateChecker.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/data/updater/AppUpdateChecker.kt",
+      "lineCount": 59,
+      "sha256CanonicalText": "58e310e9d5a1528c7d6c5ab45407c9fa91b058194e92b882f86b08d1c5f7a580"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/domain/base/BasePreferences.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/domain/base/BasePreferences.kt",
+      "lineCount": 43,
+      "sha256CanonicalText": "86ac565a50e087fe155d9c8f95b66d42cc0e1626a2a5ab13f76273721bddd673"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/ui/browse/anime/extension/AnimeExtensionsScreenModel.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/ui/browse/anime/extension/AnimeExtensionsScreenModel.kt",
+      "lineCount": 247,
+      "sha256CanonicalText": "ec7930e4468a10eb455ff79d6332bd9ad94911924d0def0e2663ba1cc5acf96a"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/ui/browse/anime/extension/details/AnimeExtensionDetailsScreenModel.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/ui/browse/anime/extension/details/AnimeExtensionDetailsScreenModel.kt",
+      "lineCount": 162,
+      "sha256CanonicalText": "41683beea146cf18da581629aadd04c154888c9b3255d24da558d56f4af07eef"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/presentation/more/settings/screen/browse/AnimeExtensionStoresScreenModel.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/presentation/more/settings/screen/browse/AnimeExtensionStoresScreenModel.kt",
+      "lineCount": 166,
+      "sha256CanonicalText": "dc9fb2f13db7857b15ee5893ee90c2ed5e830ac7fe10c8b7dde2aa556a346155"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "core/common/src/main/java/eu/kanade/tachiyomi/network/NetworkHelper.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/core/common/src/main/java/eu/kanade/tachiyomi/network/NetworkHelper.kt",
+      "lineCount": 74,
+      "sha256CanonicalText": "ecec9efcea87a026b59ee9c0a6e09d9770bb13e41cf7b00bbcb667ab8094b889"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "core/common/src/main/java/eu/kanade/tachiyomi/network/JavaScriptEngine.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/core/common/src/main/java/eu/kanade/tachiyomi/network/JavaScriptEngine.kt",
+      "lineCount": 26,
+      "sha256CanonicalText": "50fc0bae6f9950524b965eae13d110d91d189ebd49d28a53e7bd7559f9283075"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/domain/source/anime/interactor/GetEnabledAnimeSources.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/domain/source/anime/interactor/GetEnabledAnimeSources.kt",
+      "lineCount": 42,
+      "sha256CanonicalText": "217b1a0486c3615ed1a61b1a0192791cc4a4199670921ec242bb2efa740f0cb6"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/data/backup/create/creators/AnimeSourcesBackupCreator.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/data/backup/create/creators/AnimeSourcesBackupCreator.kt",
+      "lineCount": 29,
+      "sha256CanonicalText": "d3903b35d59ccda60838627ae24152674ef39561def1a68e9aea1a333c0385b5"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/data/backup/restore/restorers/AnimeExtensionStoreRestorer.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/data/backup/restore/restorers/AnimeExtensionStoreRestorer.kt",
+      "lineCount": 25,
+      "sha256CanonicalText": "2d0d3546175b1f91939967a4774472a54bdf0cba33d30f88890c996fb7330e0f"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/model/SAnimeSeasonUpdate.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/model/SAnimeSeasonUpdate.kt",
+      "lineCount": 4,
+      "sha256CanonicalText": "f22b040fc3a657d9b24681b7f33054f0e65996a8fcff1f8eb1ce92a4a0c5ddc6"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/model/SAnimeEpisodeUpdate.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/model/SAnimeEpisodeUpdate.kt",
+      "lineCount": 4,
+      "sha256CanonicalText": "f77512483421608aefe0068092f3c347d57a7804935f2678db1ca7b410a20176"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/online/ResolvableAnimeSource.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/online/ResolvableAnimeSource.kt",
+      "lineCount": 43,
+      "sha256CanonicalText": "e6520b8e27ea87859b0e5de3d51ea38ebbaa03eb7b27ca11ca48b66f5f04b1c3"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/anime/installer/ShizukuInstallerAnime.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/extension/anime/installer/ShizukuInstallerAnime.kt",
+      "lineCount": 124,
+      "sha256CanonicalText": "c3e7d99ce2070f5bcc87e2cd1e54321645189f0edb1d676d1e73f9507425a71e"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/ui/browse/extension/ExtensionsScreenModel.kt",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/app/src/main/java/eu/kanade/tachiyomi/ui/browse/extension/ExtensionsScreenModel.kt",
+      "lineCount": 293,
+      "sha256CanonicalText": "bcccd86acf31549a3af78ee3549b42ff826f2ad99c759be05712922922838b7d"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/ui/browse/extension/details/SourcePreferencesScreen.kt",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/app/src/main/java/eu/kanade/tachiyomi/ui/browse/extension/details/SourcePreferencesScreen.kt",
+      "lineCount": 189,
+      "sha256CanonicalText": "08e374d335c593adaf3302d62d28452c36304b48789ce2dce623ad7ac58f0b04"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/data/updater/AppUpdateChecker.kt",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/app/src/main/java/eu/kanade/tachiyomi/data/updater/AppUpdateChecker.kt",
+      "lineCount": 114,
+      "sha256CanonicalText": "eeed30154031aedf755a494f01a5cfbc5dc2fd4a25cc6007d1bae06c8b4509d4"
+    },
+    {
+      "repository": "aniyomiorg/extensions-lib",
+      "path": "README.md",
+      "ref": "971ce96e76202bb35432fe71f92553e3ae40d01d",
+      "url": "https://github.com/aniyomiorg/extensions-lib/blob/971ce96e76202bb35432fe71f92553e3ae40d01d/README.md",
+      "lineCount": 75,
+      "sha256CanonicalText": "4df6da6106a84b3c40fba4cedeaa4919d8f6c19609c438e0b309d778d9428478"
+    },
+    {
+      "repository": "aniyomiorg/extensions-lib",
+      "path": "library/src/main/java/eu/kanade/tachiyomi/network/NetworkHelper.kt",
+      "ref": "971ce96e76202bb35432fe71f92553e3ae40d01d",
+      "url": "https://github.com/aniyomiorg/extensions-lib/blob/971ce96e76202bb35432fe71f92553e3ae40d01d/library/src/main/java/eu/kanade/tachiyomi/network/NetworkHelper.kt",
+      "lineCount": 25,
+      "sha256CanonicalText": "e47b3d33a499e94412755bacf0bb2607a0a21e1d2e4fd59daf881f5a3b98c638"
+    },
+    {
+      "repository": "aniyomiorg/extensions-lib",
+      "path": "library/src/main/java/eu/kanade/tachiyomi/network/JavaScriptEngine.kt",
+      "ref": "971ce96e76202bb35432fe71f92553e3ae40d01d",
+      "url": "https://github.com/aniyomiorg/extensions-lib/blob/971ce96e76202bb35432fe71f92553e3ae40d01d/library/src/main/java/eu/kanade/tachiyomi/network/JavaScriptEngine.kt",
+      "lineCount": 20,
+      "sha256CanonicalText": "0844457dd275ab34ce68e389e0443ae537b65e40f432278b8cddb65c54f4bf75"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/domain/base/ExtensionInstallerPreference.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/domain/base/ExtensionInstallerPreference.kt",
+      "lineCount": 68,
+      "sha256CanonicalText": "2418f37c346db2d098ea1734161d98dc447ea58154e490ad4ae5212cb4865d87"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/domain/base/BasePreferences.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/domain/base/BasePreferences.kt",
+      "lineCount": 43,
+      "sha256CanonicalText": "86ac565a50e087fe155d9c8f95b66d42cc0e1626a2a5ab13f76273721bddd673"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/domain/extension/anime/interactor/GetAnimeExtensionsByType.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/domain/extension/anime/interactor/GetAnimeExtensionsByType.kt",
+      "lineCount": 57,
+      "sha256CanonicalText": "8d932fba1c29ef393cf686f99b2321fe1e2dea8c0418aa754b9949c30625ce62"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/java/eu/kanade/domain/extension/model/Extensions.kt",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/app/src/main/java/eu/kanade/domain/extension/model/Extensions.kt",
+      "lineCount": 10,
+      "sha256CanonicalText": "c850eaf0ba8c53798b5f3d5f97ae6a7db298daec728d99a872bb5338877e5abc"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/model/HttpServer.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/model/HttpServer.kt",
+      "lineCount": 35,
+      "sha256CanonicalText": "3ea3e5105ec6e9910584c5957c0a19b41c2406e8e5a103b4f07f3ae391c6951c"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/AndroidManifest.xml",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/AndroidManifest.xml",
+      "lineCount": 324,
+      "sha256CanonicalText": "b077ba2d396ff791041ff0ab0229f7ffaec4e42884cbe5a181e8e5e964435948"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/AndroidManifest.xml",
+      "ref": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/app/src/main/AndroidManifest.xml",
+      "lineCount": 401,
+      "sha256CanonicalText": "d905072204a436b7f55c4a0a6f78aa650c07da677113351592939a1d950be923"
+    },
+    {
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/data/backup/models/BackupExtensionPreferences.kt",
+      "ref": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/data/backup/models/BackupExtensionPreferences.kt",
+      "lineCount": 10,
+      "sha256CanonicalText": "e0d4b8f857b8625ab92fb1d84b57295c1d38a8426ab9e50ff97c4a092c6fc301"
+    }
+  ],
+  "stableCrossChecks": [
+    {
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/util/ExtensionLoader.kt",
+      "ref": "65bdd7cc158bb198af094aa3526e28289af51113",
+      "identicalToStudiedHead": true,
+      "verification": "Byte comparison of normalized saved source files"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/ExtensionManager.kt",
+      "ref": "65bdd7cc158bb198af094aa3526e28289af51113",
+      "identicalToStudiedHead": true,
+      "verification": "Byte comparison of normalized saved source files"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/api/ExtensionApi.kt",
+      "ref": "65bdd7cc158bb198af094aa3526e28289af51113",
+      "identicalToStudiedHead": true,
+      "verification": "Byte comparison of normalized saved source files"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "domain/src/main/java/mihon/domain/extensionrepo/service/ExtensionRepoService.kt",
+      "ref": "65bdd7cc158bb198af094aa3526e28289af51113",
+      "identicalToStudiedHead": true,
+      "verification": "Byte comparison of normalized saved source files"
+    },
+    {
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/java/eu/kanade/domain/extension/interactor/TrustExtension.kt",
+      "ref": "65bdd7cc158bb198af094aa3526e28289af51113",
+      "identicalToStudiedHead": true,
+      "verification": "Byte comparison of normalized saved source files"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "AY-STORE",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "data/src/main/java/mihon/data/extension/anime/service/AnimeExtensionStoreService.kt",
+      "description": "Lecture des stores legacy/JSON/Protobuf/gzip",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/data/src/main/java/mihon/data/extension/anime/service/AnimeExtensionStoreService.kt"
+    },
+    {
+      "id": "AY-REPOS",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "data/src/main/java/mihon/data/extension/anime/repository/AnimeExtensionStoreRepositoryImpl.kt",
+      "description": "Agregation et actualisation des stores",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/data/src/main/java/mihon/data/extension/anime/repository/AnimeExtensionStoreRepositoryImpl.kt"
+    },
+    {
+      "id": "AY-SCHEMA",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "data/src/main/sqldelightanime/dataanime/extension_store.sq",
+      "description": "Persistance des stores",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/data/src/main/sqldelightanime/dataanime/extension_store.sq"
+    },
+    {
+      "id": "AY-INDEX",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "data/src/main/java/mihon/data/extension/anime/model/NetworkAnimeExtensionStore.kt",
+      "description": "Modele du nouvel index",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/data/src/main/java/mihon/data/extension/anime/model/NetworkAnimeExtensionStore.kt"
+    },
+    {
+      "id": "AY-LEGACY",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "data/src/main/java/mihon/data/extension/anime/model/NetworkLegacyAnimeExtensionRepo.kt",
+      "description": "Metadonnees legacy et index_v2",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/data/src/main/java/mihon/data/extension/anime/model/NetworkLegacyAnimeExtensionRepo.kt"
+    },
+    {
+      "id": "AY-LEGACY-EXT",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "data/src/main/java/mihon/data/extension/anime/model/NetworkLegacyAnimeExtension.kt",
+      "description": "Conversion des anciennes entrees",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/data/src/main/java/mihon/data/extension/anime/model/NetworkLegacyAnimeExtension.kt"
+    },
+    {
+      "id": "AY-LOADER",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/anime/util/AnimeExtensionLoader.kt",
+      "description": "Chargement APK, API, signatures, prive/partage",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/extension/anime/util/AnimeExtensionLoader.kt"
+    },
+    {
+      "id": "AY-TRUST",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/domain/extension/anime/interactor/TrustAnimeExtension.kt",
+      "description": "Confiance par depot ou version signee",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/domain/extension/anime/interactor/TrustAnimeExtension.kt"
+    },
+    {
+      "id": "AY-MANAGER",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/anime/AnimeExtensionManager.kt",
+      "description": "Registre, etats et mises a jour",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/extension/anime/AnimeExtensionManager.kt"
+    },
+    {
+      "id": "AY-UPDATE",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/anime/api/AnimeExtensionApi.kt",
+      "description": "Detection des nouvelles versions",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/extension/anime/api/AnimeExtensionApi.kt"
+    },
+    {
+      "id": "AY-INSTALL",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/anime/util/AnimeExtensionInstaller.kt",
+      "description": "Telechargement et installation",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/extension/anime/util/AnimeExtensionInstaller.kt"
+    },
+    {
+      "id": "AY-QUEUE",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/anime/installer/InstallerAnime.kt",
+      "description": "File d'installation et annulation",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/extension/anime/installer/InstallerAnime.kt"
+    },
+    {
+      "id": "AY-MODES",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/domain/base/BasePreferences.kt",
+      "description": "Quatre modes d'installation",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/domain/base/BasePreferences.kt"
+    },
+    {
+      "id": "AY-MODE-CHECK",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/domain/base/ExtensionInstallerPreference.kt",
+      "description": "Selection et repli des installateurs",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/domain/base/ExtensionInstallerPreference.kt"
+    },
+    {
+      "id": "AY-SOURCES",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/source/anime/AndroidAnimeSourceManager.kt",
+      "description": "Registre de sources et stubs",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/source/anime/AndroidAnimeSourceManager.kt"
+    },
+    {
+      "id": "AY-HTTP",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/online/AnimeHttpSource.kt",
+      "description": "Identite stable, reseau et appels des sources",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/online/AnimeHttpSource.kt"
+    },
+    {
+      "id": "AY-SOURCE-API",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/AnimeSource.kt",
+      "description": "Contrat des sources, saisons et relations",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/AnimeSource.kt"
+    },
+    {
+      "id": "AY-FILTER",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/model/AnimeFilter.kt",
+      "description": "Filtres types",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/model/AnimeFilter.kt"
+    },
+    {
+      "id": "AY-PREFS-API",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/ConfigurableAnimeSource.kt",
+      "description": "Preferences scopees par source",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/ConfigurableAnimeSource.kt"
+    },
+    {
+      "id": "AY-PREFS-UI",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/ui/browse/anime/extension/details/AnimeSourcePreferencesScreen.kt",
+      "description": "Construction de l'ecran de preferences",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/ui/browse/anime/extension/details/AnimeSourcePreferencesScreen.kt"
+    },
+    {
+      "id": "AY-VIDEO",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/model/Video.kt",
+      "description": "Contrat video, pistes et memos",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/model/Video.kt"
+    },
+    {
+      "id": "AY-HOSTER",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/model/Hoster.kt",
+      "description": "Resolution des hebergeurs",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/model/Hoster.kt"
+    },
+    {
+      "id": "AY-HTTP-SERVER",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/model/HttpServer.kt",
+      "description": "Serveur HTTP fourni par une source",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/model/HttpServer.kt"
+    },
+    {
+      "id": "AY-NETWORK",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "core/common/src/main/java/eu/kanade/tachiyomi/network/NetworkHelper.kt",
+      "description": "Client reseau partage",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/core/common/src/main/java/eu/kanade/tachiyomi/network/NetworkHelper.kt"
+    },
+    {
+      "id": "AY-JS",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "core/common/src/main/java/eu/kanade/tachiyomi/network/JavaScriptEngine.kt",
+      "description": "Evaluation JavaScript QuickJS",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/core/common/src/main/java/eu/kanade/tachiyomi/network/JavaScriptEngine.kt"
+    },
+    {
+      "id": "AY-CLASSLOADER",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/util/system/ChildFirstPathClassLoader.kt",
+      "description": "Ordre de resolution des classes",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/util/system/ChildFirstPathClassLoader.kt"
+    },
+    {
+      "id": "AY-UI",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/ui/browse/anime/extension/AnimeExtensionsScreenModel.kt",
+      "description": "Liste et actions groupees",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/ui/browse/anime/extension/AnimeExtensionsScreenModel.kt"
+    },
+    {
+      "id": "AY-DETAILS",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/ui/browse/anime/extension/details/AnimeExtensionDetailsScreenModel.kt",
+      "description": "Details et nettoyage des cookies",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/ui/browse/anime/extension/details/AnimeExtensionDetailsScreenModel.kt"
+    },
+    {
+      "id": "AY-SOURCE-PREFS",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/domain/source/service/SourcePreferences.kt",
+      "description": "Langues, masquage, favoris et incognito",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/domain/source/service/SourcePreferences.kt"
+    },
+    {
+      "id": "AY-BACKUP",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/data/backup/create/creators/AnimeExtensionStoresBackupCreator.kt",
+      "description": "Sauvegarde des stores",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/data/backup/create/creators/AnimeExtensionStoresBackupCreator.kt"
+    },
+    {
+      "id": "AY-BACKUP-SOURCE",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/data/backup/create/creators/AnimeSourcesBackupCreator.kt",
+      "description": "Sauvegarde des identites de sources",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/data/backup/create/creators/AnimeSourcesBackupCreator.kt"
+    },
+    {
+      "id": "AY-MANIFEST",
+      "repository": "aniyomiorg/aniyomi",
+      "path": "app/src/main/AndroidManifest.xml",
+      "description": "Permissions et liens d'import",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/AndroidManifest.xml"
+    },
+    {
+      "id": "AK-REPO",
+      "repository": "komikku-app/anikku",
+      "path": "domain/src/main/java/mihon/domain/extensionrepo/service/ExtensionRepoService.kt",
+      "description": "Lecture de repo.json",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/domain/src/main/java/mihon/domain/extensionrepo/service/ExtensionRepoService.kt"
+    },
+    {
+      "id": "AK-CREATE",
+      "repository": "komikku-app/anikku",
+      "path": "domain/src/main/java/mihon/domain/extensionrepo/interactor/CreateExtensionRepo.kt",
+      "description": "Validation URL et doublons",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/domain/src/main/java/mihon/domain/extensionrepo/interactor/CreateExtensionRepo.kt"
+    },
+    {
+      "id": "AK-REPO-UPDATE",
+      "repository": "komikku-app/anikku",
+      "path": "domain/src/main/java/mihon/domain/extensionrepo/interactor/UpdateExtensionRepo.kt",
+      "description": "Conservation de l'empreinte a l'actualisation",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/domain/src/main/java/mihon/domain/extensionrepo/interactor/UpdateExtensionRepo.kt"
+    },
+    {
+      "id": "AK-SCHEMA",
+      "repository": "komikku-app/anikku",
+      "path": "data/src/main/sqldelight/tachiyomi/data/extension_repos.sq",
+      "description": "Unicite des empreintes",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/data/src/main/sqldelight/tachiyomi/data/extension_repos.sq"
+    },
+    {
+      "id": "AK-UPDATE",
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/api/ExtensionApi.kt",
+      "description": "Catalogues, depots desactives et filtre API",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/app/src/main/java/eu/kanade/tachiyomi/extension/api/ExtensionApi.kt"
+    },
+    {
+      "id": "AK-LOADER",
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/util/ExtensionLoader.kt",
+      "description": "Chargement et plage d'API",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/app/src/main/java/eu/kanade/tachiyomi/extension/util/ExtensionLoader.kt"
+    },
+    {
+      "id": "AK-TRUST",
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/java/eu/kanade/domain/extension/interactor/TrustExtension.kt",
+      "description": "Confiance et exceptions integrees",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/app/src/main/java/eu/kanade/domain/extension/interactor/TrustExtension.kt"
+    },
+    {
+      "id": "AK-MANAGER",
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/extension/ExtensionManager.kt",
+      "description": "Candidats identifies par package et signature",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/app/src/main/java/eu/kanade/tachiyomi/extension/ExtensionManager.kt"
+    },
+    {
+      "id": "AK-PREFS",
+      "repository": "komikku-app/anikku",
+      "path": "app/src/main/java/eu/kanade/domain/source/service/SourcePreferences.kt",
+      "description": "Depots desactives et preferences",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/app/src/main/java/eu/kanade/domain/source/service/SourcePreferences.kt"
+    },
+    {
+      "id": "AK-VIDEO",
+      "repository": "komikku-app/anikku",
+      "path": "source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/model/Video.kt",
+      "description": "Contrat video de la branche Anikku",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/source-api/src/commonMain/kotlin/eu/kanade/tachiyomi/animesource/model/Video.kt"
+    },
+    {
+      "id": "LIB-INDEX",
+      "repository": "aniyomiorg/extensions-lib",
+      "path": "index/index.proto",
+      "description": "Schema Protobuf officiel",
+      "url": "https://github.com/aniyomiorg/extensions-lib/blob/971ce96e76202bb35432fe71f92553e3ae40d01d/index/index.proto"
+    },
+    {
+      "id": "LIB-README",
+      "repository": "aniyomiorg/extensions-lib",
+      "path": "index/README.md",
+      "description": "JSON/Protobuf et compression facultative",
+      "url": "https://github.com/aniyomiorg/extensions-lib/blob/971ce96e76202bb35432fe71f92553e3ae40d01d/index/README.md"
+    }
+  ],
+  "textCanonicalization": "UTF-8 text, LF, exactly one trailing newline; hashes are not Git blob hashes",
+  "androidRequirementSupplement": {
+    "consulted": "2026-10-28",
+    "document": "EXIGENCES_ANDROID_APK.md",
+    "localFiles": [
+      "android/app/src/main/AndroidManifest.xml",
+      "android/app/build.gradle.kts"
+    ],
+    "officialDocumentation": [
+      "https://developer.android.com/training/package-visibility/declaring",
+      "https://developer.android.com/training/data-storage/app-specific",
+      "https://developer.android.com/about/versions/14/behavior-changes-14#safer-dynamic-code-loading",
+      "https://developer.android.com/reference/android/content/pm/PackageInstaller"
+    ]
+  }
+}

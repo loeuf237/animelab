@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import subprocess
 import time
+import uuid
 
 
 def validate(app, tests, output, skip_native_media=False, package="com.animan.app", require_hardsub=False):
@@ -23,6 +24,13 @@ def validate(app, tests, output, skip_native_media=False, package="com.animan.ap
     subprocess.run(["adb", "shell", "wm", "dismiss-keyguard"], check=True, timeout=15)
     time.sleep(2)
     command = ["adb", "shell", "am", "instrument", "-w", "-r"]
+    probe_id=uuid.uuid4().hex if package=='com.animan.nativeprobe' else None
+    if probe_id:
+        command += ['-e','probe_run_id',probe_id]
+    if is_engine:
+        # Physical original-APK tests require a separate validation package and
+        # explicit fixture arguments. They are not production-package smoke tests.
+        command += ["-e", "class", "com.animan.app.EmbeddedEngineTest"]
     if skip_native_media: command += ["-e", "skip_native_media", "true"]
     command += [package + ".test/androidx.test.runner.AndroidJUnitRunner"]
     result = subprocess.run(command,
@@ -31,7 +39,12 @@ def validate(app, tests, output, skip_native_media=False, package="com.animan.ap
     (output / "instrumentation.txt").write_text(report)
     pid = subprocess.run(["adb", "shell", "pidof", package], capture_output=True, text=True, timeout=15)
     target_pids = pid.stdout.split()
-    if target_pids and target_pids[0].isdigit():
+    if probe_id:
+        logs=subprocess.run(['adb','logcat','-d','-b','all','-s','ANIMAN_MEDIA_PROOF:I'],
+            capture_output=True,text=True,timeout=30)
+        fresh='\n'.join(line for line in logs.stdout.splitlines() if probe_id in line)
+        (output/'logcat.txt').write_text(fresh+'\n')
+    elif target_pids and target_pids[0].isdigit():
         logs = subprocess.run(["adb", "logcat", "-d", "--pid=" + target_pids[0]],
                               capture_output=True, text=True, timeout=30)
         (output / "logcat.txt").write_text(logs.stdout)
@@ -44,8 +57,8 @@ def validate(app, tests, output, skip_native_media=False, package="com.animan.ap
     print(report)
     if result.returncode or not re.search(r"OK \(1 test\)", report) or "FAILURES" in report or "INSTRUMENTATION_FAILED" in report:
         raise RuntimeError("The installed Android engine did not pass instrumentation")
-    if require_hardsub:
-        validate_hardsub_report(report + '\n' + (output / 'logcat.txt').read_text(), output, api)
+    if require_hardsub or probe_id:
+        validate_hardsub_report(report + '\n' + (output / 'logcat.txt').read_text(), output, api,expected_probe_id=probe_id)
     if is_engine:
         footprint_path = output / "footprint.json"
         footprint = json.loads(footprint_path.read_text())
@@ -57,11 +70,16 @@ def validate(app, tests, output, skip_native_media=False, package="com.animan.ap
         footprint_path.write_text(json.dumps(footprint, indent=2) + "\n")
 
 
-def validate_hardsub_report(text, output, api):
+def validate_hardsub_report(text, output, api, *, expected_probe_id=None):
     matches = re.findall(r'ANIMAN_NATIVE_MEDIA_PROBE=(\{[^\r\n]*\})', text)
     if not matches:
         raise RuntimeError('Missing JNI hardsub evidence')
-    value = json.loads(matches[-1])
+    values=[json.loads(match) for match in matches]
+    if expected_probe_id:
+        values=[value for value in values if value.get('probeRunId')==expected_probe_id]
+    if not values:
+        raise RuntimeError('Missing fresh JNI hardsub evidence')
+    value = values[-1]
     proof = value.get('hardsub', {})
     if not (proof.get('available') is True and proof.get('renderVerified') is True and
             proof.get('pixelDifference', 0) > 10000 and proof.get('api') == api and

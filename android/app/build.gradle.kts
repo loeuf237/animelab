@@ -11,17 +11,27 @@ val optimizeApk = providers.gradleProperty("animelab.optimizeApk").orNull != "fa
 val packagingPython = System.getenv("ANIMAN_BUILD_PYTHON") ?: "python3"
 val optimizer = rootProject.file("../scripts/android_optimize.py")
 val isolatedValidation = providers.gradleProperty("animelab.isolatedValidation").orNull == "true"
+// Explicitly enabled for published betas; stable release builds keep the gate closed.
+val experimentalApkRuntime = providers.gradleProperty("animelab.experimentalApkRuntime").orNull == "true"
+val nativeTestFixture = tasks.register<Copy>("stageNativeTestFixture") {
+    dependsOn(":extension-fixture:assembleApi17Debug")
+    from(rootProject.file("extension-fixture/build/outputs/apk/api17/debug")) { include("*.apk") }
+    into(layout.buildDirectory.dir("generated/native-test-fixture"))
+}
+tasks.configureEach {
+    if (name.startsWith("merge") && name.endsWith("AndroidTestAssets")) dependsOn(nativeTestFixture)
+}
 
 android {
     namespace = "com.animan.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.animan.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 218
-        versionName = "0.1.5"
+        versionCode = 220
+        versionName = "0.1.6"
         manifestPlaceholders["appLabel"] = "@string/app_name"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -44,16 +54,19 @@ android {
     }
     buildTypes {
         release {
+            buildConfigField("boolean", "EXTENSION_RUNTIME_ENABLED", experimentalApkRuntime.toString())
             isMinifyEnabled = optimizeApk
             isShrinkResources = optimizeApk
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("release")
         }
         debug {
+            buildConfigField("boolean", "EXTENSION_RUNTIME_ENABLED", "true")
             isMinifyEnabled = false
         }
         create("validation") {
             initWith(getByName("release"))
+            buildConfigField("boolean", "EXTENSION_RUNTIME_ENABLED", "true")
             // AGP's initWith does not copy every resource-shrinker property.
             isMinifyEnabled = optimizeApk
             isShrinkResources = optimizeApk
@@ -67,13 +80,11 @@ android {
     }
     // The temporary validation key is never used by the publication job.
     testBuildType = if (System.getenv("ANIMAN_ANDROID_KEYSTORE").isNullOrBlank()) "validation" else "release"
+    sourceSets["androidTest"].assets.srcDir(layout.buildDirectory.dir("generated/native-test-fixture"))
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-    kotlinOptions {
-        jvmTarget = "17"
     }
 
     buildFeatures {
@@ -88,6 +99,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":extension-runtime"))
     implementation("androidx.core:core-ktx:1.13.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.12.0")
@@ -103,6 +115,7 @@ dependencies {
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:rules:1.6.1")
+    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
 }
 
 chaquopy {
@@ -172,3 +185,5 @@ tasks.matching { it.name.contains("Python") && it.name != "syncPythonSource" }.c
 tasks.named("preBuild") {
     dependsOn(syncPythonSource)
 }
+
+kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }

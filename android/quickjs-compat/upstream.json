@@ -1,0 +1,163 @@
+{
+  "project": "Cash App QuickJS Java",
+  "version": "0.9.2",
+  "commit": "a738129cc4aa99206c00ae49e9c5b15cb58ad880",
+  "repository": "https://github.com/cashapp/zipline",
+  "files": [
+    {
+      "path": "LICENSE",
+      "git_blob": "d645695673349e3947e8e5ae42332d0ac3164cd7",
+      "size": 11358
+    },
+    {
+      "path": "quickjs/android/src/main/java/app/cash/quickjs/QuickJsNativeLoader.java",
+      "git_blob": "0101e7e19bbd9d7341c53eadf939243d650eee5c",
+      "size": 726
+    },
+    {
+      "path": "quickjs/common/java/app/cash/quickjs/QuickJs.java",
+      "git_blob": "f8686b7c0d645632b18335bb25fd430d2c8d81f2",
+      "size": 7525
+    },
+    {
+      "path": "quickjs/common/java/app/cash/quickjs/QuickJsException.java",
+      "git_blob": "4d20f4909327a64e19422471970f2bb9d396a98b",
+      "size": 3424
+    },
+    {
+      "path": "quickjs/common/native/Context.cpp",
+      "git_blob": "8c640f592e1969b1e3d5c78b61fad39306f61d24",
+      "size": 35262
+    },
+    {
+      "path": "quickjs/common/native/Context.h",
+      "git_blob": "1da2eaeff9915d542be7b23dd1a3ee654b9e4a3a",
+      "size": 2811
+    },
+    {
+      "path": "quickjs/common/native/ExceptionThrowers.cpp",
+      "git_blob": "68a34c257aa52a593d6b89e65d913f2bca7034f7",
+      "size": 1420
+    },
+    {
+      "path": "quickjs/common/native/ExceptionThrowers.h",
+      "git_blob": "37b9b1381b81f4cd6e9322aadb9cd53ea2b3636d",
+      "size": 972
+    },
+    {
+      "path": "quickjs/common/native/JavaMethodProxy.cpp",
+      "git_blob": "cbc30f24f0e731fefda6d11840b1ab39797a56e1",
+      "size": 6289
+    },
+    {
+      "path": "quickjs/common/native/JavaMethodProxy.h",
+      "git_blob": "fa9a32c2ecb494a42da7ad29aadb2dbf2799ca9b",
+      "size": 1356
+    },
+    {
+      "path": "quickjs/common/native/JavaObjectProxy.cpp",
+      "git_blob": "6450e20e5c5377f20eee87a5af568f8d0670b7b3",
+      "size": 2101
+    },
+    {
+      "path": "quickjs/common/native/JavaObjectProxy.h",
+      "git_blob": "7f6fc6b082834516fb25d75ec8446f37ccab22e2",
+      "size": 1269
+    },
+    {
+      "path": "quickjs/common/native/JsMethodProxy.cpp",
+      "git_blob": "2b0fb42fde1345355a7b00e9fcedae7c1fe2e3c6",
+      "size": 3761
+    },
+    {
+      "path": "quickjs/common/native/JsMethodProxy.h",
+      "git_blob": "770a7810fda30e4bb6fe35b43d768d1a24b2568f",
+      "size": 1296
+    },
+    {
+      "path": "quickjs/common/native/JsObjectProxy.cpp",
+      "git_blob": "6382f06a7d2c57e354a1c85e50ffa91ae2a9ab08",
+      "size": 2051
+    },
+    {
+      "path": "quickjs/common/native/JsObjectProxy.h",
+      "git_blob": "e5fc622cb50865eef809f204e49b5c0a03d2cf90",
+      "size": 1054
+    },
+    {
+      "path": "quickjs/common/native/quickjs-jni.cpp",
+      "git_blob": "dbf51b5205559c518a077b115d838fc27abc72c1",
+      "size": 4571
+    },
+    {
+      "path": "quickjs/common/native/quickjs/VERSION",
+      "git_blob": "22ffec18479cb7e7184283439660e31089890d3f",
+      "size": 11
+    },
+    {
+      "path": "quickjs/common/native/quickjs/cutils.c",
+      "git_blob": "a02fb768862b0ab410345cadc8d5230b931b8114",
+      "size": 17551
+    },
+    {
+      "path": "quickjs/common/native/quickjs/cutils.h",
+      "git_blob": "31f7cd84a053af7a64f5707a5744652845613361",
+      "size": 7403
+    },
+    {
+      "path": "quickjs/common/native/quickjs/libregexp-opcode.h",
+      "git_blob": "f90c23b3470e6bbb5ed39a7548447f17c829b016",
+      "size": 2236
+    },
+    {
+      "path": "quickjs/common/native/quickjs/libregexp.c",
+      "git_blob": "379bfc7a95d25aa40564bae81cbdbe6084ebb639",
+      "size": 84501
+    },
+    {
+      "path": "quickjs/common/native/quickjs/libregexp.h",
+      "git_blob": "9aedb7e937d08814f59a840a2467ccb43446a1ef",
+      "size": 3184
+    },
+    {
+      "path": "quickjs/common/native/quickjs/libunicode-table.h",
+      "git_blob": "0ef21135604fd4ade02382f6e8d00454c5057483",
+      "size": 211895
+    },
+    {
+      "path": "quickjs/common/native/quickjs/libunicode.c",
+      "git_blob": "63c12a077115969684e1be53ed7c9589021f6dbc",
+      "size": 46849
+    },
+    {
+      "path": "quickjs/common/native/quickjs/libunicode.h",
+      "git_blob": "cfa600a50d25f0f764a41f9cd8e64a2986459568",
+      "size": 3751
+    },
+    {
+      "path": "quickjs/common/native/quickjs/list.h",
+      "git_blob": "0a1bc5a493de1383952ab6275fc02de19774ff23",
+      "size": 3119
+    },
+    {
+      "path": "quickjs/common/native/quickjs/quickjs-atom.h",
+      "git_blob": "4c2279452ac730fc78bd163e91b9525097e29f02",
+      "size": 7914
+    },
+    {
+      "path": "quickjs/common/native/quickjs/quickjs-opcode.h",
+      "git_blob": "c731a14a9cefe9f24d0b33278bb7f095efc80b8f",
+      "size": 15247
+    },
+    {
+      "path": "quickjs/common/native/quickjs/quickjs.c",
+      "git_blob": "48aeffc62ebebd5586b37474848a6937820a4b80",
+      "size": 1754925
+    },
+    {
+      "path": "quickjs/common/native/quickjs/quickjs.h",
+      "git_blob": "d4a5cd3114b19f76a89857582b295a8c68895ec8",
+      "size": 41501
+    }
+  ]
+}

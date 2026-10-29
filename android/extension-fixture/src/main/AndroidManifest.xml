@@ -1,0 +1,8 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-feature android:name="tachiyomi.animeextension" android:required="false" />
+    <application android:label="AnimeLab extension fixture" android:allowBackup="false">
+        <meta-data android:name="tachiyomi.animeextension.class" android:value="org.animelab.extensionfixture.FixtureFactory" />
+        <meta-data android:name="aniyomix.extensionLib" android:value="${fixtureApi}" />
+        <meta-data android:name="aniyomix.name" android:value="AnimeLab APK fixture" />
+    </application>
+</manifest>

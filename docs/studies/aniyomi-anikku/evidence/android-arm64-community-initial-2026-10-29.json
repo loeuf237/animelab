@@ -1,0 +1,65 @@
+{
+  "communityAPKOperations": [
+    {
+      "pkg": "eu.kanade.tachiyomi.animeextension.fr.animesama",
+      "versionCode": "33",
+      "signer": "cbec121aa82ebb02aaa73806992e0368a97d47b5451ed6524816d03084c45905",
+      "operations": [
+        "trust",
+        "filters",
+        "preferences",
+        "popular",
+        "detail"
+      ],
+      "catalogueResults": 2,
+      "episodes": 0,
+      "state": "verification_needed",
+      "phase": "detail",
+      "code": "empty_episode_list",
+      "notReinstalled": true
+    },
+    {
+      "pkg": "eu.kanade.tachiyomi.animeextension.fr.franime",
+      "versionCode": "29",
+      "signer": "cbec121aa82ebb02aaa73806992e0368a97d47b5451ed6524816d03084c45905",
+      "operations": [
+        "trust",
+        "filters"
+      ],
+      "state": "verification_needed",
+      "phase": "preferences",
+      "code": "extension_runtime_error",
+      "notReinstalled": true
+    },
+    {
+      "pkg": "eu.kanade.tachiyomi.animeextension.fr.anisama",
+      "versionCode": "28",
+      "signer": "cbec121aa82ebb02aaa73806992e0368a97d47b5451ed6524816d03084c45905",
+      "operations": [
+        "trust",
+        "filters",
+        "preferences"
+      ],
+      "state": "verification_needed",
+      "phase": "popular",
+      "code": "source_network_error",
+      "notReinstalled": true
+    }
+  ],
+  "androidApi": 29,
+  "abi": "arm64-v8a",
+  "optimizedApplication": true,
+  "pythonNetworkGateway": true,
+  "mediaPlaybackTested": false,
+  "mediaDownloadRequested": false,
+  "otherHostsModified": false,
+  "date": "2026-10-29",
+  "sourceCommit": "6ebb32b96a3b4afdd77ace4fe35c43cf1efc9787",
+  "hardware": "SCV38",
+  "instrumentationPassed": false,
+  "limits": [
+    "First catalogue entry only for this initial run.",
+    "FRAnime does not implement ConfigurableAnimeSource; its preferences call was an invalid test assumption, not a demonstrated compatibility defect.",
+    "No successful complete video path or reciprocal host interoperability is claimed."
+  ]
+}

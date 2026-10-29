@@ -1,0 +1,15 @@
+{
+  "baseline": "e0718ea",
+  "testKind": "offline_control_flow_with_fake_webview_and_upstream",
+  "realExternalRequests": 0,
+  "realBrowserOpened": false,
+  "browserCookiesChanged": false,
+  "simulatedUpstreamCalls": [
+    {
+      "method": "GET",
+      "webviewOpen": true,
+      "verifyChallenge": true
+    }
+  ],
+  "concurrentProbeReproduced": true
+}

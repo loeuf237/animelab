@@ -30,6 +30,7 @@ object EngineHost {
         if (started) return
         started = true
         context = applicationContext.applicationContext
+        if (BuildConfig.EXTENSION_RUNTIME_ENABLED) ExtensionBridge.initialize(context)
         port = ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { it.localPort }
         thread(name = "AnimanPythonEngine", isDaemon = true) {
             try {

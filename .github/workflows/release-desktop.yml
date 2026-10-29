@@ -8,7 +8,7 @@ on:
       tag_name:
         description: Existing release tag
         required: true
-        default: v0.1.4
+        default: v0.1.6-beta.3
 
 permissions:
   contents: read
@@ -131,6 +131,7 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -138,6 +139,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Require successful source CI on the exact release commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          source_commit=$(git rev-parse HEAD)
+          gh api --method GET "repos/$GITHUB_REPOSITORY/actions/runs" \
+            -f head_sha="$source_commit" -f event=push -f per_page=100 \
+            --jq '.workflow_runs | map(select(.name == "CI")) | sort_by(.created_at) | last |
+              if .status == "completed" and .conclusion == "success"
+              then "Source CI passed for the release commit"
+              else error("The exact release commit has not passed source CI") end'
       - name: Prepare structured release title and notes
         id: release
         run: python scripts/desktop_release.py release-info

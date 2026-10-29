@@ -25,6 +25,54 @@ class FakeSession:
         self.closed = True
 
 
+class RedirectRaw:
+    def __init__(self,url,code=200,headers=None):
+        self.url,self.status_code,self.headers=url,code,httpx.Headers(headers or {})
+        self.content=b'ok'
+    def close(self): pass
+    def iter_content(self,chunk_size=65536): yield self.content
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('bounded',[False,True])
+@pytest.mark.parametrize('follow_ssl',[False,True])
+async def test_redirect_scheme_policy_is_respected_before_forwarding_credentials(transport,monkeypatch,bounded,follow_ssl):
+    monkeypatch.setattr('animelab.services.source_http.is_safe_url',lambda url:url.startswith(('https://','http://')))
+    visited=[]
+    def handler(session,method,url,kwargs):
+        assert '_follow_ssl_redirects' not in kwargs
+        visited.append((url,dict(kwargs['headers'])))
+        return RedirectRaw(url,302,{'location':'http://source.example/end'}) if url.endswith('/start') else RedirectRaw(url)
+    service=transport(handler)
+    options={'_follow_ssl_redirects':follow_ssl,'headers':{'Authorization':'private','Cookie':'private=1'}}
+    if bounded:
+        result=await service.async_client().get('https://source.example/start',max_response_bytes=1024,**options)
+    else:
+        result=service.client().get('https://source.example/start',**options)
+    assert result.status_code==(200 if follow_ssl else 302)
+    assert len(visited)==(2 if follow_ssl else 1)
+    if follow_ssl:
+        assert 'authorization' not in visited[1][1] and 'cookie' not in visited[1][1]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('status,expected_method',[(301,'GET'),(302,'GET'),(303,'GET'),(307,'POST'),(308,'POST')])
+async def test_bounded_requests_preserve_http_redirect_method_and_body_semantics(transport,status,expected_method):
+    visited=[]
+    def handler(session,method,url,kwargs):
+        visited.append((method,kwargs.get('content'),dict(kwargs['headers'])))
+        return RedirectRaw(url,status,{'location':'/end'}) if url.endswith('/start') else RedirectRaw(url)
+    service=transport(handler)
+    result=await service.async_client().request('POST','https://source.example/start',content=b'private-body',
+        headers={'Content-Type':'application/json','Content-Length':'12'},max_response_bytes=1024)
+    assert result.status_code==200 and len(visited)==2
+    assert visited[1][0]==expected_method
+    if expected_method=='GET':
+        assert visited[1][1] is None and 'content-type' not in visited[1][2] and 'content-length' not in visited[1][2]
+    else:
+        assert visited[1][1]==b'private-body'
+
+
 @pytest.fixture
 def transport(tmp_path, monkeypatch):
     monkeypatch.setattr('animelab.services.source_http.is_safe_url', lambda url: url.startswith('https://'))
@@ -125,6 +173,31 @@ def test_plain_403_is_not_a_challenge(transport):
     r = service.client().get('https://source.example/episode')
     with pytest.raises(httpx.HTTPStatusError): r.raise_for_status()
     assert not service.diagnostics()[0]['verificationRequired']
+
+
+@pytest.mark.asyncio
+async def test_bounded_source_html_is_allowed_and_retains_distinct_set_cookies(transport):
+    def raw(session,method,url,options):
+        result=response(url,200,'<h1>Actual catalogue</h1>',[('content-type','text/html'),('set-cookie','one=1; Path=/'),('set-cookie','two=2; Path=/')])
+        result.iter_content=lambda:iter([result.content])
+        return result
+    service=transport(raw)
+    async with service.async_client() as client:
+        result=await client.get('https://source.example/catalogue',max_response_bytes=1000)
+    assert result.text=='<h1>Actual catalogue</h1>'
+    assert len(result.headers.get_list('set-cookie'))==2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('code',[200,403,503])
+async def test_bounded_source_html_still_detects_challenge_before_returning_it(transport,code):
+    def raw(session,method,url,options):
+        result=response(url,code,'<html>Just a moment /cdn-cgi/challenge-platform/ cf-chl-token</html>',{'content-type':'text/html'})
+        result.iter_content=lambda:iter([result.content])
+        return result
+    service=transport(raw)
+    with pytest.raises(VerificationRequired):
+        await service.async_client().get('https://source.example/check',max_response_bytes=1000)
 
 
 def test_rate_limit_respects_retry_after_without_long_blocking_wait(transport):

@@ -1,9 +1,11 @@
 # AnimeLab
 
+[English](README.md) | [Français](README.fr.md)
+
 <img src="docs/branding/animelab-wordmark.png" alt="AnimeLab" width="360" />
 
 [![CI](https://github.com/loeuf237/animelab/actions/workflows/ci.yml/badge.svg)](https://github.com/loeuf237/animelab/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/loeuf237/animelab)](https://github.com/loeuf237/animelab/releases/latest)
+[![Beta release](https://img.shields.io/github/v/release/loeuf237/animelab?include_prereleases)](https://github.com/loeuf237/animelab/releases)
 [![License: GPLv3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 
 **AnimeLab** lets you discover, watch, download and organize anime episodes from supported sources. It combines a **Python / FastAPI** engine with a **Vue 3 / TypeScript** interface, available on desktop, Android and in a browser.
@@ -11,6 +13,9 @@
 ## Downloads
 
 Choose a build from [GitHub Releases](https://github.com/loeuf237/animelab/releases). Android and desktop downloads are grouped in the same release.
+
+**All current versions are beta.** The [v0.1.6-beta.3 notes](docs/releases/v0.1.6-beta.3.md)
+describe the experimental Android APK extension runtime, WebView session changes and remaining limitations.
 
 | Platform | Package | Getting started |
 | --- | --- | --- |
@@ -24,7 +29,7 @@ Desktop packages include Python, the compiled interface, FFmpeg and ffprobe. Win
 
 Desktop builds open a native tabbed launcher. Choose your interface, port, folders and download settings, then click **Launch**. It also provides diagnostics, proxy settings, backups and graceful shutdown. See the [0.1.4 release notes](docs/releases/v0.1.4.md) and [desktop tools and recovery](docs/desktop-distribution.md).
 
-Android device coverage remains **beta**. The [0.1.4 release notes](docs/releases/v0.1.4.md) explain its emulator coverage and pending full physical-device validation. Release assets include checksums and build information.
+Android device coverage remains **beta**. The [0.1.6-beta.3 release notes](docs/releases/v0.1.6-beta.3.md) explain the experimental APK runtime, emulator coverage and pending physical-device validation. Release assets include checksums and build information.
 
 In supporting browsers, install the web interface as a PWA using the browser's install or **Add to Home Screen** option. The AnimeLab server must remain available.
 
@@ -97,9 +102,11 @@ HTTPS deployment, resource limits and manual tests.
 
 Import an Aniyomi-compatible repository from **Sources → Extensions**, then enable the sources you want to use. Source health checks and recipe configuration help diagnose failures.
 
-AnimeLab extracts selectors and request constants from APKs and runs serializable recipes through a shared Python interpreter. There are no per-source runtime adapters. Recipes can describe HTML, JSON catalogues, AJAX episodes, literal player arrays and redirects. Some known sources use declarative compatibility plans to supplement extracted constants.
+Multiple repositories now coexist and refreshing their catalogues preserves installed versions and recipes. The original Android APK runtime is available in validation builds while its interoperability tests are completed. See the [extension usage and validation status](docs/studies/aniyomi-anikku/UTILISATION.md) for installation, trust, shared packages and current limits.
 
-An APK contains compiled Kotlin code, **not a portable scraping recipe**. AnimeLab does not run Android bytecode: arbitrary Kotlin logic, encrypted requests and unsupported parsers cannot automatically be converted into complete recipes. Compatibility therefore depends on the operations the interpreter supports and on the external website. See [recipe execution and limitations](docs/extension-recipes.md).
+On desktop/server, AnimeLab extracts selectors and request constants from APKs and runs serializable recipes through a shared Python interpreter. There are no per-source runtime adapters. Recipes can describe HTML, JSON catalogues, AJAX episodes, literal player arrays and redirects. Some known sources use declarative compatibility plans to supplement extracted constants.
+
+An APK contains compiled Kotlin code, **not a portable scraping recipe**. The desktop/server recipe engine does not run Android bytecode: arbitrary Kotlin logic, encrypted requests and unsupported parsers cannot automatically be converted into complete recipes. Compatibility therefore depends on the operations the interpreter supports and on the external website. Android validation builds use a separate native host for original installed APKs, subject to the validation limits linked above. See [recipe execution and limitations](docs/extension-recipes.md).
 
 If a site blocks access or requests verification, AnimeLab offers a manual website link and retry controls. Supported verification windows can capture cookies after you complete verification. Opening an ordinary browser tab alone does not transfer cookies to AnimeLab. Proxy configuration and optional rotation are available in Settings; they do not guarantee access.
 
@@ -202,6 +209,19 @@ Stop it with `docker compose down`. See the [Docker guide](docs/docker.md) for v
 
 ## Development and contributions
 
+Start with the contribution guide ([English](CONTRIBUTING.en.md) /
+[Français](CONTRIBUTING.md)) for bug reports, setup, validation and pull requests.
+Contributions in French and English are welcome.
+
+**We are looking for contributors:** Android loading-screen design, automatic
+update detection and downloads, duplicate-download fixes (French-Manga and other
+affected sources), Aniyomi/Anikku extension validation, a new **Tools** tab for
+subtitles and multi-audio MKV workflows, Extensions page design and documentation.
+These are contribution opportunities; see the goals and validation criteria in
+the call for contributors ([English](docs/contribution-priorities.en.md) /
+[Français](docs/contribution-priorities.md)). Feature and architecture proposals
+are welcome. Contact the maintainer on [Telegram — @loeuf237](https://t.me/loeuf237).
+
 The Python engine lives in `animelab/`; desktop packaging uses `animelab.spec`.
 See the [package namespace and compatibility notes](docs/package-namespace.md).
 
@@ -237,6 +257,7 @@ Python dependencies, including development tools, are pinned in `uv.lock`; `requ
 
 - [Architecture, UML diagrams and improvement plan](docs/architecture/README.md)
 - [Desktop distribution](docs/desktop-distribution.md) and [Android build and storage guide](docs/android-distribution.md)
+- [Aniyomi/Anikku extension management study and implementation plan](docs/studies/aniyomi-anikku/README.md)
 - [Docker setup](docs/docker.md)
 - [Mobile UI validation](docs/mobile-ui.md) and [proxy provider study](docs/proxy-providers.md)
 - [Release notes](docs/releases/) and [branding assets](docs/branding/README.md)

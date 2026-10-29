@@ -1,0 +1,179 @@
+name: Android extension APK runtime
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'android/**'
+      - 'android_runtime.py'
+      - 'scripts/prepare_quickjs.py'
+      - 'scripts/android_release.py'
+      - 'animelab/migrations.py'
+      - 'animelab/api_errors.py'
+      - 'animelab/routers/extensions.py'
+      - 'animelab/routers/download.py'
+      - 'animelab/routers/media.py'
+      - 'animelab/services/source_http.py'
+      - 'animelab/services/*extension*'
+      - 'animelab/services/android_extension*'
+      - '.github/workflows/android-extensions.yml'
+  pull_request:
+    paths:
+      - 'android/**'
+      - 'android_runtime.py'
+      - 'scripts/prepare_quickjs.py'
+      - 'scripts/android_release.py'
+      - 'animelab/migrations.py'
+      - 'animelab/api_errors.py'
+      - 'animelab/routers/extensions.py'
+      - 'animelab/routers/download.py'
+      - 'animelab/routers/media.py'
+      - 'animelab/services/source_http.py'
+      - 'animelab/services/*extension*'
+      - 'animelab/services/android_extension*'
+      - '.github/workflows/android-extensions.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: android-extensions-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full-app:
+    name: Optimized AnimeLab Android integration build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build current interface
+        working-directory: frontend
+        run: npm ci && npm run build
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/cache@v4
+        id: wheels
+        with:
+          path: android/wheels
+          key: android-native-arm64-${{ hashFiles('scripts/android_native_wheels.py') }}
+      - name: Prepare native dependency tools
+        run: sudo apt-get update && sudo apt-get install -y llvm patchelf
+      - name: Build missing native wheels
+        if: steps.wheels.outputs.cache-hit != 'true'
+        run: python scripts/android_native_wheels.py
+      - name: Build optimized application with the real Python and native bridges
+        working-directory: android
+        run: ./gradlew :app:assembleValidation :app:assembleValidationAndroidTest -Panimelab.isolatedValidation=true --no-daemon --max-workers=2
+      - name: Check every packaged native library for 16 KiB alignment
+        run: python scripts/android_release.py android/app/build/outputs/apk/validation/app-validation.apk android-validation --validation --optimized
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension-animelab-integration-arm64
+          path: |
+            android/app/build/outputs/apk/validation/*.apk
+            android/app/build/outputs/apk/androidTest/validation/*.apk
+            android/app/build/outputs/mapping/validation/missing_rules.txt
+          if-no-files-found: error
+          retention-days: 7
+
+  runtime-compile:
+    name: Compile original APK host API
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 platforms;android-36 build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Compile extension runtime and public ABI
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew :extension-runtime:assembleDebug :extension-probe:assembleValidation :extension-probe:assembleValidationAndroidTest --no-daemon --max-workers=2
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: extension-host-api
+          path: |
+            android/extension-runtime/build/outputs/aar/*.aar
+            android/extension-probe/build/outputs/apk/**/*.apk
+          retention-days: 7
+
+  emulator:
+    name: Original APK execution Android ${{ matrix.api }}
+    needs: runtime-compile
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [29, 30, 35]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: extension-host-api
+          path: artifacts
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          arch: x86_64
+          profile: pixel_2
+          ram-size: 4096M
+          heap-size: 512M
+          disable-animations: true
+          script: |
+            adb install -r artifacts/extension-probe/build/outputs/apk/validation/extension-probe-validation.apk
+            adb install -r artifacts/extension-probe/build/outputs/apk/androidTest/validation/extension-probe-validation-androidTest.apk
+            adb shell appops set com.animan.extensions.probe REQUEST_INSTALL_PACKAGES allow
+            adb shell am instrument -w -r com.animan.extensions.probe.test/androidx.test.runner.AndroidJUnitRunner | tee instrumentation.txt
+            adb logcat -d -s ANIMELAB_APK_PROOF:I > proof.txt
+            adb logcat -d -b crash > crash.txt
+            adb logcat -d -s PackageInstaller:I PackageInstallerSession:I ActivityTaskManager:I > installer.txt
+            adb logcat -d -s ActivityManager:I lmkd:I libc:I DEBUG:I AndroidRuntime:E > runtime-system.txt
+            adb shell uiautomator dump /sdcard/extension-test-window.xml
+            adb pull /sdcard/extension-test-window.xml window.xml
+            grep -q 'OK (' instrumentation.txt
+            grep -q 'executesComputedCode' proof.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: original-apk-android-${{ matrix.api }}-proof
+          path: |
+            instrumentation.txt
+            proof.txt
+            crash.txt
+            installer.txt
+            window.xml
+            runtime-system.txt
+          retention-days: 7

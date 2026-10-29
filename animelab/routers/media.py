@@ -1,4 +1,5 @@
 from animelab.api_contracts import ContractRoute
+from animelab.api_errors import APIProblem
 from animelab.services.source_http import source_http, VerificationRequired
 import asyncio
 import json
@@ -100,6 +101,74 @@ def _get_media_async_client(timeout: float = 10.0) -> httpx.AsyncClient:
     return source_http.async_client(timeout=timeout, follow_redirects=True,
                                     url_validator=validate_media_url,
                                     event_hooks={"request": [_validate_media_request]})
+
+
+@router.api_route('/api/media/extension-resource/{token}', methods=['GET', 'HEAD'])
+async def extension_resource(token: str, request: Request):
+    from animelab.services.extension_media import extension_media
+    from animelab.services.subtitle_service import to_webvtt
+    try:
+        resource = extension_media.get(token)
+    except ValueError as error:
+        raise HTTPException(410, str(error)) from error
+    headers = dict(resource.headers)
+    if request.headers.get('range'):
+        headers['Range'] = request.headers['range']
+    client = _get_media_async_client(timeout=60)
+    stream = client.stream(request.method, resource.url, headers=headers)
+    response = None
+    handed_off = False
+    try:
+        response = await stream.__aenter__()
+        ctype = response.headers.get('content-type', 'application/octet-stream')
+        path = urllib.parse.urlsplit(str(response.url)).path.lower()
+        manifest = path.endswith('.m3u8') or 'mpegurl' in ctype.lower()
+        if response.status_code >= 400:
+            raise HTTPException(response.status_code, 'Ressource média indisponible.')
+        output_headers = {'Cache-Control':'private, no-store'}
+        for key in ('content-range', 'accept-ranges'):
+            if key in response.headers:
+                output_headers[key] = response.headers[key]
+        if request.method == 'HEAD':
+            if 'content-length' in response.headers:
+                output_headers['Content-Length'] = response.headers['content-length']
+            return Response(status_code=response.status_code, headers=output_headers, media_type=ctype)
+        if manifest or resource.kind == 'subtitle':
+            body = bytearray()
+            async for chunk in response.aiter_bytes():
+                body.extend(chunk)
+                if len(body) > 8*1024*1024:
+                    raise HTTPException(413, 'Playlist ou sous-titre trop volumineux.')
+            if manifest:
+                content = extension_media.playlist(body.decode('utf-8-sig'), resource, str(response.url))
+                ctype = 'application/vnd.apple.mpegurl'
+            else:
+                content = to_webvtt(body.decode('utf-8-sig'), format_hint=path.rsplit('.', 1)[-1])
+                ctype = 'text/vtt'
+            return Response(content=content, media_type=ctype, headers=output_headers)
+        if path.endswith('.mpd') or 'dash+xml' in ctype.lower():
+            raise HTTPException(422, 'La lecture DASH avec en-têtes APK n’est pas encore prise en charge.')
+        if 'content-length' in response.headers:
+            output_headers['Content-Length'] = response.headers['content-length']
+        upstream = response
+        async def body_stream():
+            try:
+                async for chunk in upstream.aiter_bytes():
+                    yield chunk
+            finally:
+                await stream.__aexit__(None, None, None)
+                await client.aclose()
+        result = StreamingResponse(body_stream(), status_code=response.status_code, media_type=ctype, headers=output_headers)
+        response = None  # body_stream now owns the upstream stream and client.
+        handed_off = True
+        return result
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
+    finally:
+        if not handed_off:
+            if response is not None:
+                await stream.__aexit__(None, None, None)
+            await client.aclose()
 
 @router.get("/api/media/image-proxy")
 async def proxy_image(url: str):
@@ -270,6 +339,7 @@ async def resolve_stream(
     selected_quality = quality or "auto"
     qualities_dict: Dict[str, str] = {}
     tracks: List[Dict[str, Any]] = []
+    native_media = None
 
     container_source = None
     if source not in ("voir-anime", "animepahe", "french-manga"):
@@ -291,7 +361,7 @@ async def resolve_stream(
     if container_source:
         try:
             container_sources = await container_source.get_episode_sources(episodeUrl)
-        except VerificationRequired:
+        except (VerificationRequired, APIProblem):
             raise
         except Exception as e:
             logger.warning("[media] Error getting episode sources from container: %s", e)
@@ -317,6 +387,7 @@ async def resolve_stream(
                 if matched:
                     candidates = matched + [cs for cs in container_sources if cs not in matched]
 
+            candidate_failures = []
             for cand in candidates:
                 cand_url = cand.get("url") if isinstance(cand, dict) else getattr(cand, "url", "")
                 cand_srv = cand.get("server") if isinstance(cand, dict) else getattr(cand, "server", "imported")
@@ -326,23 +397,29 @@ async def resolve_stream(
                     continue
 
                 try:
-                    resolved = await download_manager.resolve_imported_video_stream(
-                        cand_url,
-                        referer=episodeUrl,
-                        preferred_quality=quality or cand_q,
-                    )
+                    if getattr(container_source, 'runtime', '') == 'android-apk':
+                        resolved = await container_source.resolve_candidate(cand)
+                    else:
+                        resolved = await download_manager.resolve_imported_video_stream(
+                            cand_url, referer=episodeUrl, preferred_quality=quality or cand_q)
                     if resolved and resolved.get("videoUrl"):
+                        if getattr(container_source, 'runtime', '') == 'android-apk':
+                            native_media = resolved
                         video_url = resolved["videoUrl"]
                         server_type = resolved.get("serverType") or cand_srv
                         selected_quality = resolved.get("selectedQuality") or cand_q or "HD"
                         break
                 except VerificationRequired:
                     raise
+                except APIProblem as ex:
+                    candidate_failures.append(ex)
                 except Exception as ex:
                     logger.debug("[media] Error resolving candidate %s: %s", cand_url, ex)
+            if not video_url and candidate_failures:
+                raise candidate_failures[0]
 
         # Si toujours non résolu, tenter directement sur episodeUrl
-        if not video_url and episodeUrl:
+        if not video_url and episodeUrl and getattr(container_source, 'runtime', '') != 'android-apk':
             try:
                 resolved = await download_manager.resolve_imported_video_stream(
                     episodeUrl,
@@ -470,7 +547,20 @@ async def resolve_stream(
         )
 
     # Si le flux provient de Kwik / Owocdn HLS, le router via le proxy HLS local
-    if video_url and (".m3u8" in video_url.lower()) and any(d in video_url for d in ["owocdn.top", "kwik"]):
+    if native_media:
+        from animelab.services.extension_media import extension_media
+        if native_media.get('unsupportedArguments'):
+            raise HTTPException(422, 'Cette vidéo exige des options de lecteur non prises en charge.')
+        if urllib.parse.urlsplit(video_url).path.lower().endswith('.mpd'):
+            raise HTTPException(422, 'La lecture DASH avec en-têtes APK exige un lecteur compatible.')
+        if native_media.get('audioTracks'):
+            raise HTTPException(422, 'La lecture de pistes audio APK séparées n’est pas encore prise en charge.')
+        video_url = extension_media.issue(video_url, native_media['headers'])
+        tracks = [{'kind':'captions', 'label':track['label'], 'srclang':track['lang'],
+                   'src':extension_media.issue(track['url'], {**native_media['headers'], **track['headers']}, kind='subtitle'),
+                   'default':index==0} for index, track in enumerate(native_media['subtitles'])]
+        qualities_dict = {}  # Selecting a new quality must rerun the actual source callback.
+    elif video_url and (".m3u8" in video_url.lower()) and any(d in video_url for d in ["owocdn.top", "kwik"]):
         video_url = f"/api/media/hls-proxy/playlist.m3u8?url={urllib.parse.quote(video_url)}"
     elif (
         video_url

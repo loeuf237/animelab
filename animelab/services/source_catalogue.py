@@ -1,4 +1,4 @@
-from animelab.services.source_registry import source_registry, RegisteredSource
+from animelab.services.source_registry import source_registry, RegisteredSource, source_identity
 """Browse each source using its actual routes, filters and extension recipe."""
 import hashlib
 import json
@@ -34,12 +34,17 @@ class SourceCatalogueService:
 
     def sources(self):
         entries = [self.descriptor(sid, self.provider(sid)) for sid in ('voir-anime', 'animepahe', 'french-manga')]
-        active = {ext.pkg: ext for ext in extension_service.get_enabled_container_sources()}
-        entries += [self.descriptor(sid, ext) for sid, ext in active.items()]
+        active = {source_identity(ext,ext.pkg): ext for ext in extension_service.get_enabled_container_sources()}
+        entries += [self.descriptor(sid, ext) for sid, ext in active.items() if not getattr(ext,'metadata',{}).get('hidden')]
+        for saved in extension_service.retained_source_descriptors():
+            if saved['source_key'] not in active and not saved['hidden']:
+                entries.append({'id':saved['source_key'],'name':saved['name'],'lang':saved['lang'],
+                                'baseUrl':saved['base_url'],'type':'imported','isEnabled':False,'views':[],
+                                'multiTags':True,'state':'unavailable'})
         # A compiled recipe represents an installed extension; repository listings
         # without a recipe remain in the Extensions store.
         for ext in extension_service.get_visible_extensions():
-            if ext.get('recipe_json') and ext['pkg'] not in active:
+            if ext.get('recipe_json') and ext['pkg'] not in active and not any(src.pkg==ext['pkg'] for src in active.values()):
                 entries.append({'id': ext['pkg'], 'name': ext['name'], 'type': 'imported',
                                 'lang': ext['lang'], 'baseUrl': ext.get('base_url') or '',
                                 'isEnabled': False, 'views': [], 'multiTags': False})
@@ -53,6 +58,9 @@ class SourceCatalogueService:
 
     async def filters(self, source_id):
         service = self.provider(source_id).service
+        if getattr(service,'runtime','') == 'android-apk':
+            return {'tags':[], 'groups':[], 'orders':[{'id':'source','label':'Ordre de la source'}],
+                    'nativeFilters':await service.call('filters')}
         recipe = getattr(service, 'recipe', None)
         revision = hashlib.sha256(json.dumps(recipe.to_dict(), sort_keys=True).encode()).hexdigest() if recipe else ''
         key = (source_id, service.base_url, revision)
@@ -250,8 +258,22 @@ class SourceCatalogueService:
         if urlparse(target)._replace(fragment='') == urlparse(url)._replace(fragment='') or urlparse(target).hostname != urlparse(url).hostname: return None
         return self.remember_cursor(context, target)
 
-    async def browse(self, source_id, mode='latest', query='', tags=(), order='source', cursor=None):
+    async def browse(self, source_id, mode='latest', query='', tags=(), order='source', cursor=None, native_filters=None):
         provider=self.provider(source_id)
+        if getattr(provider.service,'runtime','') == 'android-apk':
+            if mode not in ('search','popular','catalogue','latest') or (mode=='latest' and not provider.service.supports_latest):
+                raise CatalogueError('Opération indisponible pour cette source APK.')
+            context=(source_id,mode,query,json.dumps(native_filters,sort_keys=True),order)
+            page=1
+            if cursor:
+                saved=self._cursors.get(cursor)
+                if not saved or saved['context']!=context or saved['expires'] < time.monotonic():
+                    raise CatalogueError('La page a expiré ; rechargez le catalogue')
+                page=saved['offset']
+            result=await provider.observe('browse',provider.service.catalogue('popular' if mode=='catalogue' else mode,
+                                           page=page,query=query,filters=native_filters))
+            return {'source':source_id,'results':result['results'],'queryScope':'catalogue',
+                    'nextCursor':self.remember_cursor(context,offset=page+1) if result['hasNextPage'] else None}
         return await provider.observe('browse',self._browse(source_id,mode,query,tags,order,cursor))
 
     async def _browse(self, source_id, mode='latest', query='', tags=(), order='source', cursor=None):

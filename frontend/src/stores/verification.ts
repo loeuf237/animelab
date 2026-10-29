@@ -89,16 +89,19 @@ export const useVerificationStore = defineStore('verification', () => {
     }
   }
   let timer: ReturnType<typeof setTimeout> | null = null
-  async function verified(result: { domain: string; resumed?: number }) {
+  async function verified(result: { domain: string; resumed?: number; accessVerified?: boolean }) {
     job.value = null
     const retries = [...pending.entries()].filter(([, request]) =>
       request.domains.has(result.domain),
     )
     for (const [key] of retries) pending.delete(key)
     await Promise.allSettled(retries.map(([, request]) => request.retry()))
-    notice.value = retries.length
-      ? 'Accès vérifié. La recherche ou le catalogue a été actualisé.'
-      : `Accès vérifié. ${result.resumed || 0} téléchargement(s) repris.`
+    notice.value =
+      result.accessVerified === false
+        ? 'Session WebView récupérée. Les opérations en attente ont été relancées ; leur résultat déterminera si le site accepte l’accès.'
+        : retries.length
+          ? 'Accès vérifié. La recherche ou le catalogue a été actualisé.'
+          : `Accès vérifié. ${result.resumed || 0} téléchargement(s) repris.`
     await refresh()
   }
   async function poll(id: string) {

@@ -1,0 +1,10 @@
+{
+  "sourceCommit": "e0718ea",
+  "worktreeModified": true,
+  "testKind": "offline_control_flow_with_fake_webview_and_upstream",
+  "realExternalRequests": 0,
+  "realBrowserOpened": false,
+  "browserCookiesChanged": false,
+  "simulatedUpstreamCalls": [],
+  "concurrentProbeReproduced": false
+}

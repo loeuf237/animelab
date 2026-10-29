@@ -1,0 +1,78 @@
+{
+  "communityAPKOperations": [
+    {
+      "pkg": "eu.kanade.tachiyomi.animeextension.fr.animesama",
+      "versionCode": "33",
+      "signer": "cbec121aa82ebb02aaa73806992e0368a97d47b5451ed6524816d03084c45905",
+      "api": 14,
+      "operations": [
+        "trust",
+        "filters",
+        "preferences",
+        "popular"
+      ],
+      "sourceId": "aniyomi:6170936930338275444",
+      "preferencesSupported": true,
+      "catalogueResults": 2,
+      "detailCandidatesTried": 1,
+      "state": "verification_needed",
+      "phase": "detail",
+      "code": "verification_required",
+      "notReinstalled": true
+    },
+    {
+      "pkg": "eu.kanade.tachiyomi.animeextension.fr.franime",
+      "versionCode": "29",
+      "signer": "cbec121aa82ebb02aaa73806992e0368a97d47b5451ed6524816d03084c45905",
+      "api": 14,
+      "operations": [
+        "trust",
+        "filters"
+      ],
+      "sourceId": "aniyomi:3074980924810171824",
+      "preferencesSupported": false,
+      "state": "verification_needed",
+      "phase": "popular",
+      "code": "source_network_error",
+      "notReinstalled": true
+    },
+    {
+      "pkg": "eu.kanade.tachiyomi.animeextension.fr.anisama",
+      "versionCode": "28",
+      "signer": "cbec121aa82ebb02aaa73806992e0368a97d47b5451ed6524816d03084c45905",
+      "api": 14,
+      "operations": [
+        "trust",
+        "filters",
+        "preferences"
+      ],
+      "sourceId": "aniyomi:1898818943039425198",
+      "preferencesSupported": true,
+      "state": "verification_needed",
+      "phase": "popular",
+      "code": "source_network_error",
+      "notReinstalled": true
+    }
+  ],
+  "probeRunId": "a07eebb8afd6460e87a3dda361f74852",
+  "androidApi": 29,
+  "abi": "arm64-v8a",
+  "optimizedApplication": true,
+  "pythonNetworkGateway": true,
+  "mediaPlaybackTested": false,
+  "mediaDownloadRequested": false,
+  "otherHostsModified": false,
+  "instrumentationPassed": true,
+  "date": "2026-10-29",
+  "sourceCommit": "64c591a9ab43bd05e5ea0171f5914def320a634a",
+  "hardware": "SCV38",
+  "ciRun": 40805875973,
+  "ciArtifactSha256": "5557faf155a8a5732b6b4e1e762b09be4bbb747bb7d7f295a13d51171d8f76ef",
+  "limits": [
+    "Zero complete metadata-to-video paths passed.",
+    "AnimeSama requires a site verification after catalogue access.",
+    "FRAnime correctly declares no preferences; popular requests still fail at the network boundary.",
+    "Anisama popular requests still fail at the network boundary.",
+    "No shared package was reinstalled and no other host data was modified."
+  ]
+}

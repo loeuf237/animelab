@@ -1,3 +1,4 @@
+import httpx
 import json
 import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
@@ -98,9 +99,7 @@ async def test_container_source_parsing():
 @pytest.mark.asyncio
 async def test_extension_service_business_rules(tmp_path):
     """
-    Vérifie les deux règles d'or demandées par l'utilisateur:
-    1. Règle du dernier magasin ajouté (seules ses sources sont visibles).
-    2. Toutes les sources importées sont désactivées par défaut (is_enabled = 0).
+    Les dépôts coexistent et les nouvelles extensions restent désactivées.
     """
     db_file = str(tmp_path / "test_extensions.sqlite3")
     service = ExtensionService(db_path=db_file)
@@ -128,6 +127,7 @@ async def test_extension_service_business_rules(tmp_path):
     mock_resp1 = MagicMock()
     mock_resp1.status_code = 200
     mock_resp1.json.return_value = repo1_data
+    mock_resp1.content = json.dumps(repo1_data).encode()
 
     with patch("animelab.services.source_http.AsyncSourceClient.get", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = mock_resp1
@@ -143,7 +143,7 @@ async def test_extension_service_business_rules(tmp_path):
 
     assert len(service.get_enabled_container_sources()) == 0
 
-    # RÈGLE 1: Importation d'un second dépôt -> Il devient le SEUL magasin actif visible
+    # Un deuxième dépôt complète le catalogue sans masquer le premier.
     repo2_data = [
         {
             "pkg": "eu.kanade.tachiyomi.animeextension.en.repo2_gamma",
@@ -158,6 +158,7 @@ async def test_extension_service_business_rules(tmp_path):
     mock_resp2 = MagicMock()
     mock_resp2.status_code = 200
     mock_resp2.json.return_value = repo2_data
+    mock_resp2.content = json.dumps(repo2_data).encode()
 
     with patch("animelab.services.source_http.AsyncSourceClient.get", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = mock_resp2
@@ -165,14 +166,13 @@ async def test_extension_service_business_rules(tmp_path):
         assert res2["success"] is True
         assert res2["count"] == 1
 
-    # Vérification que SEUL le dernier magasin ajouté (repo2) est visible
     visible2 = service.get_visible_extensions()
-    assert len(visible2) == 1
-    assert visible2[0]["name"] == "Repo2 Gamma"
-    assert visible2[0]["is_enabled"] == 0
+    assert len(visible2) == 3
+    assert {entry['name'] for entry in visible2} == {'Repo1 Alpha', 'Repo1 Beta', 'Repo2 Gamma'}
+    assert all(not entry['is_enabled'] for entry in visible2)
 
-    # Activation manuelle d'une extension par l'utilisateur
-    gamma_id = visible2[0]["id"]
+    # Activation manuelle d'une extension du deuxième dépôt.
+    gamma_id = next(entry['id'] for entry in visible2 if entry['name'] == 'Repo2 Gamma')
     with patch("animelab.services.extension_service.is_safe_url", return_value=True), patch.object(service, "_compile_extension_recipe", new_callable=AsyncMock) as mock_compile:
         mock_compile.return_value = SourceRecipe(
             pkg="eu.kanade.tachiyomi.animeextension.en.repo2_gamma",
@@ -416,7 +416,11 @@ async def test_extension_update_detection_and_user_triggered_upgrade(tmp_path, e
 
     with patch("animelab.services.source_http.AsyncSourceClient.get", new_callable=AsyncMock) as mock_get, \
          patch("animelab.services.extension_service.is_safe_url", return_value=True):
-        mock_get.return_value = mock_resp
+        async def response_for_url(url, **kwargs):
+            if str(url).endswith('.json'):
+                return httpx.Response(200, json=repo_v1, request=httpx.Request('GET', str(url)))
+            return mock_resp
+        mock_get.side_effect = response_for_url
         await service.import_repository("https://example.com/repo/index.min.json")
         ext = service.get_visible_extensions()[0]
         await service.toggle_extension(ext["id"], True)

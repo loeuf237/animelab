@@ -88,6 +88,19 @@ def test_instrumentation_requires_real_render_cancel_and_export_evidence(tmp_pat
         validate_hardsub_report('ANIMAN_NATIVE_MEDIA_PROBE='+json.dumps(data), tmp_path, 35)
 
 
+def test_native_media_receipt_must_belong_to_this_run_even_after_process_exit(tmp_path):
+    from scripts.android_instrumentation import validate_hardsub_report
+    data=dict(probeRunId='old-run',hardsub=dict(available=True,renderVerified=True,pixelDifference=20000,api=35,pageSize=4096),
+              managed_cancellation=True,managed_progress=True,storage_export=True)
+    old='ANIMAN_NATIVE_MEDIA_PROBE='+json.dumps(data)
+    with pytest.raises(RuntimeError,match='fresh'):
+        validate_hardsub_report(old,tmp_path,35,expected_probe_id='new-run')
+    data['probeRunId']='new-run'
+    fresh='ANIMAN_NATIVE_MEDIA_PROBE='+json.dumps(data)
+    validate_hardsub_report(fresh+'\n'+old,tmp_path,35,expected_probe_id='new-run')
+    assert json.loads((tmp_path/'hardsub-proof.json').read_text())['probeRunId']=='new-run'
+
+
 @pytest.mark.parametrize('alignment,expected_ok', [(4096, False), (16384, True)])
 def test_probe_audit_rejects_four_kilobyte_load_segments(tmp_path, alignment, expected_ok):
     import struct

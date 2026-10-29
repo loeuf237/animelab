@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Any, List, Optional
 from pydantic import BaseModel, Field
 
 if not hasattr(BaseModel, "model_dump"):
@@ -18,6 +18,7 @@ class Episode(BaseModel):
     version: str = "VOSTFR"
     synopsis: Optional[str] = None
     thumbnailUrl: Optional[str] = None
+    nativeMetadata: dict[str, Any] = Field(default_factory=dict)
 
 class AnimeResult(BaseModel):
     id: str
@@ -46,3 +47,4 @@ class AnimeDetail(BaseModel):
     source: str = ""
     tmdbId: Optional[int] = None
     releaseDate: Optional[str] = None
+    nativeMetadata: dict[str, Any] = Field(default_factory=dict)

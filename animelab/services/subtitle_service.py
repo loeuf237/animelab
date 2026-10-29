@@ -53,3 +53,17 @@ def subtitle_extension(content: bytes) -> str:
     if "[Events]" in text and "Dialogue:" in text:
         return ".ass"
     raise ValueError("Contenu de sous-titres invalide (VTT, SRT ou ASS attendu)")
+
+
+def to_webvtt(text: str, *, format_hint: str = '') -> str:
+    """VTT/SRT for the browser track element; ASS needs a renderer, not stripping."""
+    import re
+    text = text.lstrip('\ufeff').replace('\r\n', '\n')
+    extension = subtitle_extension(text.encode())
+    if extension == '.vtt':
+        return text
+    if extension != '.srt':
+        raise ValueError('Les sous-titres ASS nécessitent un lecteur avec rendu ASS.')
+    text = re.sub(r'(?m)^(\d{1,3}:\d{2}:\d{2}),(\d{3})(\s*-->\s*)(\d{1,3}:\d{2}:\d{2}),(\d{3})',
+                  r'\1.\2\3\4.\5', text)
+    return 'WEBVTT\n\n' + text

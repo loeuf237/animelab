@@ -101,3 +101,9 @@ def test_unified_release_accepts_matching_common_tag(candidate):
     result = prepare(candidate, tag='v0.1.0', signing_method='github_actions')
     assert result['tag'] == 'v0.1.0'
     assert result['apk'] == 'AnimeLab-v0.1.0-Android-arm64.apk'
+
+
+@pytest.mark.parametrize('tag',['v0.1.0-beta.1','android-v0.1.0-beta.2'])
+def test_beta_filename_retains_the_public_channel_marker(candidate,tag):
+    result=prepare(candidate,tag=tag,signing_method='github_actions')
+    assert result['apk']=='AnimeLab-'+tag.removeprefix('android-')+'-Android-arm64.apk'

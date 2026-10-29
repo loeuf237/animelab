@@ -91,6 +91,7 @@ class DomainSession:
     last_error: str | None = None
     generation: int = 0
     pending_reset: bool = False
+    verification_owner: str | None = None
     last_used: float = field(default_factory=time.monotonic)
 
 
@@ -166,10 +167,14 @@ class SourceHTTPService:
     @contextmanager
     def lease(self, state):
         with state.condition:
+            if state.verification_owner:
+                raise VerificationRequired(state.blocked_url or 'https://'+state.domain+'/')
             while state.leased >= self.max_connections:
                 if self.closed:
                     raise RuntimeError("Transport source arrêté")
                 state.condition.wait()
+                if state.verification_owner:
+                    raise VerificationRequired(state.blocked_url or 'https://'+state.domain+'/')
             if self.closed:
                 raise RuntimeError("Transport source arrêté")
             state.leased += 1
@@ -217,6 +222,33 @@ class SourceHTTPService:
                 state.last_used = time.monotonic()
                 state.condition.notify_all()
 
+    def pause_for_webview(self, url, owner, timeout=30, cancelled=None):
+        """Drain existing handles before opening; forbid new HTTP/stream leases."""
+        state=self.state(url)
+        with state.condition:
+            if cancelled is not None and cancelled.is_set():
+                raise ValueError('La vérification WebView a été annulée.')
+            if state.verification_owner not in (None,owner):
+                raise ValueError('Une WebView utilise déjà cette session.')
+            state.verification_owner=owner
+            deadline=time.monotonic()+timeout
+            while state.leased:
+                if state.verification_owner!=owner or (cancelled is not None and cancelled.is_set()):
+                    raise ValueError('La vérification WebView a été annulée.')
+                remaining=deadline-time.monotonic()
+                if remaining<=0:
+                    state.verification_owner=None
+                    state.condition.notify_all()
+                    raise ValueError('Les requêtes en cours ne sont pas terminées ; réessayez la WebView.')
+                state.condition.wait(remaining)
+
+    def release_webview(self, url, owner):
+        state=self.state(url)
+        with state.condition:
+            if state.verification_owner==owner:
+                state.verification_owner=None
+                state.condition.notify_all()
+
     def _change_proxy(self, state, proxy, *, public=False):
         """Caller holds the domain lock and there are no active handles."""
         for client in state.clients:
@@ -250,6 +282,9 @@ class SourceHTTPService:
             if automatic: return False
             raise ValueError("Aucune session connue pour cette source")
         with state.condition:
+            if state.verification_owner:
+                if automatic: return False
+                raise ValueError('Fermez la vérification WebView avant de changer le proxy de ce domaine.')
             # Never switch the address underneath an active media stream or request.
             if state.leased or state.pending_reset:
                 if automatic: return False
@@ -337,6 +372,8 @@ class SourceHTTPService:
             # this client's redirect policy, even when it shares source state.
             bypass_cache = True
         state = self.state(url)
+        if state.verification_owner:
+            raise VerificationRequired(state.blocked_url or str(url))
         headers = dict(httpx.Headers(headers or {}))
         headers["user-agent"] = USER_AGENT
         kwargs.pop("impersonate", None)
@@ -392,13 +429,14 @@ class SourceHTTPService:
 
     def _request(self, method, url, headers, timeout, follow, verifying, kwargs):
         validator = kwargs.pop('_url_validator', None)
+        follow_ssl = kwargs.pop('_follow_ssl_redirects', True)
         for redirect in range(7):
             if validator:
                 validator(url)
             if not is_safe_url(url):
                 raise ValueError("URL source non autorisée")
             state = self.state(url)
-            if state.blocked_url and not verifying:
+            if state.verification_owner or (state.blocked_url and not verifying):
                 raise VerificationRequired(state.blocked_url)
             for attempt in range(3):
                 self.pace(state)
@@ -434,7 +472,9 @@ class SourceHTTPService:
             if not follow or response.status_code not in (301, 302, 303, 307, 308) or not response.headers.get("location"):
                 return response
             target = urljoin(url, response.headers["location"])
-            if urlparse(target).netloc != urlparse(url).netloc:
+            if not follow_ssl and urlparse(target).scheme != urlparse(url).scheme:
+                return response
+            if (urlparse(target).scheme,urlparse(target).netloc) != (urlparse(url).scheme,urlparse(url).netloc):
                 headers = {k: v for k, v in headers.items() if k not in ("authorization", "cookie", "origin")}
             if response.status_code == 303 or (method == "POST" and response.status_code in (301, 302)):
                 method = "GET"
@@ -560,6 +600,26 @@ class AsyncSourceClient(SourceClient):
         # Hooks remain supported for callers with additional URL checks.
         for hook in self.event_hooks.get("request", []):
             await hook(httpx.Request(method, url))
+        maximum = kwargs.pop('max_response_bytes', None)
+        if maximum is not None:
+            if type(maximum) is not int or maximum < 1:
+                raise ValueError('Invalid response byte budget')
+            chunks, total = [], 0
+            headers = kwargs.pop('headers', {})
+            async with self.stream(method, url, headers=headers, _allow_html=True, **kwargs) as response:
+                async for chunk in response.aiter_bytes():
+                    total += len(chunk)
+                    if total > maximum:
+                        raise ValueError('La réponse dépasse la taille autorisée.')
+                    chunks.append(chunk)
+                # curl has already decoded HTTP content encodings. Do not ask
+                # HTTPX to decompress the resulting bytes a second time.
+                pairs = response.headers.multi_items() if hasattr(response.headers,'multi_items') else response.headers.items()
+                safe_headers = [(key,value) for key,value in pairs if key.lower() not in ('content-encoding','content-length')]
+                buffered = httpx.Response(response.status_code,headers=safe_headers,
+                                          content=b''.join(chunks),request=response.request)
+                self.service.classify(self.service.state(str(buffered.url)),buffered,str(buffered.url))
+                return buffered
         call = partial(super().request, method, url, **kwargs)
         return await asyncio.get_running_loop().run_in_executor(self.service.executor, call)
 
@@ -614,7 +674,10 @@ class SourceStream:
     def _open(self):
         service = self.client.service
         url = self.url
+        method = self.method
         kwargs = dict(self.kwargs)
+        allow_html = kwargs.pop('_allow_html',False)
+        follow_ssl = kwargs.pop('_follow_ssl_redirects',True)
         verifying = kwargs.pop("verify_challenge", False)
         for _ in range(7):
             if self.client.url_validator:
@@ -622,28 +685,33 @@ class SourceStream:
             if not is_safe_url(url):
                 raise ValueError("URL source non autorisée")
             state = service.state(url)
-            if state.blocked_url and not verifying:
+            if state.verification_owner or (state.blocked_url and not verifying):
                 raise VerificationRequired(state.blocked_url)
             service.pace(state)
             self.lease = service.lease(state)
             transport = self.lease.__enter__()
             try:
-                self.raw = transport.request(self.method, url, headers=self.headers, stream=True,
+                self.raw = transport.request(method, url, headers=self.headers, stream=True,
                                              allow_redirects=False, timeout=service.timeout(self.client.timeout), **kwargs)
                 response = httpx.Response(self.raw.status_code, headers=response_headers(self.raw),
-                                          request=httpx.Request(self.method, self.raw.url))
+                                          request=httpx.Request(method, self.raw.url))
                 service.classify(state, response, url, streaming=True)
                 if self.client.follow_redirects and response.status_code in (301, 302, 303, 307, 308) and response.headers.get("location"):
                     target = urljoin(url, response.headers["location"])
-                    if urlparse(target).netloc != urlparse(url).netloc:
-                        self.headers.pop("authorization", None)
-                        self.headers.pop("cookie", None)
-                    self.close()
-                    kwargs.pop("params", None)
-                    url = target
-                    continue
+                    if follow_ssl or urlparse(target).scheme == urlparse(url).scheme:
+                        if (urlparse(target).scheme,urlparse(target).netloc) != (urlparse(url).scheme,urlparse(url).netloc):
+                            self.headers.pop("authorization", None)
+                            self.headers.pop("cookie", None)
+                        if (response.status_code==303 and method.upper()!='HEAD') or (method.upper()=='POST' and response.status_code in (301,302)):
+                            method='GET'
+                            for key in ('content','data','json'): kwargs.pop(key,None)
+                            for key in ('content-type','content-length','transfer-encoding'): self.headers.pop(key,None)
+                        self.close()
+                        kwargs.pop("params", None)
+                        url = target
+                        continue
                 # HTML is never a media stream; inspect its small body for challenge markers.
-                if "text/html" in response.headers.get("content-type", "").lower():
+                if not allow_html and "text/html" in response.headers.get("content-type", "").lower():
                     body = bytearray()
                     for chunk in self.raw.iter_content():
                         body.extend(chunk)
@@ -657,7 +725,7 @@ class SourceStream:
                     with state.condition:
                         state.cooldown = max(state.cooldown, time.monotonic() + delay)
                     raise RateLimited(response, delay)
-                if response.status_code in (403, 451):
+                if not allow_html and response.status_code in (403, 451):
                     response.raise_for_status()
                 self.response = SourceStreamResponse(self, response)
                 return self.response

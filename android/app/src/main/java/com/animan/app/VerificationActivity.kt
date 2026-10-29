@@ -17,10 +17,12 @@ class VerificationActivity : AppCompatActivity() {
     var verificationUrl = ""
         private set
     private lateinit var browser: WebView
+    private var browserStopped = false
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         verificationUrl = intent.getStringExtra("url") ?: ""
+        if (!VerificationBridge.isOpen(verificationUrl)) { finish(); return }
         val parsed = try { URI(verificationUrl) } catch (_: Exception) { finish(); return }
         if (parsed.scheme != "https" || parsed.host == null || parsed.userInfo != null) { finish(); return }
         VerificationBridge.activity = this
@@ -42,14 +44,24 @@ class VerificationActivity : AppCompatActivity() {
         layout.addView(browser, LinearLayout.LayoutParams(-1, 0, 1f))
         layout.addView(Button(this).apply {
             text = getString(R.string.return_to_animan)
-            setOnClickListener { CookieManager.getInstance().flush(); finish() }
+            setOnClickListener { shutdownBrowser(); finish() }
         })
         setContentView(layout)
         browser.loadUrl(verificationUrl)
     }
+    fun shutdownBrowser() {
+        if (::browser.isInitialized && !browserStopped) {
+            browserStopped = true
+            browser.stopLoading()
+            CookieManager.getInstance().flush()
+            (browser.parent as? android.view.ViewGroup)?.removeView(browser)
+            browser.destroy()
+        }
+    }
     override fun onDestroy() {
         if (VerificationBridge.activity === this) VerificationBridge.activity = null
-        if (::browser.isInitialized) { browser.stopLoading(); browser.destroy() }
+        shutdownBrowser()
+        if (!isChangingConfigurations) VerificationBridge.didClose(verificationUrl)
         super.onDestroy()
     }
 }

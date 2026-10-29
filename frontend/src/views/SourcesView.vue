@@ -157,7 +157,13 @@
                 {{ tx('Réessayer') }}
               </button>
             </p>
-            <template v-if="filters.tags.length">
+            <template v-if="nativeFilters.length">
+              <NativeSourceFilters v-model="nativeFilters" />
+              <button type="submit" class="btn btn-primary">
+                {{ tx('Appliquer les filtres') }}
+              </button>
+            </template>
+            <template v-else-if="filters.tags.length">
               <input
                 v-model="tagQuery"
                 type="search"
@@ -267,6 +273,8 @@ import { useVerificationStore, challengeFromError } from '@/stores/verification'
 import AnimeCard from '@/components/AnimeCard.vue'
 import VerificationPrompt from '@/components/VerificationPrompt.vue'
 import ProxyRotationButton from '@/components/ProxyRotationButton.vue'
+import NativeSourceFilters from '@/components/NativeSourceFilters.vue'
+import type { NativeFilter } from '@/types/extensions'
 import type { AnimeResult, CatalogueSource, CatalogueFilters, SourceChallenge } from '@/types'
 
 defineOptions({ name: 'SourcesView' })
@@ -289,6 +297,7 @@ const filters = ref<CatalogueFilters>({
 const filtersOpen = ref(false),
   tagQuery = ref(''),
   filtersLoading = ref(false)
+const nativeFilters = ref<NativeFilter[]>([])
 const listLoading = ref(false),
   loading = ref(false),
   listError = ref(''),
@@ -302,7 +311,13 @@ const pageChallenges = ref<SourceChallenge[]>([]),
 const challenges = computed(() => [...pageChallenges.value, ...filterChallenges.value])
 const appliedCriteria = ref('')
 const criteria = computed(() =>
-  JSON.stringify([mode.value, query.value.trim(), order.value, [...selectedTags.value].sort()]),
+  JSON.stringify([
+    mode.value,
+    query.value.trim(),
+    order.value,
+    [...selectedTags.value].sort(),
+    nativeFilters.value,
+  ]),
 )
 const hasUnappliedFilters = computed(() => criteria.value !== appliedCriteria.value)
 let generation = 0,
@@ -361,7 +376,9 @@ function openSource(id: string, view: string) {
 }
 function applyFilters() {
   const selectedMode =
-    query.value.trim() && !selectedTags.value.length && sourceId.value !== 'voir-anime'
+    (query.value.trim() || nativeFilters.value.length) &&
+    !selectedTags.value.length &&
+    sourceId.value !== 'voir-anime'
       ? 'search'
       : mode.value
   void router
@@ -373,6 +390,7 @@ function applyFilters() {
         q: query.value.trim() || undefined,
         order: order.value,
         tags: selectedTags.value.length ? selectedTags.value : undefined,
+        nativeFilters: nativeFilters.value.length ? JSON.stringify(nativeFilters.value) : undefined,
       },
     })
     .then(() => {
@@ -385,6 +403,7 @@ function changeMode(value: string) {
   query.value = ''
   selectedTags.value = []
   order.value = 'source'
+  nativeFilters.value = JSON.parse(JSON.stringify(filters.value.nativeFilters || []))
   applyFilters()
 }
 function toggleTag(id: string) {
@@ -414,6 +433,7 @@ function toggleTag(id: string) {
 function resetFilters() {
   selectedTags.value = []
   order.value = 'source'
+  nativeFilters.value = JSON.parse(JSON.stringify(filters.value.nativeFilters || []))
   applyFilters()
 }
 async function loadFilters() {
@@ -426,7 +446,11 @@ async function loadFilters() {
   filterChallenges.value = []
   try {
     const response = await api.getCatalogueFilters(source)
-    if (current === generation && sequence === filterSequence && !disposed) filters.value = response
+    if (current === generation && sequence === filterSequence && !disposed) {
+      filters.value = response
+      if (!nativeFilters.value.length)
+        nativeFilters.value = JSON.parse(JSON.stringify(response.nativeFilters || []))
+    }
   } catch (exc) {
     if (current !== generation || sequence !== filterSequence || disposed) return
     const challenge = challengeFromError(exc)
@@ -450,6 +474,7 @@ async function fetchPage(cursor?: string | null, append = false) {
     tags: [...selectedTags.value],
     order: order.value,
     cursor: cursor || undefined,
+    nativeFilters: nativeFilters.value.length ? nativeFilters.value : undefined,
   }
   verification.clearPending('source-page')
   loading.value = true
@@ -504,9 +529,22 @@ async function readRoute() {
   selectedTags.value = (
     Array.isArray(route.query.tags) ? route.query.tags : route.query.tags ? [route.query.tags] : []
   ).filter((t): t is string => typeof t === 'string')
+  nativeFilters.value = []
+  if (typeof route.query.nativeFilters === 'string' && route.query.nativeFilters.length <= 32768) {
+    try {
+      const saved = JSON.parse(route.query.nativeFilters)
+      if (Array.isArray(saved)) nativeFilters.value = saved
+    } catch {
+      /* Invalid URL state is replaced with the source defaults. */
+    }
+  }
   appliedCriteria.value = criteria.value
   filters.value = { tags: [], orders: [{ id: 'source', label: 'Ordre de la source' }] }
-  if (currentSource.value?.isEnabled) await Promise.all([loadFilters(), fetchPage()])
+  if (currentSource.value?.isEnabled) {
+    await loadFilters()
+    appliedCriteria.value = criteria.value
+    await fetchPage()
+  }
 }
 function refreshCatalogue() {
   applyFilters()

@@ -12,6 +12,11 @@ from animelab.models.anime import AnimeResult, AnimeDetail
 from animelab.services.aniyomi_dex_parser import SourceRecipe
 
 
+def source_identity(service, fallback):
+    value=getattr(service,'source_id',None)
+    return value if isinstance(value,str) and value else fallback
+
+
 @runtime_checkable
 class SourceProvider(Protocol):
     base_url: str
@@ -145,7 +150,10 @@ class SourceRegistry:
         native_names = {'french-manga': 'French-Manga', 'voir-anime': 'VoirAnime', 'animepahe': 'AnimePahe'}
         imported = source_id not in self.natives()
         recipe = getattr(service, 'recipe', None)
-        if imported and isinstance(recipe, SourceRecipe):
+        if imported and getattr(service, 'runtime', '') == 'android-apk':
+            capabilities = SourceCapabilities(search=True, detail=True, latest=service.supports_latest,
+                                              popular=True, catalogue=True, multi_tags=True)
+        elif imported and isinstance(recipe, SourceRecipe):
             api_catalogue = bool(recipe.runtime.get('catalogue'))
             popular = bool(
                 (recipe.popular_request_path and recipe.popular_selector)
@@ -171,7 +179,7 @@ class SourceRegistry:
 
     def all(self) -> list[RegisteredSource]:
         providers = dict(self.natives())
-        providers.update({source.pkg: source for source in self.extensions().get_enabled_container_sources()})
+        providers.update({source_identity(source,source.pkg): source for source in self.extensions().get_enabled_container_sources()})
         return [self.describe(sid, service) for sid, service in providers.items()]
 
     def get(self, source_id: str) -> RegisteredSource:
@@ -181,7 +189,7 @@ class SourceRegistry:
             service = self.extensions().get_container_source_by_id(source_id)
         if service is None:
             raise APIProblem('source_not_found', status=404, category='not_found')
-        return self.describe(source_id, service)
+        return self.describe(source_identity(service,source_id), service)
 
     def detect(self, url: str, fallback: str = 'french-manga') -> str:
         host = (urlparse(url).hostname or '').lower()

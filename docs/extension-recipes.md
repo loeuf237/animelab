@@ -24,3 +24,7 @@ French Anime (`…fr.frenchanime`, `french-anime.com`) is distinct from FRAnime 
 The French Anime recipe uses the upstream DataLifeEngine card selector and its `div.eps` episode encoding. Existing recipes demonstrably contaminated with `api:hanime` are repaired on load. The previous recipe is retained in revision history, and unrelated custom source recipes are preserved. Restart the server to load repaired recipes; refresh the page to clear previously displayed filters.
 
 The source-specific adapter implementation has been removed; JSON and AJAX support now uses the shared recipe interpreter.
+
+## Extension management study
+
+The [Aniyomi/Anikku study](studies/aniyomi-anikku/README.md) compares upstream repositories, APK trust and loading, updates, multiple sources, preferences and runtime contracts with AnimeLab. It includes reproducible local findings and an implementation plan. The proposed package managers and runtime backends are not yet implemented.

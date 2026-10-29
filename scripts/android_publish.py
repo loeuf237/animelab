@@ -41,7 +41,7 @@ def prepare(source, output, tools, tag, source_commit, candidate_run_id, signed_
         raise ValueError('A production signing identity is required')
     version = info['version']
     if (not re.fullmatch(r'\d+\.\d+\.\d+', version) or
-            (tag != 'v' + version and not re.fullmatch(re.escape('android-v' + version) + r'-beta\.[1-9]\d*', tag))):
+            (tag != 'v' + version and not re.fullmatch(r'(?:android-)?'+re.escape('v' + version) + r'-beta\.[1-9]\d*', tag))):
         raise ValueError('Release tag does not match APK version')
     app = source / 'AnimeLab-Android-under-test.apk'
     inspect_apk(app, require_optimized=True)
@@ -58,7 +58,7 @@ def prepare(source, output, tools, tag, source_commit, candidate_run_id, signed_
             or package.group(3) != version or "application-label:'AnimeLab'" not in badging):
         raise ValueError('APK package, version or label is unsuitable for this release')
     output.mkdir(parents=True, exist_ok=False)
-    filename = f'AnimeLab-v{version}-Android-arm64.apk'
+    filename = f'AnimeLab-{tag.removeprefix("android-")}-Android-arm64.apk'
     shutil.copyfile(app, output / filename)
     info.update(emulator_api_levels_tested=[29, 30, 35],
                 runtime_api_levels_tested=[30, 35], runtime_test_abi='arm64-v8a via Android native translation',

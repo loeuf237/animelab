@@ -9,12 +9,18 @@ import java.util.concurrent.TimeUnit
 
 object VerificationBridge {
     @Volatile var activity: VerificationActivity? = null
+    @Volatile private var openedUrl: String? = null
     @JvmStatic fun open(url: String, userAgent: String) {
+        openedUrl = url
         EngineHost.main.post {
-            EngineHost.context.startActivity(Intent(EngineHost.context, VerificationActivity::class.java)
-                .putExtra("url", url).putExtra("user_agent", userAgent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            try {
+                EngineHost.context.startActivity(Intent(EngineHost.context, VerificationActivity::class.java)
+                    .putExtra("url", url).putExtra("user_agent", userAgent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            } catch (_: Exception) { didClose(url) }
         }
     }
+    @JvmStatic fun isOpen(url: String): Boolean = openedUrl == url
+    fun didClose(url: String) { if (openedUrl == url) openedUrl = null }
     @JvmStatic fun cookies(url: String): String {
         val ready = CountDownLatch(1)
         var result = ""
@@ -49,6 +55,13 @@ object VerificationBridge {
         failure.get()?.let { throw it }
     }
     @JvmStatic fun close(url: String) {
-        EngineHost.main.post { activity?.let { if (it.verificationUrl == url) it.finish() } }
+        val ready = CountDownLatch(1)
+        EngineHost.main.post {
+            try {
+                activity?.let { if (it.verificationUrl == url) { it.shutdownBrowser(); it.finish() } }
+                didClose(url)
+            } finally { ready.countDown() }
+        }
+        check(ready.await(5, TimeUnit.SECONDS)) { "Verification browser did not stop" }
     }
 }

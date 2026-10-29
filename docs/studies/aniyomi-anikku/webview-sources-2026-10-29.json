@@ -1,0 +1,150 @@
+{
+  "date": "2026-10-29",
+  "method": "Primary source inspection at pinned commits; no claim of reciprocal device validation",
+  "files": [
+    {
+      "repo": "aniyomiorg/aniyomi",
+      "commit": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "path": "app/src/main/java/eu/kanade/presentation/webview/WebViewScreenContent.kt",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/presentation/webview/WebViewScreenContent.kt",
+      "gitBlob": "33a827db1f211dbb62dea170d1b3d9333045ffe6",
+      "lines": 231
+    },
+    {
+      "repo": "aniyomiorg/aniyomi",
+      "commit": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/ui/webview/WebViewActivity.kt",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/ui/webview/WebViewActivity.kt",
+      "gitBlob": "c07afb293d831e8cf70e9ea67768f74dea099fbd",
+      "lines": 152
+    },
+    {
+      "repo": "aniyomiorg/aniyomi",
+      "commit": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/ui/webview/WebViewScreenModel.kt",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/app/src/main/java/eu/kanade/tachiyomi/ui/webview/WebViewScreenModel.kt",
+      "gitBlob": "af5eadad6ec1e7af3debac8b65d40e1359522c90",
+      "lines": 66
+    },
+    {
+      "repo": "aniyomiorg/aniyomi",
+      "commit": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "path": "core/common/src/main/java/eu/kanade/tachiyomi/network/AndroidCookieJar.kt",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/core/common/src/main/java/eu/kanade/tachiyomi/network/AndroidCookieJar.kt",
+      "gitBlob": "f9322e840fedeb79f2152884b41c8817643e2f74",
+      "lines": 55
+    },
+    {
+      "repo": "aniyomiorg/aniyomi",
+      "commit": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "path": "core/common/src/main/java/eu/kanade/tachiyomi/network/NetworkHelper.kt",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/core/common/src/main/java/eu/kanade/tachiyomi/network/NetworkHelper.kt",
+      "gitBlob": "e8ce8aec9ae1c57674259e998511010059ac0acf",
+      "lines": 75
+    },
+    {
+      "repo": "aniyomiorg/aniyomi",
+      "commit": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "path": "core/common/src/main/java/eu/kanade/tachiyomi/network/interceptor/CloudflareInterceptor.kt",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/core/common/src/main/java/eu/kanade/tachiyomi/network/interceptor/CloudflareInterceptor.kt",
+      "gitBlob": "923042d646ca8da9247554b9fd24de941964bf2d",
+      "lines": 139
+    },
+    {
+      "repo": "aniyomiorg/aniyomi",
+      "commit": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "path": "core/common/src/main/java/eu/kanade/tachiyomi/network/interceptor/UserAgentInterceptor.kt",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/core/common/src/main/java/eu/kanade/tachiyomi/network/interceptor/UserAgentInterceptor.kt",
+      "gitBlob": "b085ece3c11732370b102e4c19a8eedbd66aa912",
+      "lines": 25
+    },
+    {
+      "repo": "aniyomiorg/aniyomi",
+      "commit": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "path": "core/common/src/main/java/eu/kanade/tachiyomi/network/interceptor/WebViewInterceptor.kt",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/core/common/src/main/java/eu/kanade/tachiyomi/network/interceptor/WebViewInterceptor.kt",
+      "gitBlob": "d72aa7337d83a59280d2445ebcba2ed9a6385930",
+      "lines": 114
+    },
+    {
+      "repo": "aniyomiorg/aniyomi",
+      "commit": "97414446b8a95994c72dd33c41c971a89d4d25b8",
+      "path": "core/common/src/main/java/eu/kanade/tachiyomi/util/system/WebViewUtil.kt",
+      "url": "https://github.com/aniyomiorg/aniyomi/blob/97414446b8a95994c72dd33c41c971a89d4d25b8/core/common/src/main/java/eu/kanade/tachiyomi/util/system/WebViewUtil.kt",
+      "gitBlob": "a66ca6994cf6e8f153ec43b611fa7de01ec6ec3c",
+      "lines": 117
+    },
+    {
+      "repo": "komikku-app/anikku",
+      "commit": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "path": "app/src/main/java/eu/kanade/presentation/webview/WebViewScreenContent.kt",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/app/src/main/java/eu/kanade/presentation/webview/WebViewScreenContent.kt",
+      "gitBlob": "745d5ab0ae6d8733c0a3be9eeb2e71d32a1df7ad",
+      "lines": 338
+    },
+    {
+      "repo": "komikku-app/anikku",
+      "commit": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/ui/webview/WebViewActivity.kt",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/app/src/main/java/eu/kanade/tachiyomi/ui/webview/WebViewActivity.kt",
+      "gitBlob": "b89431ce6a67f96bb394d6433e617065e9ba5cd0",
+      "lines": 152
+    },
+    {
+      "repo": "komikku-app/anikku",
+      "commit": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "path": "app/src/main/java/eu/kanade/tachiyomi/ui/webview/WebViewScreenModel.kt",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/app/src/main/java/eu/kanade/tachiyomi/ui/webview/WebViewScreenModel.kt",
+      "gitBlob": "833806db8f8c8678fc9c5095a91d3b96511ed6ef",
+      "lines": 56
+    },
+    {
+      "repo": "komikku-app/anikku",
+      "commit": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "path": "core/common/src/main/kotlin/eu/kanade/tachiyomi/network/AndroidCookieJar.kt",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/core/common/src/main/kotlin/eu/kanade/tachiyomi/network/AndroidCookieJar.kt",
+      "gitBlob": "f9322e840fedeb79f2152884b41c8817643e2f74",
+      "lines": 55
+    },
+    {
+      "repo": "komikku-app/anikku",
+      "commit": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "path": "core/common/src/main/kotlin/eu/kanade/tachiyomi/network/NetworkHelper.kt",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/core/common/src/main/kotlin/eu/kanade/tachiyomi/network/NetworkHelper.kt",
+      "gitBlob": "849a28f289cce0b0873cc7540025880542c913f4",
+      "lines": 213
+    },
+    {
+      "repo": "komikku-app/anikku",
+      "commit": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "path": "core/common/src/main/kotlin/eu/kanade/tachiyomi/network/interceptor/CloudflareInterceptor.kt",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/core/common/src/main/kotlin/eu/kanade/tachiyomi/network/interceptor/CloudflareInterceptor.kt",
+      "gitBlob": "9e1d40648a3e55b6ae1b33c68352dffaf0e20f16",
+      "lines": 157
+    },
+    {
+      "repo": "komikku-app/anikku",
+      "commit": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "path": "core/common/src/main/kotlin/eu/kanade/tachiyomi/network/interceptor/UserAgentInterceptor.kt",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/core/common/src/main/kotlin/eu/kanade/tachiyomi/network/interceptor/UserAgentInterceptor.kt",
+      "gitBlob": "b085ece3c11732370b102e4c19a8eedbd66aa912",
+      "lines": 25
+    },
+    {
+      "repo": "komikku-app/anikku",
+      "commit": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "path": "core/common/src/main/kotlin/eu/kanade/tachiyomi/network/interceptor/WebViewInterceptor.kt",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/core/common/src/main/kotlin/eu/kanade/tachiyomi/network/interceptor/WebViewInterceptor.kt",
+      "gitBlob": "98552ca3b60187e8f6c320ebd15e10f939a13ec7",
+      "lines": 106
+    },
+    {
+      "repo": "komikku-app/anikku",
+      "commit": "6e35b41f0cc7e375d15527bd61375435f998685a",
+      "path": "core/common/src/main/kotlin/eu/kanade/tachiyomi/util/system/WebViewUtil.kt",
+      "url": "https://github.com/komikku-app/anikku/blob/6e35b41f0cc7e375d15527bd61375435f998685a/core/common/src/main/kotlin/eu/kanade/tachiyomi/util/system/WebViewUtil.kt",
+      "gitBlob": "01b17a60c9c8d09c84b2a6f61bf1de07f44cf896",
+      "lines": 127
+    }
+  ]
+}

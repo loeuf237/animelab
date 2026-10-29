@@ -111,13 +111,16 @@ async def test_dooplay_loads_player_and_relative_iframe(isolated, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_repository_refresh_invalidates_changed_recipes_and_removes_stale(isolated, tmp_path, monkeypatch):
+async def test_repository_refresh_preserves_installed_recipe_and_retires_stale(isolated, tmp_path, monkeypatch):
     service = ExtensionService(str(tmp_path / 'extensions.db'))
     rows = [{'pkg':'ext.alpha','name':'Alpha','version':'1','sources':[{'baseUrl':'https://alpha.example'}]}, {'pkg':'ext.beta','name':'Beta'}]
     response = MagicMock()
     response.status_code = 200
-    response.json.side_effect = lambda: rows
-    monkeypatch.setattr('animelab.services.source_http.AsyncSourceClient.get', AsyncMock(return_value=response))
+    async def fetch(url):
+        if not url.endswith('index.min.json'):
+            raise ValueError('No optional repository metadata')
+        return json.dumps(rows).encode()
+    monkeypatch.setattr(service, '_fetch_catalog_bytes', fetch)
     await service.import_repository('https://repo.example/index.min.json')
     first = service.get_visible_extensions()[0]
     await service.configure_extension(first['id'], {'base_url':'https://alpha.example','search_selector':'article'})
@@ -125,7 +128,8 @@ async def test_repository_refresh_invalidates_changed_recipes_and_removes_stale(
     rows[:] = [{**rows[0], 'version':'2'}]
     await service.import_repository('https://repo.example/index.min.json')
     visible = service.get_visible_extensions()
-    assert len(visible) == 1
+    assert len(visible) == 2
+    assert next(row for row in visible if row['pkg']=='ext.beta')['catalog_state'] == 'retired'
     # A13 stores the regenerated effective recipe as a new revision after invalidation.
     assert json.loads(visible[0]['recipe_json'])['schema_version'] == 1
     assert service.recipe_history(visible[0]['id'])['revisions']
