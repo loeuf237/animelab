@@ -79,7 +79,7 @@ def test_compact_release_notes_keep_the_correct_tag_without_requiring_seven_sect
     monkeypatch.setenv('RELEASE_TAG','v0.1.6-beta.3')
     notes=tmp_path/'docs/releases/v0.1.6-beta.3.md'
     notes.parent.mkdir(parents=True)
-    notes.write_text('# AnimeLab v0.1.6-beta.3\n\n## '+headings[0]+'\n\n- Fix.\n\n## '+headings[1]+'\n\n[Windows](https://example.test/app.zip)\n')
+    notes.write_text('# AnimeLab v0.1.6-beta.3\n\n## '+headings[0]+'\n\n- Fix.\n\n## '+headings[1]+'\n\n[Windows](https://example.test/app.zip)\n', encoding='utf-8')
     result=desktop_release.release_metadata()
     assert result['title']=='AnimeLab v0.1.6-beta.3'
     assert '[Windows]' in result['body']
