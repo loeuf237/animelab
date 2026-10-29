@@ -19,10 +19,15 @@ sys.path.insert(0, str(ROOT))
 from animelab import __version__
 
 
-def release_metadata():
+def release_tag():
     tag = os.environ.get('RELEASE_TAG', 'v' + __version__)
-    if tag != 'v' + __version__:
+    if not re.fullmatch(re.escape('v'+__version__)+r'(?:-beta\.[1-9]\d*)?',tag):
         raise ValueError('Tag does not match the application version')
+    return tag
+
+
+def release_metadata():
+    tag = release_tag()
     notes = (ROOT / 'docs/releases' / (tag + '.md')).read_text(encoding='utf-8')
     header, _, body = notes.partition('\n')
     if not header.startswith('# ') or tag not in header.split():
@@ -46,8 +51,7 @@ def release_info():
 
 
 def prepare():
-    tag = os.environ.get('RELEASE_TAG', 'v' + __version__)
-    if tag != 'v' + __version__: raise ValueError('Tag does not match the application version')
+    tag = release_tag()
     release_metadata()  # Reject incomplete release notes before building platform binaries.
     target = ROOT / 'build' / 'release-metadata'
     target.mkdir(parents=True, exist_ok=True)
@@ -60,7 +64,8 @@ def prepare():
         tools[name] = result.stdout.splitlines()[0]
         license_text = subprocess.run([path, '-L'], capture_output=True, text=True, check=True)
         (target / (name + '-license.txt')).write_text(license_text.stdout + license_text.stderr)
-    manifest = {'version':__version__, 'commit':subprocess.check_output(['git','rev-parse','HEAD'], text=True).strip(),
+    manifest = {'version':__version__, 'release_tag':tag, 'channel':'beta' if '-beta.' in tag else 'stable',
+                'commit':subprocess.check_output(['git','rev-parse','HEAD'], text=True).strip(),
                 'platform':platform.system(), 'architecture':platform.machine(), 'python':platform.python_version(),
                 'macos_hardware_tested':False, 'media_tools':tools, 'packages':packages}
     (target / 'build-info.json').write_text(json.dumps(manifest, indent=2))
@@ -201,7 +206,7 @@ def archive():
     if not re.fullmatch(r'[A-Za-z0-9-]+',label): raise ValueError('Invalid platform label')
     output = ROOT / 'release-assets'
     output.mkdir(exist_ok=True)
-    filename = f'AnimeLab-v{__version__}-{label}'
+    filename = f'AnimeLab-{release_tag()}-{label}'
     if sys.platform == 'darwin':
         destination = output / (filename + '-UNTESTED.zip')
         wrapper = ROOT / 'build/macos-package/AnimeLab'
@@ -225,14 +230,15 @@ def archive():
 
 
 def checksums():
+    tag=release_tag()
     root = Path(sys.argv[2])
     archives = sorted(p for p in root.iterdir() if p.name.endswith(('.zip','.tar.gz')))
     expected = {'Windows-x64','Linux-x64','macOS-arm64-UNTESTED','macOS-x64-UNTESTED'}
-    if {p.name.removeprefix(f'AnimeLab-v{__version__}-').removesuffix('.tar.gz').removesuffix('.zip') for p in archives} != expected:
+    if {p.name.removeprefix(f'AnimeLab-{tag}-').removesuffix('.tar.gz').removesuffix('.zip') for p in archives} != expected:
         raise RuntimeError('Release is incomplete or contains unexpected platform archives')
     if '--include-android' in sys.argv[3:]:
-        apk = f'AnimeLab-v{__version__}-Android-arm64.apk'
-        manifests = {f'AnimeLab-v{__version__}-{label}-build-info.json' for label in
+        apk = f'AnimeLab-{tag}-Android-arm64.apk'
+        manifests = {f'AnimeLab-{tag}-{label}-build-info.json' for label in
                      ('Windows-x64', 'Linux-x64', 'macOS-arm64', 'macOS-x64')}
         expected_files = {p.name for p in archives} | manifests | {apk, 'Android-build-info.json'}
         actual_files = {p.name for p in root.iterdir() if p.name != 'SHA256SUMS.txt'}
@@ -248,11 +254,13 @@ def checksums():
         except ModuleNotFoundError:
             from android_publish import SIGNING_CERTIFICATE
         android = json.loads((root / 'Android-build-info.json').read_text(encoding='utf-8'))
-        if (android.get('release_tag') != 'v' + __version__ or
+        if (android.get('release_tag') != tag or
                 android.get('validation_key_only') is not False or
                 android.get('signing_certificate_sha256') != SIGNING_CERTIFICATE or
                 android.get('emulator_api_levels_tested') != [29, 30, 35]):
             raise RuntimeError('Android production signing and device validation are required')
+        if '-beta.' in tag and android.get('experimental_apk_runtime_enabled') is not True:
+            raise RuntimeError('This beta requires the explicitly enabled experimental APK runtime')
     with (root / 'SHA256SUMS.txt').open('w') as handle:
         for path in sorted(p for p in root.iterdir() if p.name != 'SHA256SUMS.txt'):
             with path.open('rb') as source:

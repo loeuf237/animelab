@@ -23,7 +23,7 @@ SourceHTTP pendant la fenêtre et limites du partage de cookies entre processus.
 | E14 | Archive d'identités/stubs ; artefacts optionnels vérifiés SHA-256 ; restauration sans confiance implicite. | Tests hors ligne, secrets/confiance exclus, chemins/empreintes ; recettes et préférences non secrètes complètes restant à intégrer. |
 | E15 | Vrai host Android, API hôte à la référence amont, chargeur des classes des APK installés, signatures système, installateur et pont Python. | Banc optimisé validé sur Android 10/11/15 ; chargement de trois APK réels sur ARM64 acquis. Réception APK01–APK14 et parcours complet encore à terminer. |
 | E16 | Moteur de recettes conservé sur bureau. | Prototype JVM non réalisé ; aucune promesse d'exécution APK sur Linux/Windows. |
-| E17–E18 | Corpus synthétique, workflow dédié et artefacts ; moteur désactivé dans les builds release. | Adoption Android non prononcée tant que les critères obligatoires ne sont pas démontrés. |
+| E17–E18 | Corpus synthétique, workflow dédié et artefacts ; moteur désactivé par défaut dans les builds release. | À la demande explicite de l'utilisateur, `v0.1.6-beta.1` active le moteur expérimental ; l'adoption en production reste non prononcée tant que les critères obligatoires ne sont pas démontrés. |
 
 ## Résultats acquis
 

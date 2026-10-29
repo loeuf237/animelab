@@ -31,7 +31,7 @@ on:
         default: false
       tag_name:
         description: Android release tag
-        default: android-v0.1.2-beta.1
+        default: android-v0.1.6-beta.1
         required: true
       source_ref:
         description: Optional branch or SHA for a non-publishing test build
@@ -146,10 +146,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y llvm
           chmod +x gradlew
-          if [ -n "$ANIMAN_ANDROID_KEYSTORE" ]; then
-            ./gradlew assembleRelease assembleReleaseAndroidTest --stacktrace
+          runtime_flags=()
+          if [[ "$RELEASE_TAG" == *-beta.* ]]; then
+            runtime_flags+=(-Panimelab.experimentalApkRuntime=true)
+            echo 'ANIMELAB_EXPERIMENTAL_APK_RUNTIME=true' >> "$GITHUB_ENV"
           else
-            ./gradlew assembleValidation assembleValidationAndroidTest --stacktrace
+            echo 'ANIMELAB_EXPERIMENTAL_APK_RUNTIME=false' >> "$GITHUB_ENV"
+          fi
+          if [ -n "$ANIMAN_ANDROID_KEYSTORE" ]; then
+            ./gradlew assembleRelease assembleReleaseAndroidTest "${runtime_flags[@]}" --stacktrace
+          else
+            ./gradlew assembleValidation assembleValidationAndroidTest "${runtime_flags[@]}" --stacktrace
           fi
           ./gradlew :media-probe:assembleDebug :media-probe:assembleDebugAndroidTest --stacktrace
       - name: Inspect packaged engine and 16 KB native alignment

@@ -102,6 +102,7 @@ def manifest(apk, output, validation=False, optimized=False):
     version = re.search(r'versionName\s*=\s*"([^"]+)"', configuration).group(1)
     version_code = int(re.search(r'versionCode\s*=\s*(\d+)', configuration).group(1))
     report.update({"version": version, "version_code": version_code, "min_android_api": 29,
+                   "experimental_apk_runtime_enabled": os.getenv('ANIMELAB_EXPERIMENTAL_APK_RUNTIME')=='true',
                    "commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
                    "physical_device_tested": False, "validation_key_only": validation,
                    "ffmpeg": "dev.ffmpegkit-maintained:ffmpeg-kit-full-gpl:6.0.4",

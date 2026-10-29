@@ -11,6 +11,8 @@ val optimizeApk = providers.gradleProperty("animelab.optimizeApk").orNull != "fa
 val packagingPython = System.getenv("ANIMAN_BUILD_PYTHON") ?: "python3"
 val optimizer = rootProject.file("../scripts/android_optimize.py")
 val isolatedValidation = providers.gradleProperty("animelab.isolatedValidation").orNull == "true"
+// Explicitly enabled for published betas; stable release builds keep the gate closed.
+val experimentalApkRuntime = providers.gradleProperty("animelab.experimentalApkRuntime").orNull == "true"
 val nativeTestFixture = tasks.register<Copy>("stageNativeTestFixture") {
     dependsOn(":extension-fixture:assembleApi17Debug")
     from(rootProject.file("extension-fixture/build/outputs/apk/api17/debug")) { include("*.apk") }
@@ -28,8 +30,8 @@ android {
         applicationId = "com.animan.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 218
-        versionName = "0.1.5"
+        versionCode = 219
+        versionName = "0.1.6"
         manifestPlaceholders["appLabel"] = "@string/app_name"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -52,7 +54,7 @@ android {
     }
     buildTypes {
         release {
-            buildConfigField("boolean", "EXTENSION_RUNTIME_ENABLED", "false")
+            buildConfigField("boolean", "EXTENSION_RUNTIME_ENABLED", experimentalApkRuntime.toString())
             isMinifyEnabled = optimizeApk
             isShrinkResources = optimizeApk
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

@@ -66,6 +66,25 @@ def test_desktop_publisher_generates_notes_before_uploading_assets():
     assert 'release-info' in steps[notes]['run']
     assert steps[upload]['with']['name'] == '${{ steps.release.outputs.title }}'
     assert steps[upload]['with']['body_path'] == 'build/release-notes.md'
+    assert steps[upload]['with']['prerelease'] is True
+    assert steps[upload]['with']['make_latest'] is False
+    gate=next(i for i,step in enumerate(steps) if 'head_sha=' in step.get('run',''))
+    assert gate<upload and publish['permissions']['actions']=='read'
+
+
+@pytest.mark.parametrize('tag',['v0.1.6-beta.1','v0.1.6-beta.12'])
+def test_beta_tag_is_valid_without_changing_the_numeric_application_version(monkeypatch,tag):
+    monkeypatch.setattr(desktop_release,'__version__','0.1.6')
+    monkeypatch.setenv('RELEASE_TAG',tag)
+    assert desktop_release.release_tag()==tag
+
+
+@pytest.mark.parametrize('tag',['v0.1.6-beta.0','v0.1.6-beta.01','v0.1.7-beta.1','v0.1.6-beta.1/other'])
+def test_invalid_or_mismatched_beta_tags_are_rejected(monkeypatch,tag):
+    monkeypatch.setattr(desktop_release,'__version__','0.1.6')
+    monkeypatch.setenv('RELEASE_TAG',tag)
+    with pytest.raises(ValueError,match='Tag'):
+        desktop_release.release_tag()
 
 
 def test_windowed_entry_point_can_configure_server_without_console(tmp_path):
@@ -105,26 +124,35 @@ def test_archives_ship_quoted_administration_shortcuts(tmp_path, windows, mac, b
             assert shortcut.stat().st_mode & 0o111
 
 
-def test_unified_release_requires_signed_android_and_matching_manifests(tmp_path, monkeypatch):
+@pytest.mark.parametrize('tag',['v0.1.4','v0.1.4-beta.1'])
+def test_unified_release_requires_signed_android_and_matching_manifests(tmp_path, monkeypatch,tag):
     from scripts.android_publish import SIGNING_CERTIFICATE
     monkeypatch.setattr(desktop_release, '__version__', '0.1.4')
+    monkeypatch.setenv('RELEASE_TAG',tag)
     monkeypatch.setattr(desktop_release.subprocess, 'check_output', lambda *a, **kw: 'a' * 40)
     monkeypatch.setattr(sys, 'argv', ['release', 'checksums', str(tmp_path), '--include-android'])
     for platform, extension in [('Windows-x64', '.zip'), ('Linux-x64', '.tar.gz'),
                                 ('macOS-arm64-UNTESTED', '.zip'), ('macOS-x64-UNTESTED', '.zip')]:
-        (tmp_path / ('AnimeLab-v0.1.4-' + platform + extension)).write_bytes(b'archive')
-        manifest = 'AnimeLab-v0.1.4-' + platform.removesuffix('-UNTESTED') + '-build-info.json'
+        (tmp_path / ('AnimeLab-'+tag+'-' + platform + extension)).write_bytes(b'archive')
+        manifest = 'AnimeLab-'+tag+'-' + platform.removesuffix('-UNTESTED') + '-build-info.json'
         (tmp_path / manifest).write_text(json.dumps(dict(version='0.1.4', commit='a' * 40)))
     with pytest.raises(RuntimeError, match='incomplete'):
         desktop_release.checksums()
-    apk = tmp_path / 'AnimeLab-v0.1.4-Android-arm64.apk'
+    apk = tmp_path / ('AnimeLab-'+tag+'-Android-arm64.apk')
     apk.write_bytes(b'signed apk')
-    info = dict(version='0.1.4', commit='a' * 40, release_tag='v0.1.4', validation_key_only=False,
+    info = dict(version='0.1.4', commit='a' * 40, release_tag=tag, validation_key_only=False,
+                experimental_apk_runtime_enabled=True,
                 signing_certificate_sha256=SIGNING_CERTIFICATE, emulator_api_levels_tested=[29, 30, 35])
     manifest = tmp_path / 'Android-build-info.json'
     manifest.write_text(json.dumps(info))
     desktop_release.checksums()
     assert len((tmp_path / 'SHA256SUMS.txt').read_text().splitlines()) == 10
+    if '-beta.' in tag:
+        info['experimental_apk_runtime_enabled']=False
+        manifest.write_text(json.dumps(info))
+        with pytest.raises(RuntimeError,match='experimental APK runtime'):
+            desktop_release.checksums()
+        info['experimental_apk_runtime_enabled']=True
     info['commit'] = 'b' * 40
     manifest.write_text(json.dumps(info))
     with pytest.raises(RuntimeError, match='source version and commit'):
