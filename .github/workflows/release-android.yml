@@ -154,9 +154,9 @@ jobs:
             echo 'ANIMELAB_EXPERIMENTAL_APK_RUNTIME=false' >> "$GITHUB_ENV"
           fi
           if [ -n "$ANIMAN_ANDROID_KEYSTORE" ]; then
-            ./gradlew assembleRelease assembleReleaseAndroidTest "${runtime_flags[@]}" --stacktrace
+            ./gradlew :app:assembleRelease :app:assembleReleaseAndroidTest "${runtime_flags[@]}" --stacktrace
           else
-            ./gradlew assembleValidation assembleValidationAndroidTest "${runtime_flags[@]}" --stacktrace
+            ./gradlew :app:assembleValidation :app:assembleValidationAndroidTest "${runtime_flags[@]}" --stacktrace
           fi
           ./gradlew :media-probe:assembleDebug :media-probe:assembleDebugAndroidTest --stacktrace
       - name: Inspect packaged engine and 16 KB native alignment

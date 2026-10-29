@@ -4,8 +4,8 @@ plugins {
 }
 val fixtures = tasks.register<Copy>("stageExtensionFixtures") {
     dependsOn((12..17).map { ":extension-fixture:assembleApi${it}Debug" })
-    from(rootProject.file("extension-fixture/build/outputs/apk")) {
-        include("**/*.apk")
+    from((12..17).map { rootProject.file("extension-fixture/build/outputs/apk/api$it/debug") }) {
+        include("*.apk")
         eachFile { path = name }
         includeEmptyDirs = false
     }

@@ -177,3 +177,6 @@ def test_unified_workflow_keeps_android_tests_before_publication():
     assert publisher['android']['uses'] == './.github/workflows/release-android.yml'
     assert publisher['android']['with']['publish'] is False
     assert any('--include-android' in step.get('run', '') for step in publisher['publish']['steps'])
+    build=next(step['run'] for step in jobs['build']['steps'] if step.get('name')=='Build installed test target and APK')
+    assert ':app:assembleRelease :app:assembleReleaseAndroidTest' in build
+    assert ':app:assembleValidation :app:assembleValidationAndroidTest' in build
