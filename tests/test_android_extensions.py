@@ -36,6 +36,11 @@ def test_native_discovery_retains_ids_and_source_instance_metadata(host):
     assert len(sources)==2
     assert {s.source_id for s in sources}=={'aniyomi:1152921504606846977','aniyomi:1152921504606846978'}
     assert service.get_container_source_by_id('fixture.one') is None
+    from animelab.services.source_registry import SourceRegistry
+    assert {entry.id for entry in SourceRegistry(natives={},extensions=service).all()}=={source.source_id for source in sources}
+    from animelab.services.source_settings_service import SourceSettingsService
+    settings=SourceSettingsService(service.db_path).get_all_sources_with_settings()
+    assert {s['id'] for s in settings if s['type']=='imported'}=={source.source_id for source in sources}
     source=sources[0]
     source._episodes['https://fixture.example/episode']={'memo':{'cursor':'native'}}
     service.sync_android_extensions()

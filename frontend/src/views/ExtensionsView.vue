@@ -917,7 +917,12 @@ async function handleToggleExtension(ext: ExtensionSource, enabled: boolean) {
     const result = await api.toggleExtension(ext.id, enabled)
     animeStore.homeFeed = null
     await fetchExtensions()
-    showToast(result.pending ? 'Confirmez l’installation dans Android, puis approuvez le paquet installé.' : `${ext.name} ${enabled ? 'activée' : 'désactivée'}.`, 'success')
+    showToast(
+      result.pending
+        ? 'Confirmez l’installation dans Android, puis approuvez le paquet installé.'
+        : `${ext.name} ${enabled ? 'activée' : 'désactivée'}.`,
+      'success',
+    )
   } catch (e: any) {
     showToast(e.message || "Erreur lors de l'activation/désactivation de l'extension.", 'error')
     await fetchExtensions()

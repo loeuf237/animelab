@@ -137,6 +137,16 @@ class SourceSettingsService:
         # 2. Extensions Aniyomi importées
         try:
             with self._get_conn() as conn:
+                from animelab.services import android_extensions
+                if android_extensions.available():
+                    for saved in conn.execute('SELECT s.*,e.is_enabled FROM extension_sources s JOIN imported_extensions e ON e.id=s.ext_id ORDER BY s.name'):
+                        sid=saved['source_key']
+                        sources_list.append({'id':sid,'pkg':saved['pkg'],'name':saved['name'],'type':'imported','lang':saved['lang'],
+                                             'icon':'','baseUrl':saved['base_url'],'badge':'APK Android',
+                                             'isEnabled':bool(saved['is_enabled'] and saved['enabled'] and json.loads(saved['metadata_json']).get('installed')),
+                                             'has_custom_settings':False,'settings':all_settings.get(sid,{}),
+                                             'preferencesLocation':'extensions'})
+                    return sources_list
                 cursor = conn.cursor()
                 cursor.execute("""
                     SELECT id, pkg, name, lang, version, apk_url, base_url, icon_url, is_enabled

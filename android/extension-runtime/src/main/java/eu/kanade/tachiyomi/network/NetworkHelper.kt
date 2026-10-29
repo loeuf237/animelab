@@ -10,6 +10,8 @@ import okhttp3.Protocol
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.Buffer
+import okio.ForwardingSink
+import okio.buffer
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
@@ -26,10 +28,18 @@ class NetworkHelper(context: Context) {
         .readTimeout(30, TimeUnit.SECONDS)
         .callTimeout(45, TimeUnit.SECONDS)
         .addInterceptor { chain ->
-            val original = chain.request()
+            val incoming = chain.request()
+            val cookies = cookieJar.loadForRequest(incoming.url)
+            val original = if(incoming.header("Cookie")==null && cookies.isNotEmpty()) incoming.newBuilder()
+                .header("Cookie",cookies.joinToString("; ") { "${it.name}=${it.value}" }).build() else incoming
             val body = Buffer()
-            original.body?.writeTo(body)
-            if (body.size > 2_000_000) throw IOException("Request body exceeds budget")
+            val sink=object : ForwardingSink(body) {
+                override fun write(source: Buffer,byteCount: Long) {
+                    if(body.size+byteCount>2_000_000) throw IOException("Request body exceeds budget")
+                    super.write(source,byteCount)
+                }
+            }.buffer()
+            original.body?.writeTo(sink); sink.flush()
             val payload = JSONObject().put("url", original.url.toString()).put("method", original.method)
                 .put("headers", JSONArray(original.headers.map { JSONArray(listOf(it.first, it.second)) }))
                 .put("body", Base64.encodeToString(body.readByteArray(), Base64.NO_WRAP))
@@ -56,6 +66,8 @@ class NetworkHelper(context: Context) {
                     headers.add(pair.getString(0), pair.getString(1))
             }
             val content = Base64.decode(response.getString("body"), Base64.DEFAULT)
+            val effectiveUrl=original.url.resolve(response.optString("url")) ?: original.url
+            cookieJar.saveFromResponse(effectiveUrl,okhttp3.Cookie.parseAll(effectiveUrl,headers.build()))
             Response.Builder().request(original.newBuilder().url(response.optString("url", original.url.toString())).build())
                 .protocol(Protocol.HTTP_1_1).code(response.getInt("status")).message("Source response")
                 .headers(headers.build()).body(content.toResponseBody(response.optString("contentType").toMediaTypeOrNull())).build()

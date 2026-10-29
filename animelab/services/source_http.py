@@ -566,7 +566,7 @@ class AsyncSourceClient(SourceClient):
                 raise ValueError('Invalid response byte budget')
             chunks, total = [], 0
             headers = kwargs.pop('headers', {})
-            async with self.stream(method, url, headers=headers, **kwargs) as response:
+            async with self.stream(method, url, headers=headers, _allow_html=True, **kwargs) as response:
                 async for chunk in response.aiter_bytes():
                     total += len(chunk)
                     if total > maximum:
@@ -574,10 +574,12 @@ class AsyncSourceClient(SourceClient):
                     chunks.append(chunk)
                 # curl has already decoded HTTP content encodings. Do not ask
                 # HTTPX to decompress the resulting bytes a second time.
-                safe_headers = {key: value for key, value in response.headers.items()
-                                if key.lower() not in ('content-encoding', 'content-length')}
-                return httpx.Response(response.status_code, headers=safe_headers,
-                                      content=b''.join(chunks), request=response.request)
+                pairs = response.headers.multi_items() if hasattr(response.headers,'multi_items') else response.headers.items()
+                safe_headers = [(key,value) for key,value in pairs if key.lower() not in ('content-encoding','content-length')]
+                buffered = httpx.Response(response.status_code,headers=safe_headers,
+                                          content=b''.join(chunks),request=response.request)
+                self.service.classify(self.service.state(str(buffered.url)),buffered,str(buffered.url))
+                return buffered
         call = partial(super().request, method, url, **kwargs)
         return await asyncio.get_running_loop().run_in_executor(self.service.executor, call)
 
@@ -633,6 +635,7 @@ class SourceStream:
         service = self.client.service
         url = self.url
         kwargs = dict(self.kwargs)
+        allow_html = kwargs.pop('_allow_html',False)
         verifying = kwargs.pop("verify_challenge", False)
         for _ in range(7):
             if self.client.url_validator:
@@ -661,7 +664,7 @@ class SourceStream:
                     url = target
                     continue
                 # HTML is never a media stream; inspect its small body for challenge markers.
-                if "text/html" in response.headers.get("content-type", "").lower():
+                if not allow_html and "text/html" in response.headers.get("content-type", "").lower():
                     body = bytearray()
                     for chunk in self.raw.iter_content():
                         body.extend(chunk)
@@ -675,7 +678,7 @@ class SourceStream:
                     with state.condition:
                         state.cooldown = max(state.cooldown, time.monotonic() + delay)
                     raise RateLimited(response, delay)
-                if response.status_code in (403, 451):
+                if not allow_html and response.status_code in (403, 451):
                     response.raise_for_status()
                 self.response = SourceStreamResponse(self, response)
                 return self.response

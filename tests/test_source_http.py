@@ -127,6 +127,31 @@ def test_plain_403_is_not_a_challenge(transport):
     assert not service.diagnostics()[0]['verificationRequired']
 
 
+@pytest.mark.asyncio
+async def test_bounded_source_html_is_allowed_and_retains_distinct_set_cookies(transport):
+    def raw(session,method,url,options):
+        result=response(url,200,'<h1>Actual catalogue</h1>',[('content-type','text/html'),('set-cookie','one=1; Path=/'),('set-cookie','two=2; Path=/')])
+        result.iter_content=lambda:iter([result.content])
+        return result
+    service=transport(raw)
+    async with service.async_client() as client:
+        result=await client.get('https://source.example/catalogue',max_response_bytes=1000)
+    assert result.text=='<h1>Actual catalogue</h1>'
+    assert len(result.headers.get_list('set-cookie'))==2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('code',[200,403,503])
+async def test_bounded_source_html_still_detects_challenge_before_returning_it(transport,code):
+    def raw(session,method,url,options):
+        result=response(url,code,'<html>Just a moment /cdn-cgi/challenge-platform/ cf-chl-token</html>',{'content-type':'text/html'})
+        result.iter_content=lambda:iter([result.content])
+        return result
+    service=transport(raw)
+    with pytest.raises(VerificationRequired):
+        await service.async_client().get('https://source.example/check',max_response_bytes=1000)
+
+
 def test_rate_limit_respects_retry_after_without_long_blocking_wait(transport):
     calls = []
     service = transport(lambda s,m,u,k: calls.append(u) or response(u,429,headers={'retry-after':'120'}))

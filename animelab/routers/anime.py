@@ -187,7 +187,7 @@ async def api_home_feed():
     for idx, ext in enumerate(enabled_extensions):
         res = all_res[3 + idx]
         if not isinstance(res, Exception) and res:
-            ext_releases[ext.pkg] = {
+            ext_releases[getattr(ext,'source_id',ext.pkg)] = {
                 "name": ext.name,
                 "releases": [r.model_dump() for r in res[:24]],
             }
@@ -223,12 +223,12 @@ async def api_home_feed():
         "recentHistory": history_items,
         "enabledExtensions": [
             {
-                "id": ext.pkg,
+                "id": getattr(ext,'source_id',ext.pkg),
                 "pkg": ext.pkg,
                 "name": ext.name,
                 "lang": getattr(ext, "lang", "fr"),
                 "baseUrl": getattr(ext, "base_url", ""),
-                "supportsLatest": source_registry.describe(ext.pkg, ext).capabilities.latest,
+                "supportsLatest": source_registry.describe(getattr(ext,'source_id',ext.pkg), ext).capabilities.latest,
             }
             for ext in enabled_extensions
         ],

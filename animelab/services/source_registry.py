@@ -174,7 +174,7 @@ class SourceRegistry:
 
     def all(self) -> list[RegisteredSource]:
         providers = dict(self.natives())
-        providers.update({source.pkg: source for source in self.extensions().get_enabled_container_sources()})
+        providers.update({getattr(source,'source_id',source.pkg): source for source in self.extensions().get_enabled_container_sources()})
         return [self.describe(sid, service) for sid, service in providers.items()]
 
     def get(self, source_id: str) -> RegisteredSource:

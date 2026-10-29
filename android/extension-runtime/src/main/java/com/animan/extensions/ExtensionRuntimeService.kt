@@ -26,6 +26,7 @@ import uy.kohesive.injekt.api.*
 
 /** Separate crash/lifecycle process. Same UID: this is NOT a security sandbox. */
 class ExtensionRuntimeService : Service() {
+    companion object { private var profileInitialized=false }
     private data class Loaded(val identity: String, val pkg: String, val sources: List<AnimeSource>)
     private val loaded = ConcurrentHashMap<String, Loaded>()
     private val jobs = ConcurrentHashMap<String, Job>()
@@ -35,6 +36,14 @@ class ExtensionRuntimeService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        // The UI and this process must never contend for WebView's default
+        // profile lock. Native cookie APIs use this worker-owned profile.
+        synchronized(ExtensionRuntimeService::class.java) {
+            if(!profileInitialized) {
+                android.webkit.WebView.setDataDirectorySuffix("extension-runtime")
+                profileInitialized=true
+            }
+        }
         val app = application
         Injekt.importModule(object : InjektModule {
             override fun InjektRegistrar.registerInjectables() {
