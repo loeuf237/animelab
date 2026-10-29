@@ -70,7 +70,7 @@ internal object ExtensionPackages {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE).intentSender
     }
 
-    fun install(context: Context, path: String, expectedPackage: String): JSONObject {
+    @Synchronized fun install(context: Context, path: String, expectedPackage: String): JSONObject {
         val value = file(context, path)
         val inspected = inspect(context, path)
         require(expectedPackage.isEmpty() || inspected.getString("pkg") == expectedPackage) { "APK package differs from repository" }
@@ -94,7 +94,10 @@ internal object ExtensionPackages {
         return publicOperation(operation)
     }
 
-    private fun commit(context: Context, operation: JSONObject) {
+    @Synchronized private fun commit(context: Context, operation: JSONObject) {
+        store(context).getString(operation.getString("id"),null)?.let { saved ->
+            if(JSONObject(saved).optString("state") !in setOf("preparing","permission_required")) return
+        }
         // Reinspect after permission/settings UI; the staged file may have changed.
         val value = file(context, operation.getString("path"))
         require(inspect(context, value.path).getString("sha256") == operation.getString("sha256")) { "Staged APK changed" }
