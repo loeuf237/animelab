@@ -172,6 +172,6 @@ jobs:
           body_path: build/release-notes.md
           files: release-assets/*
           fail_on_unmatched_files: true
-          make_latest: false
+          make_latest: true
           draft: false
-          prerelease: true
+          prerelease: false

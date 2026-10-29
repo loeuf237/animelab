@@ -12,7 +12,7 @@
 
 Choose a build from [GitHub Releases](https://github.com/loeuf237/animelab/releases). Android and desktop downloads are grouped in the same release.
 
-**All current releases are beta/pre-release.** The new [v0.1.6-beta.3 notes](docs/releases/v0.1.6-beta.3.md)
+**All current versions are beta.** The [v0.1.6-beta.3 notes](docs/releases/v0.1.6-beta.3.md)
 describe the experimental Android APK extension runtime, WebView session changes and remaining limitations.
 
 | Platform | Package | Getting started |

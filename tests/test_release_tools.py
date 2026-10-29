@@ -66,10 +66,23 @@ def test_desktop_publisher_generates_notes_before_uploading_assets():
     assert 'release-info' in steps[notes]['run']
     assert steps[upload]['with']['name'] == '${{ steps.release.outputs.title }}'
     assert steps[upload]['with']['body_path'] == 'build/release-notes.md'
-    assert steps[upload]['with']['prerelease'] is True
-    assert steps[upload]['with']['make_latest'] is False
+    assert steps[upload]['with']['prerelease'] is False
+    assert steps[upload]['with']['make_latest'] is True
     gate=next(i for i,step in enumerate(steps) if 'head_sha=' in step.get('run',''))
     assert gate<upload and publish['permissions']['actions']=='read'
+
+
+@pytest.mark.parametrize('headings',[('Changes','Downloads'),('Changements','Téléchargements')])
+def test_compact_release_notes_keep_the_correct_tag_without_requiring_seven_sections(tmp_path,monkeypatch,headings):
+    monkeypatch.setattr(desktop_release,'ROOT',tmp_path)
+    monkeypatch.setattr(desktop_release,'__version__','0.1.6')
+    monkeypatch.setenv('RELEASE_TAG','v0.1.6-beta.3')
+    notes=tmp_path/'docs/releases/v0.1.6-beta.3.md'
+    notes.parent.mkdir(parents=True)
+    notes.write_text('# AnimeLab v0.1.6-beta.3\n\n## '+headings[0]+'\n\n- Fix.\n\n## '+headings[1]+'\n\n[Windows](https://example.test/app.zip)\n')
+    result=desktop_release.release_metadata()
+    assert result['title']=='AnimeLab v0.1.6-beta.3'
+    assert '[Windows]' in result['body']
 
 
 @pytest.mark.parametrize('tag',['v0.1.6-beta.1','v0.1.6-beta.12'])

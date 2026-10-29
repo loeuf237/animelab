@@ -32,10 +32,12 @@ def release_metadata():
     header, _, body = notes.partition('\n')
     if not header.startswith('# ') or tag not in header.split():
         raise ValueError('Release notes must start with a title containing the release tag')
-    sections = ('Major Changes', 'Added', 'Changed', 'Fixed', 'WebUI', 'Downloads', 'Contributors')
-    missing = [name for name in sections if not re.search(r'^## ' + re.escape(name) + r'\s*$', body, re.M)]
-    if missing:
-        raise ValueError('Release notes are missing sections: ' + ', '.join(missing))
+    legacy = ('Major Changes', 'Added', 'Changed', 'Fixed', 'WebUI', 'Downloads', 'Contributors')
+    formats = (('Changements','Téléchargements'),('Changes','Downloads'),legacy)
+    def contains(sections):
+        return all(re.search(r'^## '+re.escape(name)+r'\s*$',body,re.M) for name in sections)
+    if not any(contains(sections) for sections in formats):
+        raise ValueError('Release notes are missing sections: Changes/Downloads or Changements/Téléchargements')
     return {'tag': tag, 'title': header[2:].strip(), 'body': body.lstrip()}
 
 
