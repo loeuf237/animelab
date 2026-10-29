@@ -1,6 +1,7 @@
 """The physical-test driver must leave unknown packages and APKs untouched."""
 from argparse import Namespace
 import hashlib
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -55,3 +56,29 @@ def test_community_corpus_cannot_target_an_arbitrary_android_app(device):
     with pytest.raises(ValueError, match='community extension'):
         driver.validate(args)
     assert all('instrument' not in call and 'appops' not in call for call in calls)
+
+
+@pytest.mark.parametrize('fresh,passed',[(False,True),(True,False),(True,True)])
+def test_receipts_are_bound_to_the_current_run_and_failures_keep_partial_evidence(device,monkeypatch,fresh,passed):
+    args,_,run=device
+    args.community_package=['eu.kanade.tachiyomi.animeextension.fr.fixture']
+    monkeypatch.setattr(driver.uuid,'uuid4',lambda:SimpleNamespace(hex='current-run'))
+    proof={'probeRunId':'current-run' if fresh else 'old-run','communityAPKOperations':[
+        {'pkg':args.community_package[0],'state':'metadata_path_passed' if passed else 'verification_needed'}]}
+    def execute(command,**kwargs):
+        if 'instrument' in command:
+            return SimpleNamespace(returncode=0,stdout='OK (1 test)' if passed else 'FAILURES!!!')
+        if 'logcat' in command:
+            return SimpleNamespace(returncode=0,stdout='I ANIMELAB_APK_PROOF: '+json.dumps(proof))
+        return run(command,**kwargs)
+    monkeypatch.setattr(driver.subprocess,'run',execute)
+    args.output.mkdir()
+    (args.output/'proof.json').write_text(json.dumps({'instrumentationPassed':True,'probeRunId':'old-run'}))
+    if fresh and passed:
+        driver.validate(args)
+    else:
+        with pytest.raises(RuntimeError,match='validation failed'):
+            driver.validate(args)
+    saved=json.loads((args.output/'proof.json').read_text())
+    assert saved['probeRunId']=='current-run' and saved['instrumentationPassed'] is (fresh and passed)
+    assert ('communityAPKOperations' in saved) is fresh

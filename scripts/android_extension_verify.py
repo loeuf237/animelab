@@ -64,8 +64,10 @@ def validate(args: argparse.Namespace) -> None:
     run_id = uuid.uuid4().hex
     command += ['-e', 'probe_run_id', run_id, '-e', 'class', 'com.animan.app.NativeExtensionIntegrationTest#' + method,
                 PACKAGE + '.test/androidx.test.runner.AndroidJUnitRunner']
-    report = adb(*command, timeout=960)
     args.output.mkdir(parents=True, exist_ok=True)
+    placeholder = {'probeRunId': run_id, 'instrumentationPassed': False, 'proofRecorded': False, 'state': 'running'}
+    (args.output / 'proof.json').write_text(json.dumps(placeholder) + '\n')
+    report = adb(*command, timeout=960)
     (args.output / 'instrumentation.txt').write_text(report)
     # A busy phone can produce >1000 unrelated log lines before this read.
     # Filter every retained buffer and bind evidence to this exact invocation.
@@ -89,6 +91,9 @@ def validate(args: argparse.Namespace) -> None:
     if proofs:
         proofs[-1]['instrumentationPassed'] = passed
         (args.output / 'proof.json').write_text(json.dumps(proofs[-1], ensure_ascii=False, indent=2) + '\n')
+    else:
+        placeholder['state'] = 'failed'
+        (args.output / 'proof.json').write_text(json.dumps(placeholder) + '\n')
     summary: dict[str, bool | int] = {'instrumentationPassed': passed, 'proofRecorded': bool(proofs)}
     if args.community_package and proofs:
         cases = proofs[-1].get('communityAPKOperations', [])
