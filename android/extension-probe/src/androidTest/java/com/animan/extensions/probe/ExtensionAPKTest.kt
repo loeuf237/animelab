@@ -79,7 +79,9 @@ class ExtensionAPKTest {
     }
 
     @Test fun original_apks_install_discover_execute_and_preserve_source_preferences() {
-        device.executeShellCommand("appops set ${context.packageName} REQUEST_INSTALL_PACKAGES allow")
+        // Changing this AppOp can kill the instrumented process on Android 11.
+        // The CI/device driver must grant it before starting instrumentation.
+        assertTrue("Grant the test install permission before instrumentation",context.packageManager.canRequestPackageInstalls())
         ActivityScenario.launch(ProbeActivity::class.java).use {
             val latch=CountDownLatch(1)
             lateinit var runtime: IExtensionRuntime

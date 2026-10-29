@@ -134,6 +134,7 @@ jobs:
           script: |
             adb install -r artifacts/extension-probe/build/outputs/apk/validation/extension-probe-validation.apk
             adb install -r artifacts/extension-probe/build/outputs/apk/androidTest/validation/extension-probe-validation-androidTest.apk
+            adb shell appops set com.animan.extensions.probe REQUEST_INSTALL_PACKAGES allow
             adb shell am instrument -w -r com.animan.extensions.probe.test/androidx.test.runner.AndroidJUnitRunner | tee instrumentation.txt
             adb logcat -d -s ANIMELAB_APK_PROOF:I > proof.txt
             adb logcat -d -b crash > crash.txt
