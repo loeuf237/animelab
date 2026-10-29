@@ -27,8 +27,18 @@ def unpack(value):
         if code == 'verification_required':
             from animelab.services.source_http import VerificationRequired
             raise VerificationRequired(data.get('url') or '')
-        raise APIProblem(code, status=400 if code in ('extension_untrusted', 'source_operation_unsupported') else 502,
-                         category='validation' if code == 'extension_untrusted' else 'network')
+        status,category = {
+            'extension_untrusted':(409,'permission'),
+            'source_operation_unsupported':(400,'validation'),
+            'extension_abi_incompatible':(422,'validation'),
+            'extension_runtime_unavailable':(503,'internal'),
+            'extension_runtime_timeout':(504,'internal'),
+            'extension_runtime_busy':(429,'rate_limit'),
+            'extension_runtime_error':(502,'internal'),
+            'cancelled':(409,'conflict'),
+            'rate_limited':(429,'rate_limit'),
+        }.get(code,(502,'network'))
+        raise APIProblem(code,status=status,category=category)
     return data['result']
 
 

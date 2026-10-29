@@ -91,8 +91,13 @@ class ExtensionAPKTest {
                     val installation=ExtensionPackages.install(context,apk.path,pkg)
                     val deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(60)
                     var state=""
+                    var confirmed=false
                     while (System.nanoTime()<deadline) {
-                        device.wait(Until.findObject(By.text(Pattern.compile("(?i)^(install|installer|installieren|instalar)$"))),500)?.click()
+                        if(!confirmed && device.currentPackageName.orEmpty().contains("packageinstaller")) {
+                            device.wait(Until.findObject(By.text(Pattern.compile("(?i)^(install|installer|installieren|instalar)$"))),500)?.let {
+                                it.click(); confirmed=true
+                            }
+                        }
                         val ops=ExtensionPackages.operations(context)
                         state=(0 until ops.length()).map { ops.getJSONObject(it) }.single { it.getString("id")==installation.getString("id") }.getString("state")
                         if (state in listOf("installed","failed","cancelled")) break

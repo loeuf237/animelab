@@ -42,6 +42,13 @@ class APIProblem(RuntimeError):
         self.status = status
         self.problem = Problem(code=code, category=category, messageKey={
             'source_operation_unsupported': 'Cette source ne propose pas cette fonctionnalité.',
+            'extension_untrusted': 'Approuvez la version et le signataire de cet APK avant son exécution.',
+            'extension_abi_incompatible': 'Les classes ou bibliothèques de cet APK sont incompatibles avec le moteur actuel.',
+            'extension_runtime_unavailable': 'Le moteur APK est indisponible. Réessayez son chargement.',
+            'extension_runtime_timeout': 'L’extension a dépassé le délai autorisé. Son worker a été arrêté.',
+            'extension_runtime_busy': 'Le moteur APK est occupé. Attendez la fin des appels en cours.',
+            'extension_runtime_error': 'Le code de l’extension a échoué pendant cette opération.',
+            'cancelled': 'L’opération de l’extension a été annulée.',
             'verification_route_changed': 'La route réseau a changé. Fermez cette fenêtre et recommencez la vérification.',
             'verification_cancelled': 'Cette vérification est fermée. Ouvrez une nouvelle fenêtre.',
             'verification_mode_unavailable': 'Ce mode de vérification est indisponible pour cette plateforme ou ce proxy.',

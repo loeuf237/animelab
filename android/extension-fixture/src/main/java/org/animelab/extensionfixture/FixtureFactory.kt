@@ -29,6 +29,9 @@ class Fixture(override val lang: String) : AnimeHttpSource(), ConfigurableAnimeS
     override fun fetchLatestUpdates(page: Int): Observable<AnimesPage> = fetchPopularAnime(page)
     override fun fetchSearchAnime(page: Int, query: String, filters: AnimeFilterList): Observable<AnimesPage> {
         if (query == "__block_worker__") Thread.sleep(120_000)
+        // In the full app this crosses Binder back into the real Python broker,
+        // proving a nested callback can complete while the source call waits.
+        if(BuildConfig.EXTENSION_API>=14) network.defaultUserAgentProvider()
         val computed = runBlocking { JavaScriptEngine(Injekt.get<Application>()).evaluate<Int>("6 * 7") }
         val suffix = (filters[0] as AnimeFilter.Text).state
         val quality = getSourcePreferences().getString("quality", "720")

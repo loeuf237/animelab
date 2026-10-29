@@ -137,6 +137,16 @@ def test_native_default_user_agent_matches_the_verification_session():
     assert json.loads(android_runtime.extension_http('{"action":"user_agent"}'))=={'userAgent':USER_AGENT}
 
 
+@pytest.mark.parametrize('code,status,category',[
+    ('extension_abi_incompatible',422,'validation'),('rate_limited',429,'rate_limit'),
+    ('extension_untrusted',409,'permission'),('extension_runtime_timeout',504,'internal')])
+def test_native_failures_keep_their_actual_category(code,status,category):
+    from animelab.api_errors import APIProblem
+    with pytest.raises(APIProblem) as caught:
+        native.unpack(json.dumps({'ok':False,'code':code}))
+    assert caught.value.status==status and caught.value.problem.category==category
+
+
 @pytest.mark.asyncio
 async def test_catalogue_and_episode_memos_survive_callbacks(monkeypatch):
     source=native.AndroidAPKSource(package(),package()['sources'][0])

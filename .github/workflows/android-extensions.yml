@@ -128,6 +128,8 @@ jobs:
           api-level: ${{ matrix.api }}
           arch: x86_64
           profile: pixel_2
+          ram-size: 4096M
+          heap-size: 512M
           disable-animations: true
           script: |
             adb install -r artifacts/extension-probe/build/outputs/apk/validation/extension-probe-validation.apk
@@ -135,6 +137,10 @@ jobs:
             adb shell am instrument -w -r com.animan.extensions.probe.test/androidx.test.runner.AndroidJUnitRunner | tee instrumentation.txt
             adb logcat -d -s ANIMELAB_APK_PROOF:I > proof.txt
             adb logcat -d -b crash > crash.txt
+            adb logcat -d -s PackageInstaller:I PackageInstallerSession:I ActivityTaskManager:I > installer.txt
+            adb logcat -d -s ActivityManager:I lmkd:I libc:I DEBUG:I AndroidRuntime:E > runtime-system.txt
+            adb shell uiautomator dump /sdcard/extension-test-window.xml
+            adb pull /sdcard/extension-test-window.xml window.xml
             grep -q 'OK (' instrumentation.txt
             grep -q 'executesComputedCode' proof.txt
       - uses: actions/upload-artifact@v4
@@ -145,4 +151,7 @@ jobs:
             instrumentation.txt
             proof.txt
             crash.txt
+            installer.txt
+            window.xml
+            runtime-system.txt
           retention-days: 7
