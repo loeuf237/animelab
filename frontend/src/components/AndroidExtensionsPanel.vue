@@ -161,7 +161,16 @@
     <ul v-if="pending.length" aria-live="polite">
       <li v-for="operation in pending" :key="operation.id">
         {{ operation.pkg }} — {{ tx(status(operation.state)) }}
-        <span v-if="operation.error">({{ operation.error }})</span>
+        <span v-if="operation.error">({{ tx(operationError(operation.error)) }})</span>
+        <button
+          v-if="operation.action === 'install' && activeStates.includes(operation.state)"
+          type="button"
+          class="btn btn-secondary"
+          :disabled="busy"
+          @click="run(() => api.cancelAndroidInstallation(operation.id))"
+        >
+          {{ tx('Annuler l’installation') }}
+        </button>
       </li>
     </ul>
   </section>
@@ -188,6 +197,21 @@ const values = ref<Record<string, string | boolean | string[] | null>>({})
 const changed = new Set<string>()
 let timer: ReturnType<typeof setInterval> | undefined
 const pending = computed(() => state.value?.operations?.slice(-12) || [])
+const activeStates = ['preparing', 'waiting_user', 'permission_required', 'installing']
+const operationError = (code: string) =>
+  (
+    ({
+      package_installer_conflict:
+        'Android refuse le remplacement : conflit avec un paquet installé, notamment sa signature.',
+      package_installer_blocked: 'Installation bloquée par une règle ou un contrôle Android.',
+      package_installer_incompatible: 'APK incompatible avec cet appareil.',
+      package_installer_invalid: 'APK invalide selon Android.',
+      package_installer_storage: 'Espace de stockage insuffisant.',
+      package_installer_failed: 'Android n’a pas pu installer cet APK.',
+      package_installer_confirmation_missing: 'La confirmation Android est indisponible.',
+      package_installer_confirmation_unavailable: 'Impossible d’ouvrir la confirmation Android.',
+    }) as Record<string, string>
+  )[code] || code
 const status = (value: string) =>
   (
     ({
@@ -280,12 +304,7 @@ onMounted(async () => {
     error.value = failure instanceof Error ? failure.message : ''
   }
   timer = setInterval(() => {
-    if (
-      !busy.value &&
-      state.value?.operations?.some((op) =>
-        ['waiting_user', 'permission_required', 'installing'].includes(op.state),
-      )
-    )
+    if (!busy.value && state.value?.operations?.some((op) => activeStates.includes(op.state)))
       void run(() => Promise.resolve())
   }, 4000)
 })

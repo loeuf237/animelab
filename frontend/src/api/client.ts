@@ -860,6 +860,11 @@ export const api = {
   async uninstallAndroidExtension(pkg: string): Promise<unknown> {
     return request(`/api/extensions/android/${encodeURIComponent(pkg)}`, { method: 'DELETE' })
   },
+  async cancelAndroidInstallation(id: string): Promise<unknown> {
+    return request(`/api/extensions/android/operations/${encodeURIComponent(id)}/cancel`, {
+      method: 'POST',
+    })
+  },
   async importAndroidAPK(file: File): Promise<{ operation: ExtensionOperation }> {
     return request('/api/extensions/android/install-apk', {
       method: 'POST',

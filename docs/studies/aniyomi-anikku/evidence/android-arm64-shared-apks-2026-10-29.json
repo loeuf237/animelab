@@ -1,0 +1,62 @@
+{
+  "date": "2026-10-29",
+  "sourceCommit": "2796d8afb51291fb96e56625f8c628c8a86cb794",
+  "hardware": "SCV38",
+  "androidApi": 29,
+  "abi": "arm64-v8a",
+  "optimizedProbe": true,
+  "host": {
+    "package": "xyz.jmir.tachiyomi.mi",
+    "version": "0.18.2.1"
+  },
+  "cases": [
+    {
+      "pkg": "eu.kanade.tachiyomi.animeextension.fr.animesama",
+      "versionCode": "33",
+      "signer": "cbec121aa82ebb02aaa73806992e0368a97d47b5451ed6524816d03084c45905",
+      "state": "loaded",
+      "sources": 1,
+      "error": "",
+      "notReinstalled": true,
+      "realSiteOperationsTested": false,
+      "installedBy": "xyz.jmir.tachiyomi.mi",
+      "versionName": "14.33",
+      "postRunAPKsha256": "9f46108c63497b59210f8c346244f95b2f96bfb302c3b4408c793d346bea4a73"
+    },
+    {
+      "pkg": "eu.kanade.tachiyomi.animeextension.fr.franime",
+      "versionCode": "29",
+      "signer": "cbec121aa82ebb02aaa73806992e0368a97d47b5451ed6524816d03084c45905",
+      "state": "loaded",
+      "sources": 1,
+      "error": "",
+      "notReinstalled": true,
+      "realSiteOperationsTested": false,
+      "installedBy": "xyz.jmir.tachiyomi.mi",
+      "versionName": "14.29",
+      "postRunAPKsha256": "513e3aac3475c525b28b087603ebf4bf2ffe4580e6d741b9cbbda3aba50b5633"
+    },
+    {
+      "pkg": "eu.kanade.tachiyomi.animeextension.fr.anisama",
+      "versionCode": "28",
+      "signer": "cbec121aa82ebb02aaa73806992e0368a97d47b5451ed6524816d03084c45905",
+      "state": "loaded",
+      "sources": 1,
+      "error": "",
+      "notReinstalled": true,
+      "realSiteOperationsTested": false,
+      "installedBy": "xyz.jmir.tachiyomi.mi",
+      "versionName": "14.28",
+      "postRunAPKsha256": "a822f83b3120841dab52ba2a6b545173928144ae2b4c8a2f2d6200fae70e505e"
+    }
+  ],
+  "actualAniyomiUIInteroperabilityTested": false,
+  "anikkuTested": false,
+  "pythonFrontendIntegrationTested": false,
+  "limits": [
+    "Installed package constructors/factories and source discovery only.",
+    "No search/detail/video network operations tested.",
+    "No APK reinstall or transformation used for these three packages.",
+    "Separate validation app UID, not the production AnimeLab application."
+  ]
+}

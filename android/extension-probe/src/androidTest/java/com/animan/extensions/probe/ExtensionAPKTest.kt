@@ -104,6 +104,7 @@ class ExtensionAPKTest {
                     val installation=ExtensionPackages.install(context,apk.path,pkg)
                     val deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(60)
                     var state=""
+                    var lastOperation=installation
                     var confirmed=false
                     while (System.nanoTime()<deadline) {
                         if(!confirmed && device.currentPackageName.orEmpty().contains("packageinstaller")) {
@@ -112,11 +113,12 @@ class ExtensionAPKTest {
                             }
                         }
                         val ops=ExtensionPackages.operations(context)
-                        state=(0 until ops.length()).map { ops.getJSONObject(it) }.single { it.getString("id")==installation.getString("id") }.getString("state")
+                        lastOperation=(0 until ops.length()).map { ops.getJSONObject(it) }.single { it.getString("id")==installation.getString("id") }
+                        state=lastOperation.getString("state")
                         if (state in listOf("installed","failed","cancelled")) break
                         Thread.sleep(150)
                     }
-                    assertEquals("PackageInstaller state for $pkg", "installed",state)
+                    assertEquals("PackageInstaller state for $pkg: $lastOperation", "installed",state)
                     fun discovered(): JSONObject {
                         val packages=decoded(runtime.discover()) as JSONArray
                         return requireNotNull((0 until packages.length()).map { packages.getJSONObject(it) }.singleOrNull { it.getString("pkg")==pkg }) { "Installed $pkg absent from discovery: $packages" }
@@ -157,6 +159,25 @@ class ExtensionAPKTest {
                         .put("unchangedSigner",inspection.getString("signer")==descriptor.getString("signer"))
                         .put("sources",2).put("executesComputedCode",true).put("javaScript",true).put("preferencesScoped",true))
                 }
+                // Cancellation is final even when a previously committed session replies late.
+                val cancellationAPK=File(context.cacheDir,"extension-fixture-api17-debug.apk")
+                val cancellation=ExtensionPackages.install(context,cancellationAPK.path,
+                    "eu.kanade.tachiyomi.animeextension.all.animelabfixture.api17")
+                fun cancellationState(): JSONObject {
+                    val ops=ExtensionPackages.operations(context)
+                    return (0 until ops.length()).map { ops.getJSONObject(it) }.single { it.getString("id")==cancellation.getString("id") }
+                }
+                val wrongSession=Intent().putExtra("operationId",cancellation.getString("id"))
+                    .putExtra("ownerSessionId",cancellation.getInt("sessionId")+1)
+                    .putExtra(android.content.pm.PackageInstaller.EXTRA_STATUS,android.content.pm.PackageInstaller.STATUS_FAILURE_CONFLICT)
+                ExtensionPackages.received(context,wrongSession)
+                assertNotEquals("failed",cancellationState().getString("state"))
+                ExtensionPackages.cancel(context,cancellation.getString("id"))
+                val late=Intent().putExtra("operationId",cancellation.getString("id"))
+                    .putExtra("ownerSessionId",cancellation.getInt("sessionId"))
+                    .putExtra(android.content.pm.PackageInstaller.EXTRA_STATUS,android.content.pm.PackageInstaller.STATUS_SUCCESS)
+                ExtensionPackages.received(context,late)
+                assertEquals("cancelled",cancellationState().getString("state"))
                 ExtensionHostClient(context,timeoutMillis=8_000).use { client ->
                     fun selected(): JSONObject {
                         val packages=decoded(client.discover()) as JSONArray
@@ -183,6 +204,7 @@ class ExtensionAPKTest {
                 val proof=JSONObject().put("androidApi",android.os.Build.VERSION.SDK_INT).put("abis",JSONArray(android.os.Build.SUPPORTED_ABIS.toList()))
                     .put("blockedWorkerTerminated",true).put("workerRestarted",true).put("preferencesSurviveRestart",true)
                     .put("revocationRestartsWorker",true)
+                    .put("cancelledOperationIgnoresLateCallback",true).put("callbackSessionChecked",true)
                     .put("cases",proofs).put("realAniyomiAnikkuHostsTested",false)
                 android.util.Log.i("ANIMELAB_APK_PROOF",proof.toString())
                 assertEquals(6,proofs.length())

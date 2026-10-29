@@ -123,3 +123,41 @@ test('Native filters retain 64 bit source IDs and nested states through navigati
   await expect(page.getByLabel('Titre', { exact: true })).toHaveValue('Naruto')
   await expect(page.getByLabel('Doublé', { exact: true })).toHaveValue('2')
 })
+
+test('A pending APK installation can be cancelled without affecting installed packages', async ({
+  page,
+}) => {
+  await mockApp(page)
+  const operation = {
+    id: 'install-1',
+    pkg: 'fixture.one',
+    action: 'install',
+    state: 'waiting_user',
+  }
+  await page.route('**/api/extensions/android', (route) =>
+    route.fulfill({
+      json: {
+        available: true,
+        packages: [],
+        operations: [operation],
+        securityBoundary: 'same-uid-worker',
+      },
+    }),
+  )
+  await page.route('**/api/extensions/repositories', (route) =>
+    route.fulfill({ json: { repositories: [] } }),
+  )
+  const requests = []
+  await page.route('**/api/extensions/android/operations/install-1/cancel', (route) => {
+    requests.push(route.request().method())
+    operation.state = 'cancelled'
+    return route.fulfill({ json: { operation } })
+  })
+  await page.goto('/app/extensions')
+  await expect(page.getByText('fixture.one — Confirmation Android attendue')).toBeVisible()
+  await page.getByRole('button', { name: 'Annuler l’installation' }).click()
+  await expect.poll(() => requests.length).toBe(1)
+  expect(requests).toEqual(['POST'])
+  await expect(page.getByText('fixture.one — Annulée')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Annuler l’installation' })).toHaveCount(0)
+})

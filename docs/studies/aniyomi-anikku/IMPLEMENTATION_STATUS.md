@@ -17,7 +17,7 @@ applications/paquets réellement distribués. Il ne certifie pas une release.
 | E12 | Détails/épisodes, saisons/relations, hébergeurs/vidéos ; métadonnées/mémos ; en-têtes privés, ressources HLS et sous-titres via capacités temporaires. | DASH avec en-têtes, audio externe et rendu ASS incomplets ; options de lecteur non admises ; pas d'admission implicite des torrents/serveurs locaux. |
 | E13 | Panneaux dépôts et APK, états réels, import, approbation/révocation, désinstallation partagée, préférences et activation des sources. | Tests navigateur ; nettoyage ciblé et parcours avancés restant à compléter. |
 | E14 | Archive d'identités/stubs ; artefacts optionnels vérifiés SHA-256 ; restauration sans confiance implicite. | Tests hors ligne, secrets/confiance exclus, chemins/empreintes ; recettes et préférences non secrètes complètes restant à intégrer. |
-| E15 | Vrai host Android, API hôte à la référence amont, chargeur des classes des APK installés, signatures système, installateur et pont Python. | Preuve initiale Android 15 ci-dessous ; réception APK01–APK14, vrais hôtes et ARM64 encore à compléter. |
+| E15 | Vrai host Android, API hôte à la référence amont, chargeur des classes des APK installés, signatures système, installateur et pont Python. | Banc optimisé validé sur Android 10/11/15 ; chargement de trois APK réels sur ARM64 acquis. Réception APK01–APK14 et parcours complet encore à terminer. |
 | E16 | Moteur de recettes conservé sur bureau. | Prototype JVM non réalisé ; aucune promesse d'exécution APK sur Linux/Windows. |
 | E17–E18 | Corpus synthétique, workflow dédié et artefacts ; moteur désactivé dans les builds release. | Adoption Android non prononcée tant que les critères obligatoires ne sont pas démontrés. |
 
@@ -34,19 +34,36 @@ applications/paquets réellement distribués. Il ne certifie pas une release.
   job Android 35 : six APK installés via PackageInstaller puis exécutés,
   fabriques FR/EN, résultat calculé, QuickJS, filtres, préférences séparées,
   détails, hébergeur et sous-titres. Banc **debug**, ABI hôte actuelle.
-- Les premiers bancs Android 29/30 n'ont pas validé la réception ; correctifs
-  et essais optimisés en cours. La preuve Android 35 ne les remplace pas.
+- Au commit `16c5cac`, les deux workflows sont entièrement réussis :
+  [CI générale, 7 jobs](https://github.com/loeuf237/animelab/actions/runs/40798123649)
+  et [runtime Android, 5 jobs](https://github.com/loeuf237/animelab/actions/runs/40798123645).
+  Le second construit l'application ARM64 optimisée et exécute les six APK
+  synthétiques sur Android 10, 11 et 15 (API 29/30/35). Les tests couvrent
+  aussi arrêt du worker bloqué, reprise des préférences et révocation.
+- Sur le SCV38 Android 10 ARM64, le banc optimisé a chargé les classes/fabriques
+  des APK AnimeSama, FRAnime et AniSama déjà installés par Aniyomi 0.18.2.1,
+  avec découverte de leurs sources, sans réinstallation ni transformation.
+  Voir la [preuve enregistrée](evidence/android-arm64-shared-apks-2026-10-29.json).
+  Cela ne prouve pas encore leurs recherches, détails ou vidéos dans AnimeLab.
 
 ## Réception restant obligatoire
 
 Les six variantes déclarent des API 12–17 mais sont compilées contre l'ABI
 actuelle. Elles ne prouvent pas toutes les anciennes ABI. Les vrais hôtes
-Aniyomi/Anikku n'ont pas encore été exécutés pour APK02–APK04. Aucun résultat
-sur téléphone ARM64 ni build optimisé n'est annoncé avant enregistrement.
+Aniyomi/Anikku n'ont pas encore été exécutés dans un parcours réciproque
+complet pour APK02–APK04. La preuve ARM64 ci-dessus reste limitée au
+chargement et à la découverte dans une application de validation distincte.
 
 Le téléphone SCV38 connecté a été identifié en lecture seule comme Android 10,
 ARM64. Les tests prévus utilisent des applications/paquets de fixtures distincts.
 Les APK sont construits par GitHub Actions, sans compilation locale.
+
+Le dernier échec d'installation physique a été reproduit avec la confirmation
+Android affichée et acceptée : Android refuse la signature d'une ancienne
+fixture `animelabfixture.api12`, identifiée par son SHA-256 comme issue du
+banc `2796d8a`. Il ne démontre pas un blocage d'affichage de la confirmation.
+Seul ce paquet synthétique identifié est supprimé pour reprendre la campagne ;
+les extensions communautaires et les données des autres hôtes sont conservées.
 
 Le contrat final reste [APK01–APK14](EXIGENCES_ANDROID_APK.md). Les lots
 incomplets restent nécessaires ; une limite ou non-adoption provisoire

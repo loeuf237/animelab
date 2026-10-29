@@ -19,6 +19,7 @@ import kotlin.concurrent.thread
 /** Android's package installer owns shared APKs; recipes never count as installation. */
 internal object ExtensionPackages {
     private const val MAX_APK = 64L * 1024 * 1024
+    private const val LEGACY_STATUS = "android.content.pm.extra.LEGACY_STATUS"
     private fun store(context: Context) = context.getSharedPreferences("extension_package_operations", Context.MODE_PRIVATE)
 
     private fun file(context: Context, path: String): File {
@@ -65,7 +66,8 @@ internal object ExtensionPackages {
     }
 
     private fun callback(context: Context, id: String, session: Int): android.content.IntentSender {
-        val intent = Intent(context, ExtensionInstallReceiver::class.java).putExtra("operationId", id)
+        val intent = Intent(context, ExtensionInstallReceiver::class.java)
+            .putExtra("operationId", id).putExtra("ownerSessionId", session)
         return PendingIntent.getBroadcast(context, session, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE).intentSender
     }
@@ -147,7 +149,7 @@ internal object ExtensionPackages {
     private fun publicOperation(value: JSONObject): JSONObject = JSONObject(value.toString()).apply { remove("path") }
     fun operations(context: Context): JSONArray = JSONArray(store(context).all.values.filterIsInstance<String>().map { publicOperation(JSONObject(it)) }.sortedBy { it.optLong("createdAt") })
 
-    fun cancel(context: Context,id: String): JSONObject {
+    @Synchronized fun cancel(context: Context,id: String): JSONObject {
         val operation=JSONObject(requireNotNull(store(context).getString(id,null)))
         require(operation.optString("action")=="install" && operation.optString("state") in setOf("preparing","permission_required","waiting_user","installing"))
         if (operation.has("sessionId")) {
@@ -159,15 +161,28 @@ internal object ExtensionPackages {
     }
 
     @Suppress("DEPRECATION")
-    fun received(context: Context, intent: Intent) {
+    @Synchronized fun received(context: Context, intent: Intent) {
         val id=intent.getStringExtra("operationId") ?: return
         val operation=store(context).getString(id,null)?.let(::JSONObject) ?: return
+        // A delayed system callback must not reopen or replace a cancelled operation.
+        if (operation.optString("state") in setOf("installed","uninstalled","failed","cancelled")) return
+        if (operation.has("sessionId") && intent.getIntExtra("ownerSessionId",-1)!=operation.getInt("sessionId")) return
         val status=intent.getIntExtra(PackageInstaller.EXTRA_STATUS,PackageInstaller.STATUS_FAILURE)
+        operation.put("installerStatus",status)
         when (status) {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
                 operation.put("state","waiting_user"); save(context,operation)
-                val confirmation=intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT) ?: return
-                context.startActivity(confirmation.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                val confirmation=intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
+                if (confirmation==null) {
+                    operation.put("state","failed").put("error","package_installer_confirmation_missing")
+                    save(context,operation)
+                    return
+                }
+                try { context.startActivity(confirmation.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                catch (_: Exception) {
+                    operation.put("state","failed").put("error","package_installer_confirmation_unavailable")
+                    save(context,operation)
+                }
                 return
             }
             PackageInstaller.STATUS_SUCCESS -> {
@@ -183,7 +198,21 @@ internal object ExtensionPackages {
                 } catch (failure: Exception) { operation.put("state","failed").put("error",failure.javaClass.simpleName) }
             }
             PackageInstaller.STATUS_FAILURE_ABORTED -> operation.put("state","cancelled")
-            else -> operation.put("state","failed").put("error","package_installer_$status")
+            else -> {
+                val code=when(status) {
+                    PackageInstaller.STATUS_FAILURE_BLOCKED -> "package_installer_blocked"
+                    PackageInstaller.STATUS_FAILURE_CONFLICT -> "package_installer_conflict"
+                    PackageInstaller.STATUS_FAILURE_INCOMPATIBLE -> "package_installer_incompatible"
+                    PackageInstaller.STATUS_FAILURE_INVALID -> "package_installer_invalid"
+                    PackageInstaller.STATUS_FAILURE_STORAGE -> "package_installer_storage"
+                    else -> "package_installer_failed"
+                }
+                // Keep numeric diagnostics; system messages may expose local paths or other apps.
+                operation.put("state","failed").put("error",code)
+                if(intent.hasExtra(LEGACY_STATUS)) {
+                    operation.put("legacyStatus",intent.getIntExtra(LEGACY_STATUS,0))
+                }
+            }
         }
         save(context,operation)
     }
