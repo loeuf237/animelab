@@ -899,9 +899,14 @@ class ExtensionService:
                     for descriptor in package.get('sources') or []:
                         source_key = 'aniyomi:' + str(descriptor['id'])
                         previous_package = next((p for p in self._native_packages if p['pkg']==package['pkg']),None)
-                        same_identity = previous_package and all(previous_package.get(k)==package.get(k) for k in ('versionCode','signer'))
+                        same_identity = previous_package and all(previous_package.get(k)==package.get(k) for k in ('versionCode','signer','lastUpdateTime'))
                         source = self._active_container_sources.get(source_key) if same_identity else None
                         source = source or android_extensions.AndroidAPKSource(package,descriptor)
+                        if source.base_url != (descriptor.get('baseUrl') or ''):
+                            source._episodes.clear(); source._animes.clear()
+                        source.base_url=descriptor.get('baseUrl') or ''
+                        source.name=descriptor['name']; source.lang=descriptor.get('lang') or 'all'
+                        source.supports_latest=bool(descriptor.get('supportsLatest')); source.metadata=descriptor
                         conn.execute("INSERT INTO extension_sources(source_key,ext_id,upstream_id,pkg,name,lang,base_url,runtime,enabled,metadata_json) "
                                      "VALUES (?,?,?,?,?,?,?,'android-apk',1,?) ON CONFLICT(source_key) DO UPDATE SET "
                                      "name=excluded.name,lang=excluded.lang,base_url=excluded.base_url,metadata_json=excluded.metadata_json",

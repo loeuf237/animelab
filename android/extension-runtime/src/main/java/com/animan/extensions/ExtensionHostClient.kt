@@ -34,8 +34,13 @@ class ExtensionHostClient(value: Context, private val gateway: IExtensionHttp?=n
     init { bind() }
     private fun bind() { main.post { if(!closed) context.bindService(Intent(context,ExtensionRuntimeService::class.java),connection,Context.BIND_AUTO_CREATE) } }
     private fun runtime(): IExtensionRuntime {
-        check(ready.await(15,TimeUnit.SECONDS))
-        return requireNotNull(worker)
+        val deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(15)
+        while(System.nanoTime()<deadline) {
+            worker?.takeIf { it.asBinder().isBinderAlive }?.let { return it }
+            ready.await(100,TimeUnit.MILLISECONDS)
+            if(worker==null) Thread.sleep(10)
+        }
+        throw IllegalStateException("Extension worker did not bind")
     }
     private fun call(action: (IExtensionRuntime)->String): String {
         if(closed) return "{\"ok\":false,\"code\":\"extension_runtime_unavailable\"}"
@@ -49,7 +54,18 @@ class ExtensionHostClient(value: Context, private val gateway: IExtensionHttp?=n
         } catch (_: Exception) { "{\"ok\":false,\"code\":\"extension_runtime_unavailable\"}" }
     }
     fun discover(): String=call { it.discover() }
-    fun invoke(payload: String): String=call { it.invoke(payload) }
+    fun invoke(payload: String): String {
+        require(payload.length<=256_000)
+        val result=call { it.invoke(payload) }
+        if(org.json.JSONObject(payload).optString("operation")=="revoke" && org.json.JSONObject(result).optBoolean("ok")) {
+            // Revocation must also stop non-cooperative code. Other in-flight
+            // source calls can retry on the fresh worker; the Python owner lives.
+            val previous=worker
+            worker=null; ready=CountDownLatch(1)
+            try { previous?.terminate() } catch (_: Exception) { }
+        }
+        return result
+    }
     fun cancel(id: String) { try { worker?.cancel(id) } catch (_: Exception) { } }
     override fun close() {
         closed=true; calls.shutdownNow()

@@ -49,6 +49,13 @@ def test_native_discovery_retains_ids_and_source_instance_metadata(host):
     service.sync_android_extensions()
     assert service.get_container_source_by_id(source.source_id) is source
     assert source._episodes['https://fixture.example/episode']['memo']['cursor']=='native'
+    packages[0]['sources'][0]['baseUrl']='https://mirror.example'
+    service.sync_android_extensions()
+    assert service.get_container_source_by_id(source.source_id) is source
+    assert source.base_url=='https://mirror.example' and source._episodes=={}
+    packages[0]['lastUpdateTime']='changed-even-with-the-same-version-code'
+    service.sync_android_extensions()
+    assert service.get_container_source_by_id(source.source_id) is not source
     service.set_source_state(source.source_id,{'enabled':False})
     assert len(service.get_enabled_container_sources())==1
 

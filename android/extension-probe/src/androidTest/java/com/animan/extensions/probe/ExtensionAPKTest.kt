@@ -176,9 +176,13 @@ class ExtensionAPKTest {
                     assertEquals("loaded",selected().getString("state"))
                     val restored=decoded(client.invoke(request("after-restart"))) as JSONObject
                     assertTrue(restored.getJSONArray("results").getJSONObject(0).getString("title").contains(":1080:"))
+                    decoded(client.invoke(JSONObject().put("operationId",UUID.randomUUID().toString()).put("operation","revoke")
+                        .put("pkg",descriptor.getString("pkg")).toString()))
+                    assertEquals("untrusted",selected().getString("state"))
                 }
                 val proof=JSONObject().put("androidApi",android.os.Build.VERSION.SDK_INT).put("abis",JSONArray(android.os.Build.SUPPORTED_ABIS.toList()))
                     .put("blockedWorkerTerminated",true).put("workerRestarted",true).put("preferencesSurviveRestart",true)
+                    .put("revocationRestartsWorker",true)
                     .put("cases",proofs).put("realAniyomiAnikkuHostsTested",false)
                 android.util.Log.i("ANIMELAB_APK_PROOF",proof.toString())
                 assertEquals(6,proofs.length())

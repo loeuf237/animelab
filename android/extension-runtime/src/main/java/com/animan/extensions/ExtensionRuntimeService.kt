@@ -125,6 +125,7 @@ class ExtensionRuntimeService : Service() {
     }
 
     private fun identity(info: PackageInfo): String = "${info.packageName}:${info.longVersionCode}:${APKSignatures.current(info)}"
+    private fun loadIdentity(info: PackageInfo): String = "${identity(info)}:${info.lastUpdateTime}:${info.applicationInfo!!.sourceDir}"
     private fun isExtension(info: PackageInfo): Boolean = info.reqFeatures.orEmpty().any { it.name == "tachiyomi.animeextension" }
 
     private fun discoverPackages(): JSONArray {
@@ -140,6 +141,7 @@ class ExtensionRuntimeService : Service() {
             val result = JSONObject().put("pkg", info.packageName)
                 .put("name", metadata?.getString("aniyomix.name") ?: packageManager.getApplicationLabel(info.applicationInfo!!).toString())
                 .put("version", info.versionName).put("versionCode", info.longVersionCode.toString())
+                .put("lastUpdateTime",info.lastUpdateTime.toString())
                 .put("api", api(info)).put("signatures", JSONArray(fingerprints(info)))
                 .put("signer", APKSignatures.current(info)).put("trusted", trusted).put("is_installed", true)
                 .put("location", "shared").put("runtime", "android-apk").put("compatible", compatible)
@@ -168,11 +170,12 @@ class ExtensionRuntimeService : Service() {
         .put("configurable", source is ConfigurableAnimeSource)
         .put("supportsRelatedAnime", source.supportsRelatedAnime)
 
-    private fun load(info: PackageInfo): Loaded {
+    @Synchronized private fun load(info: PackageInfo): Loaded {
         val key = identity(info)
         if (!trust.getBoolean(key, false)) throw SecurityException("Approve this package/version/signer first")
         require(api(info) in 12..17) { "Unsupported extension API" }
-        loaded[info.packageName]?.takeIf { it.identity == key }?.let { return it }
+        val loadKey=loadIdentity(info)
+        loaded[info.packageName]?.takeIf { it.identity == loadKey }?.let { return it }
         val application = requireNotNull(info.applicationInfo)
         val names = requireNotNull(application.metaData?.getString("tachiyomi.animeextension.class"))
         val loader = object : PathClassLoader(application.sourceDir, application.nativeLibraryDir, javaClass.classLoader) {
@@ -195,11 +198,19 @@ class ExtensionRuntimeService : Service() {
         }
         require(sources.isNotEmpty() && sources.size <= 1000)
         require(sources.map { it.id }.distinct().size == sources.size) { "Duplicate source identifiers" }
-        return Loaded(key, info.packageName, sources).also { loaded[info.packageName] = it }
+        return Loaded(loadKey, info.packageName, sources).also { loaded[info.packageName] = it }
     }
 
     private suspend fun execute(request: JSONObject): Any {
         val operation = request.getString("operation")
+        if(operation=="revoke") {
+            val pkg=request.getString("pkg")
+            require(pkg.matches(Regex("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+")))
+            val editor=trust.edit()
+            trust.all.keys.filter { it.startsWith("$pkg:") }.forEach { editor.remove(it) }
+            editor.commit(); loaded.remove(pkg)
+            return JSONObject().put("trusted",false)
+        }
         val info = packageInfo(request.getString("pkg"))
         require(isExtension(info)) { "This is not an anime extension" }
         if (operation == "trust") {
@@ -208,10 +219,6 @@ class ExtensionRuntimeService : Service() {
             trust.edit().putBoolean(identity(info), true).commit()
             loaded.remove(info.packageName)
             return JSONObject().put("trusted", true)
-        }
-        if (operation == "revoke") {
-            trust.edit().remove(identity(info)).commit(); loaded.remove(info.packageName)
-            return JSONObject().put("trusted", false)
         }
         val entry = load(info)
         val source = entry.sources.single { it.id.toString() == request.getString("sourceId") }

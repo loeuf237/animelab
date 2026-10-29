@@ -1,6 +1,6 @@
 """Android bootstrap. Configure storage and JNI before importing the engine."""
 import asyncio
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from email.utils import formatdate
 from http.cookies import SimpleCookie
 import json
@@ -186,8 +186,19 @@ def start(data_dir, cache_dir, port, token, test_mode=False):
         async with original_lifespan(app):
             hooks.ready()
             from animelab.services.extension_service import extension_service
-            await asyncio.to_thread(extension_service.sync_android_extensions)
-            yield
+            async def discover_apks():
+                try:
+                    await asyncio.to_thread(extension_service.sync_android_extensions)
+                except Exception as failure:
+                    import logging
+                    logging.getLogger('animelab.extensions').warning('Découverte APK indisponible (%s)',type(failure).__name__)
+            discovery=asyncio.create_task(discover_apks())
+            try:
+                yield
+            finally:
+                discovery.cancel()
+                with suppress(asyncio.CancelledError):
+                    await discovery
         _loop = None
 
     run.app.router.lifespan_context = lifespan

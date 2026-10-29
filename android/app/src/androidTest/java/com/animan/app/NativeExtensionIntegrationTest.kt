@@ -58,7 +58,12 @@ class NativeExtensionIntegrationTest {
             while(!EngineHost.ready && EngineHost.error==null && System.nanoTime()<deadline) Thread.sleep(250)
             assertNull("Embedded engine failed",EngineHost.error)
             assertTrue("Embedded engine did not start",EngineHost.ready)
-            val packages=JSONObject(request("/api/extensions/android")).getJSONArray("packages")
+            var inventory: String?=null
+            repeat(30) {
+                if(inventory==null) try { inventory=request("/api/extensions/android") }
+                catch (_: java.io.IOException) { Thread.sleep(250) }
+            }
+            val packages=JSONObject(requireNotNull(inventory) { "Embedded HTTP owner did not bind" }).getJSONArray("packages")
             val fixture=(0 until packages.length()).map { packages.getJSONObject(it) }.single { it.getString("pkg")==pkg }
             request("/api/extensions/android/$pkg/trust",JSONObject().put("approved",true)
                 .put("versionCode",fixture.getString("versionCode")).put("signer",fixture.getString("signer")))
