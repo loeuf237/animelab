@@ -4,6 +4,10 @@ Mise à jour : 29 octobre 2026. L'exigence de véritables APK Android est obliga
 Ce registre distingue code écrit, tests sur fixtures et compatibilité avec les
 applications/paquets réellement distribués. Il ne certifie pas une release.
 
+L'[étude WebView et sessions](WEBVIEW_SESSIONS.md) du 29 octobre complète ce
+registre : audit de concurrence, différences entre les deux hôtes, suspension
+SourceHTTP pendant la fenêtre et limites du partage de cookies entre processus.
+
 ## Fonctionnalités présentes
 
 | Lots | Réalisation | Validation / limites |
@@ -149,6 +153,14 @@ mémos dans le client. Une erreur native typée reste identifiable ; un héberge
 fonctionnel peut encore réussir si un autre échoue. Ces nouveaux changements
 nécessitent leur propre CI et leur propre réception physique ; les preuves
 `64c591a` ci-dessus ne les valident pas.
+
+Le commit `e0718ea` de ces correctifs réussit la suite locale complète
+(1 013 tests, 5 ignorés), puis les
+[7 jobs généraux](https://github.com/loeuf237/animelab/actions/runs/40844963392)
+et [5 jobs Android](https://github.com/loeuf237/animelab/actions/runs/40844963382).
+La fixture de détail sans URL/titre réussit donc sur API 29/30/35.
+L'application ARM64 complète est construite, mais ce commit n'a pas encore
+été réceptionné physiquement sur le SCV38.
 
 Le contrat final reste [APK01–APK14](EXIGENCES_ANDROID_APK.md). Les lots
 incomplets restent nécessaires ; une limite ou non-adoption provisoire

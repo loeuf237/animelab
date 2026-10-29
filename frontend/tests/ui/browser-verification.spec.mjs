@@ -1,6 +1,74 @@
 import { test, expect } from '@playwright/test'
 import { mockApp } from './fixtures.mjs'
 
+test('a returned WebView session retries once without claiming verified access', async ({
+  page,
+}) => {
+  await mockApp(page)
+  let catalogueCalls = 0
+  let completed = false
+  let rechecks = 0
+  await page.route('**/api/sources/aniyomi-long/catalogue?**', (route) => {
+    catalogueCalls++
+    return completed
+      ? route.fulfill({
+          json: { source: 'aniyomi-long', results: [], nextCursor: null, queryScope: 'catalogue' },
+        })
+      : route.fulfill({
+          status: 409,
+          json: {
+            code: 'verification_required',
+            error: 'Vérification nécessaire',
+            domain: 'example.test',
+            url: 'https://example.test/',
+          },
+        })
+  })
+  await page.route('**/api/network/**', (route) => {
+    const path = new URL(route.request().url()).pathname
+    if (path === '/api/network/sessions')
+      return route.fulfill({
+        json: {
+          platform: 'android',
+          webviewAvailable: true,
+          browsers: [],
+          modes: [{ id: 'webview', available: true, capturesCookies: true, reason: null }],
+          sessions: [],
+        },
+      })
+    if (path === '/api/network/verification')
+      return route.fulfill({
+        json: { id: 'webview-test', domain: 'example.test', mode: 'webview' },
+      })
+    if (path.endsWith('/complete')) {
+      completed = true
+      return route.fulfill({
+        json: {
+          success: true,
+          domain: 'example.test',
+          resumed: 0,
+          sessionImported: true,
+          accessVerified: false,
+        },
+      })
+    }
+    if (path.endsWith('/status')) return route.fulfill({ json: { status: 'pending' } })
+    rechecks++
+    return route.fulfill({ json: {} })
+  })
+  await page.goto('/app/sources/aniyomi-long?mode=catalogue')
+  await page.getByText('Modes de vérification disponibles', { exact: true }).click()
+  await page
+    .getByRole('button', { name: 'Ouvrir une fenêtre de vérification', exact: true })
+    .click()
+  await page.getByRole('button', { name: 'J’ai terminé la vérification', exact: true }).click()
+  const notice = page.locator('.verification-notice')
+  await expect(notice).toContainText('Session WebView récupérée')
+  await expect(notice).not.toContainText('Accès vérifié')
+  await expect.poll(() => catalogueCalls).toBe(2)
+  expect(rechecks).toBe(0)
+})
+
 for (const [width, lang] of [
   [360, 'fr'],
   [1280, 'en'],

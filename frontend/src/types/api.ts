@@ -132,6 +132,8 @@ export interface VerificationJob {
 export interface VerificationResult extends Result {
   domain: string
   resumed: number
+  sessionImported?: boolean
+  accessVerified?: boolean
 }
 export interface DownloadResult extends Result {
   taskId?: string

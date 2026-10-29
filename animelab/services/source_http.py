@@ -91,6 +91,7 @@ class DomainSession:
     last_error: str | None = None
     generation: int = 0
     pending_reset: bool = False
+    verification_owner: str | None = None
     last_used: float = field(default_factory=time.monotonic)
 
 
@@ -166,10 +167,14 @@ class SourceHTTPService:
     @contextmanager
     def lease(self, state):
         with state.condition:
+            if state.verification_owner:
+                raise VerificationRequired(state.blocked_url or 'https://'+state.domain+'/')
             while state.leased >= self.max_connections:
                 if self.closed:
                     raise RuntimeError("Transport source arrêté")
                 state.condition.wait()
+                if state.verification_owner:
+                    raise VerificationRequired(state.blocked_url or 'https://'+state.domain+'/')
             if self.closed:
                 raise RuntimeError("Transport source arrêté")
             state.leased += 1
@@ -217,6 +222,31 @@ class SourceHTTPService:
                 state.last_used = time.monotonic()
                 state.condition.notify_all()
 
+    def pause_for_webview(self, url, owner, timeout=30):
+        """Drain existing handles before opening; forbid new HTTP/stream leases."""
+        state=self.state(url)
+        with state.condition:
+            if state.verification_owner not in (None,owner):
+                raise ValueError('Une WebView utilise déjà cette session.')
+            state.verification_owner=owner
+            deadline=time.monotonic()+timeout
+            while state.leased:
+                if state.verification_owner!=owner:
+                    raise ValueError('La vérification WebView a été annulée.')
+                remaining=deadline-time.monotonic()
+                if remaining<=0:
+                    state.verification_owner=None
+                    state.condition.notify_all()
+                    raise ValueError('Les requêtes en cours ne sont pas terminées ; réessayez la WebView.')
+                state.condition.wait(remaining)
+
+    def release_webview(self, url, owner):
+        state=self.state(url)
+        with state.condition:
+            if state.verification_owner==owner:
+                state.verification_owner=None
+                state.condition.notify_all()
+
     def _change_proxy(self, state, proxy, *, public=False):
         """Caller holds the domain lock and there are no active handles."""
         for client in state.clients:
@@ -250,6 +280,9 @@ class SourceHTTPService:
             if automatic: return False
             raise ValueError("Aucune session connue pour cette source")
         with state.condition:
+            if state.verification_owner:
+                if automatic: return False
+                raise ValueError('Fermez la vérification WebView avant de changer le proxy de ce domaine.')
             # Never switch the address underneath an active media stream or request.
             if state.leased or state.pending_reset:
                 if automatic: return False
@@ -337,6 +370,8 @@ class SourceHTTPService:
             # this client's redirect policy, even when it shares source state.
             bypass_cache = True
         state = self.state(url)
+        if state.verification_owner:
+            raise VerificationRequired(state.blocked_url or str(url))
         headers = dict(httpx.Headers(headers or {}))
         headers["user-agent"] = USER_AGENT
         kwargs.pop("impersonate", None)
@@ -399,7 +434,7 @@ class SourceHTTPService:
             if not is_safe_url(url):
                 raise ValueError("URL source non autorisée")
             state = self.state(url)
-            if state.blocked_url and not verifying:
+            if state.verification_owner or (state.blocked_url and not verifying):
                 raise VerificationRequired(state.blocked_url)
             for attempt in range(3):
                 self.pace(state)
@@ -648,7 +683,7 @@ class SourceStream:
             if not is_safe_url(url):
                 raise ValueError("URL source non autorisée")
             state = service.state(url)
-            if state.blocked_url and not verifying:
+            if state.verification_owner or (state.blocked_url and not verifying):
                 raise VerificationRequired(state.blocked_url)
             service.pace(state)
             self.lease = service.lease(state)

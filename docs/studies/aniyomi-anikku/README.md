@@ -1,5 +1,8 @@
 # Étude de la gestion des extensions Aniyomi et Anikku
 
+Complément du 29 octobre : [WebView, sessions HTTP et reprise des extensions](WEBVIEW_SESSIONS.md),
+avec analyse séparée des deux hôtes, audit de concurrence et état des corrections.
+
 **Date : 28 octobre 2026 — AnimeLab étudié au commit `75c84ec`.**
 
 ## Résultat principal

@@ -126,6 +126,9 @@ class VerificationWindow:
     def destroy(self):
         self.bridge.close(self.url)
 
+    def is_closed(self):
+        return not bool(self.bridge.isOpen(self.url))
+
 
 def start(data_dir, cache_dir, port, token, test_mode=False):
     global _loop

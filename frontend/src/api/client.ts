@@ -227,6 +227,8 @@ export const api = {
       status: 'pending' | 'completed'
       domain: string
       resumed?: number
+      sessionImported?: boolean
+      accessVerified?: boolean
       error?: string
     }>(`/api/network/verification/${encodeURIComponent(id)}/status`)
   },

@@ -200,6 +200,8 @@ class VerificationJob(WireModel):
 class VerificationResult(Result):
     domain: str
     resumed: int = 0
+    sessionImported: bool | None = None
+    accessVerified: bool | None = None
 
 
 class StorageState(WireModel):

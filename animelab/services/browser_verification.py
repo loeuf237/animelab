@@ -103,6 +103,8 @@ class BrowserVerificationService:
                     return {"id": job["id"], "domain": domain, "mode": job["mode"]}
             if len(self.jobs) >= 3:
                 raise ValueError("Fermez une vérification avant d’en ouvrir une autre")
+            if mode=='webview' and any(job['mode']=='webview' for job in self.jobs.values()):
+                raise ValueError('Fermez la WebView actuelle avant d’en ouvrir une autre.')
             job = {"id": uuid.uuid4().hex, "domain": domain, "url": url, "created": time.monotonic(),
                    "mode": mode, "process": None, "window": None}
             mechanism = self.mechanisms[mode]
@@ -111,15 +113,23 @@ class BrowserVerificationService:
             initial = snapshot(self.transport, url, visible_only=mode == "webview")
             job['engineCookies'], job['browserCookies'] = initial, initial
             try:
+                if mode=='webview':
+                    await asyncio.to_thread(self.transport.pause_for_webview,url,job['id'])
                 await mechanism.open(self, job, state, browser)
             except BaseException:
-                await mechanism.close(job)
+                try:
+                    await mechanism.close(job)
+                finally:
+                    self.transport.release_webview(url,job['id'])
                 raise
             if (job["routeProxy"], job["routeGeneration"]) != (state.proxy, state.generation):
-                await mechanism.close(job)
+                try:
+                    await mechanism.close(job)
+                finally:
+                    self.transport.release_webview(url,job['id'])
                 from animelab.api_errors import APIProblem
                 raise APIProblem("verification_route_changed", status=409, category="protection", action="verify")
-            job["needsProbe"] = True
+            job["needsProbe"] = mode!='webview'
             self.jobs[job["id"]] = job
             return {"id": job["id"], "domain": domain, "mode": mode}
 
@@ -202,7 +212,31 @@ class BrowserVerificationService:
         check_route()
         await self.synchronize(job)
         check_route()
-        # Check the upstream response, rather than trusting a user's confirmation.
+        if job['mode']=='webview':
+            # Cookie transfer is not an access verdict. Stop browser networking
+            # before resuming an actual source operation; never add an HTTP probe.
+            await self.mechanisms['webview'].close(job)
+            job['windowClosed']=True
+            check_route()
+        else:
+            await self._probe(job)
+        with state.condition:
+            check_route()
+            state.blocked_url = None
+            state.last_error = None
+            state.generation += 1
+            self.transport.release_webview(job['url'],job['id'])
+        result = {"success": True, "domain": job["domain"]}
+        if job['mode']=='webview':
+            result.update(sessionImported=True,accessVerified=False)
+        if self.verified_callback:
+            result['resumed'] = self.verified_callback(job['domain'])
+        self.completed[job_id] = {'created': time.monotonic(), 'result': result}
+        await self.cancel(job_id)
+        return result
+
+    async def _probe(self, job):
+        # Chromium mode retains its existing explicit upstream validation.
         media = any(x in urlparse(job["url"]).path.lower() for x in (".mp4", ".m3u8", ".ts", ".m4s"))
         method = "HEAD" if media else "GET"
         try:
@@ -217,24 +251,15 @@ class BrowserVerificationService:
             raise ValueError(f"La source refuse encore l’accès (HTTP {exc.response.status_code}) ; la vérification reste en attente") from exc
         except httpx.RequestError as exc:
             raise ValueError("La source est injoignable ; réessayez la validation lorsque la connexion sera rétablie") from exc
-        with state.condition:
-            check_route()
-            state.blocked_url = None
-            state.last_error = None
-            state.generation += 1
-        result = {"success": True, "domain": job["domain"]}
-        if self.verified_callback:
-            result['resumed'] = self.verified_callback(job['domain'])
-        self.completed[job_id] = {'created': time.monotonic(), 'result': result}
-        # status() is lock-free and may be polled while native close awaits
-        # process termination. Publish completion before removing the job.
-        await self.cancel(job_id)
-        return result
 
     async def cancel(self, job_id):
-        job = self.jobs.pop(job_id, None)
+        job = self.jobs.get(job_id)
         if job:
-            await self.mechanisms[job["mode"]].close(job)
+            if not job.get('windowClosed'):
+                await self.mechanisms[job["mode"]].close(job)
+            if self.jobs.get(job_id) is job:
+                self.jobs.pop(job_id)
+                self.transport.release_webview(job['url'],job['id'])
 
     async def expire(self):
         for job_id, value in list(self.completed.items()):
@@ -252,6 +277,12 @@ class BrowserVerificationService:
                 for job_id, job in list(self.jobs.items()):
                     try:
                         changed = await self.synchronize(job)
+                        if job['mode']=='webview':
+                            window=job.get('window')
+                            closed=getattr(window,'is_closed',None)
+                            if closed is not None and await asyncio.to_thread(closed):
+                                await self._complete(job_id)
+                            continue  # No emulated upstream probe while a WebView owns the session.
                         if changed or job.pop('needsProbe', False):
                             job['needsProbe'] = False
                             await self._complete(job_id)

@@ -74,16 +74,144 @@ async def test_route_change_never_imports_cookies_or_clears_challenge(service, m
 
 
 @pytest.mark.asyncio
-async def test_webview_captures_then_rechecks_and_duplicate_complete_is_idempotent(service, monkeypatch):
+async def test_webview_captures_without_a_probe_and_duplicate_complete_is_idempotent(service, monkeypatch):
     browser, state = service
     monkeypatch.setattr('animelab.services.browser_verification.is_safe_url', lambda url: True)
-    monkeypatch.setattr(browser.transport, 'request', lambda method, url, **kwargs: httpx.Response(200, request=httpx.Request(method, url)))
+    def unexpected_request(*args,**kwargs):
+        pytest.fail('WebView completion must not send an emulated HTTP probe')
+    monkeypatch.setattr(browser.transport, 'request', unexpected_request)
     job = await browser.start('source.example', mode='webview')
-    assert (await browser.complete(job['id']))['success']
+    result=await browser.complete(job['id'])
+    assert result['success'] and result['sessionImported'] and result['accessVerified'] is False
     assert state.blocked_url is None
     assert [cookie.name for cookie in state.cookies] == ['cf_clearance']
     assert (await browser.complete(job['id']))['success']
     assert browser.status(job['id'])['status'] == 'completed'
+
+
+@pytest.mark.asyncio
+async def test_webview_watcher_never_probes_or_resumes_while_the_window_is_open(service,monkeypatch):
+    import asyncio
+    browser,state=service
+    window=type('Window',(),{
+        'closed':False,'get_cookies':lambda self:[SimpleCookie('cf_clearance=fresh')],
+        'is_closed':lambda self:self.closed,'destroy':lambda self:setattr(self,'closed',True)})()
+    browser.webview_opener=lambda url:window
+    monkeypatch.setattr('animelab.services.browser_verification.is_safe_url',lambda url:True)
+    def unexpected_request(*args,**kwargs):
+        pytest.fail('The watcher issued an upstream probe')
+    monkeypatch.setattr(browser.transport,'request',unexpected_request)
+    resumed=[]
+    def resume(domain):
+        assert window.closed and state.verification_owner is None
+        resumed.append(domain)
+        return 1
+    browser.verified_callback=resume
+    job=await browser.start('source.example',mode='webview')
+    watcher=asyncio.create_task(browser.watch())
+    try:
+        await asyncio.sleep(1.15)
+        assert browser.status(job['id'])['status']=='pending'
+        assert state.blocked_url and state.verification_owner==job['id'] and not resumed
+        assert [cookie.value for cookie in state.cookies]==['fresh']
+        # Return/back in the actual app closes the window before a pending source resumes.
+        window.closed=True
+        for _ in range(25):
+            if browser.status(job['id'])['status']=='completed':
+                break
+            await asyncio.sleep(.1)
+        assert browser.status(job['id'])['accessVerified'] is False and resumed==['source.example']
+    finally:
+        watcher.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await watcher
+        await browser.close()
+
+
+@pytest.mark.asyncio
+async def test_webview_drains_active_handles_before_navigation_and_cancel_releases_gate(service,monkeypatch):
+    import asyncio
+    browser,state=service
+    monkeypatch.setattr('animelab.services.browser_verification.is_safe_url',lambda url:True)
+    opened=[]
+    old=browser.webview_opener
+    browser.webview_opener=lambda url:opened.append(url) or old(url)
+    with state.condition:
+        state.leased=1
+    opening=asyncio.create_task(browser.start('source.example',mode='webview'))
+    try:
+        for _ in range(25):
+            if state.verification_owner:
+                break
+            await asyncio.sleep(.01)
+        assert state.verification_owner and not opened
+        with state.condition:
+            state.leased=0
+            state.condition.notify_all()
+        job=await opening
+        assert opened
+        await browser.cancel(job['id'])
+        assert state.verification_owner is None and state.blocked_url
+    finally:
+        with state.condition:
+            state.leased=0
+            state.condition.notify_all()
+        await browser.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('bounded',[False,True])
+async def test_webview_gate_blocks_even_explicit_challenge_probes_before_network_io(service,monkeypatch,bounded):
+    browser,state=service
+    monkeypatch.setattr('animelab.services.browser_verification.is_safe_url',lambda url:True)
+    monkeypatch.setattr('animelab.services.source_http.is_safe_url',lambda url:True)
+    job=await browser.start('source.example',mode='webview')
+    def no_session(**kwargs):
+        pytest.fail('An emulated HTTP session was created while the WebView was open')
+    monkeypatch.setattr(browser.transport,'session_factory',no_session)
+    from animelab.services.source_http import VerificationRequired
+    try:
+        with pytest.raises(VerificationRequired):
+            if bounded:
+                async with browser.transport.async_client().stream('GET',state.blocked_url,verify_challenge=True):
+                    pass
+            else:
+                await browser.transport.async_client().get(state.blocked_url,verify_challenge=True)
+        # A stale job cannot release the current owner's gate.
+        browser.transport.release_webview(state.blocked_url,'other-job')
+        assert state.verification_owner==job['id']
+        assert browser.transport.rotate_proxy(state.domain,automatic=True) is False
+        with pytest.raises(ValueError,match='WebView'):
+            browser.transport.rotate_proxy(state.domain)
+    finally:
+        await browser.cancel(job['id'])
+
+
+def test_webview_drain_timeout_does_not_leave_a_session_locked(service):
+    browser,state=service
+    state.leased=1
+    try:
+        with pytest.raises(ValueError,match='requêtes en cours'):
+            browser.transport.pause_for_webview(state.blocked_url,'job',timeout=.001)
+        assert state.verification_owner is None
+    finally:
+        state.leased=0
+
+
+@pytest.mark.asyncio
+async def test_failed_native_close_keeps_the_gate_and_job_until_close_is_confirmed(service,monkeypatch):
+    browser,state=service
+    monkeypatch.setattr('animelab.services.browser_verification.is_safe_url',lambda url:True)
+    job=await browser.start('source.example',mode='webview')
+    close=AsyncMock(side_effect=RuntimeError('Native window is still active'))
+    monkeypatch.setattr(browser.mechanisms['webview'],'close',close)
+    with pytest.raises(RuntimeError):
+        await browser.cancel(job['id'])
+    assert job['id'] in browser.jobs and state.verification_owner==job['id']
+    assert state.blocked_url
+    close.side_effect=None
+    await browser.cancel(job['id'])
+    assert job['id'] not in browser.jobs and state.verification_owner is None
 
 
 @pytest.mark.asyncio
