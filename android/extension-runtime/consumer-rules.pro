@@ -1,4 +1,6 @@
 # Extension DEX files link these public classes and facades dynamically.
+-keep class kotlin.** { *; }
+-keep class kotlinx.coroutines.** { *; }
 -keep class eu.kanade.tachiyomi.animesource.** { *; }
 -keep class eu.kanade.tachiyomi.network.** { *; }
 -keep class eu.kanade.tachiyomi.util.** { *; }
