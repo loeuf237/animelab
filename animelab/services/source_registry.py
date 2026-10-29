@@ -12,6 +12,11 @@ from animelab.models.anime import AnimeResult, AnimeDetail
 from animelab.services.aniyomi_dex_parser import SourceRecipe
 
 
+def source_identity(service, fallback):
+    value=getattr(service,'source_id',None)
+    return value if isinstance(value,str) and value else fallback
+
+
 @runtime_checkable
 class SourceProvider(Protocol):
     base_url: str
@@ -174,7 +179,7 @@ class SourceRegistry:
 
     def all(self) -> list[RegisteredSource]:
         providers = dict(self.natives())
-        providers.update({getattr(source,'source_id',source.pkg): source for source in self.extensions().get_enabled_container_sources()})
+        providers.update({source_identity(source,source.pkg): source for source in self.extensions().get_enabled_container_sources()})
         return [self.describe(sid, service) for sid, service in providers.items()]
 
     def get(self, source_id: str) -> RegisteredSource:
@@ -184,7 +189,7 @@ class SourceRegistry:
             service = self.extensions().get_container_source_by_id(source_id)
         if service is None:
             raise APIProblem('source_not_found', status=404, category='not_found')
-        return self.describe(source_id, service)
+        return self.describe(source_identity(service,source_id), service)
 
     def detect(self, url: str, fallback: str = 'french-manga') -> str:
         host = (urlparse(url).hostname or '').lower()

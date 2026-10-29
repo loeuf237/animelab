@@ -42,6 +42,9 @@ def test_native_discovery_retains_ids_and_source_instance_metadata(host):
     settings=SourceSettingsService(service.db_path).get_all_sources_with_settings()
     assert {s['id'] for s in settings if s['type']=='imported'}=={source.source_id for source in sources}
     source=sources[0]
+    service.set_source_alias('fixture.one',source.source_id)
+    assert service.get_container_source_by_id('fixture.one') is source
+    assert SourceRegistry(natives={},extensions=service).get('fixture.one').id==source.source_id
     source._episodes['https://fixture.example/episode']={'memo':{'cursor':'native'}}
     service.sync_android_extensions()
     assert service.get_container_source_by_id(source.source_id) is source

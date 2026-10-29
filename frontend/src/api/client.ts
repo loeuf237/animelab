@@ -838,6 +838,12 @@ export const api = {
   async androidExtensions(): Promise<AndroidExtensionState> {
     return request('/api/extensions/android')
   },
+  async setExtensionSourceAlias(alias: string, sourceKey: string) {
+    return request('/api/extensions/source-aliases', {
+      method: 'POST',
+      body: JSON.stringify({ alias, source_key: sourceKey }),
+    })
+  },
   async trustAndroidExtension(extension: NativeExtension): Promise<unknown> {
     return request(`/api/extensions/android/${encodeURIComponent(extension.pkg)}/trust`, {
       method: 'POST',

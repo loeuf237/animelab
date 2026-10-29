@@ -18,6 +18,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.Assume.assumeTrue
 import org.junit.runner.RunWith
 import java.io.File
 import java.util.UUID
@@ -34,6 +35,36 @@ class ExtensionAPKTest {
         val value=JSONObject(raw)
         assertTrue("Native error: $value",value.optBoolean("ok"))
         return value.get("result")
+    }
+
+    @Test fun existing_shared_apks_load_without_reinstallation() {
+        val requested=InstrumentationRegistry.getArguments().getString("real_packages").orEmpty()
+            .split(',').filter { it.isNotBlank() }
+        assumeTrue("Optional, explicitly selected installed-APK corpus",requested.isNotEmpty())
+        require(requested.size<=5 && requested.all { it.matches(Regex("eu\\.kanade\\.tachiyomi\\.animeextension\\.[a-z0-9_.]+")) })
+        ExtensionHostClient(context).use { client ->
+            val packages=decoded(client.discover()) as JSONArray
+            val proofs=JSONArray()
+            for(pkg in requested) {
+                val before=context.packageManager.getPackageInfo(pkg,0)
+                val descriptor=(0 until packages.length()).map { packages.getJSONObject(it) }.single { it.getString("pkg")==pkg }
+                val trust=JSONObject().put("operationId",UUID.randomUUID().toString()).put("operation","trust").put("pkg",pkg)
+                    .put("versionCode",descriptor.getString("versionCode")).put("signer",descriptor.getString("signer"))
+                decoded(client.invoke(trust.toString()))
+                val refreshed=decoded(client.discover()) as JSONArray
+                val loaded=(0 until refreshed.length()).map { refreshed.getJSONObject(it) }.single { it.getString("pkg")==pkg }
+                val after=context.packageManager.getPackageInfo(pkg,0)
+                assertEquals(before.firstInstallTime,after.firstInstallTime)
+                assertEquals(before.lastUpdateTime,after.lastUpdateTime)
+                proofs.put(JSONObject().put("pkg",pkg).put("versionCode",descriptor.getString("versionCode"))
+                    .put("signer",descriptor.getString("signer")).put("state",loaded.getString("state"))
+                    .put("sources",loaded.getJSONArray("sources").length()).put("error",loaded.optString("error"))
+                    .put("notReinstalled",true).put("realSiteOperationsTested",false))
+            }
+            android.util.Log.i("ANIMELAB_APK_PROOF",JSONObject().put("installedSharedAPKCorpus",proofs)
+                .put("androidApi",android.os.Build.VERSION.SDK_INT).put("actualAniyomiAnikkuHostsTested",false).toString())
+            for(i in 0 until proofs.length()) assertEquals(proofs.getJSONObject(i).toString(),"loaded",proofs.getJSONObject(i).getString("state"))
+        }
     }
 
     @Test fun original_apks_install_discover_execute_and_preserve_source_preferences() {

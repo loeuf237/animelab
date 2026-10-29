@@ -6,6 +6,7 @@ export interface NativeSource {
   supportsLatest: boolean
   configurable: boolean
   enabled?: boolean
+  aliases?: string[]
 }
 
 export interface NativeExtension {

@@ -1,4 +1,5 @@
 # Python resolves these names and methods with java.jclass, outside R8's call graph.
+-keep class com.animan.app.BuildConfig { public static boolean EXTENSION_RUNTIME_ENABLED; }
 -keep class com.animan.app.MediaBridge { *; }
 -keep class com.animan.app.CryptoBridge { *; }
 -keep class com.animan.app.NativeHooks { *; }

@@ -40,7 +40,7 @@ class Fixture(override val lang: String) : AnimeHttpSource(), ConfigurableAnimeS
     override fun fetchEpisodeList(anime: SAnime): Observable<List<SEpisode>> = Observable.just(listOf(SEpisode.create().apply {
         url = "/episode/1"; name = "Computed episode"; episode_number = 1f
     }))
-    private fun video() = Video(videoUrl="https://fixture.example/stream.m3u8", videoTitle="720p",
+    private fun video() = Video(url="https://fixture.example/episode/1", quality="720p", videoUrl="https://fixture.example/stream.m3u8",
         headers=Headers.headersOf("Referer", "https://fixture.example/", "X-Fixture", lang),
         subtitleTracks=listOf(Track("https://fixture.example/sub.vtt",lang)))
     override fun fetchVideoList(episode: SEpisode): Observable<List<Video>> = Observable.just(listOf(video()))

@@ -1,4 +1,4 @@
-from animelab.services.source_registry import source_registry, RegisteredSource
+from animelab.services.source_registry import source_registry, RegisteredSource, source_identity
 """Browse each source using its actual routes, filters and extension recipe."""
 import hashlib
 import json
@@ -34,7 +34,7 @@ class SourceCatalogueService:
 
     def sources(self):
         entries = [self.descriptor(sid, self.provider(sid)) for sid in ('voir-anime', 'animepahe', 'french-manga')]
-        active = {getattr(ext,'source_id',ext.pkg): ext for ext in extension_service.get_enabled_container_sources()}
+        active = {source_identity(ext,ext.pkg): ext for ext in extension_service.get_enabled_container_sources()}
         entries += [self.descriptor(sid, ext) for sid, ext in active.items() if not getattr(ext,'metadata',{}).get('hidden')]
         for saved in extension_service.retained_source_descriptors():
             if saved['source_key'] not in active and not saved['hidden']:

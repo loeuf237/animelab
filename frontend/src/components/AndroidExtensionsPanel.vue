@@ -99,6 +99,15 @@
             >
               {{ tx('Préférences de la source') }}
             </button>
+            <button
+              v-if="!source.aliases?.includes(extension.pkg)"
+              class="btn btn-secondary"
+              :disabled="busy"
+              @click="run(() => api.setExtensionSourceAlias(extension.pkg, `aniyomi:${source.id}`))"
+            >
+              {{ tx('Utiliser pour les anciennes références de ce paquet') }}
+            </button>
+            <span v-else>{{ tx('Source choisie pour les anciennes références du paquet') }}</span>
           </div>
         </li>
       </ul>

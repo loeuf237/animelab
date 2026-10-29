@@ -10,6 +10,15 @@ logger = logging.getLogger("animelab.router.extensions")
 router = APIRouter(route_class=ContractRoute)
 
 
+@router.post('/api/extensions/source-aliases')
+async def set_extension_source_alias(payload: dict = Body(...)):
+    import asyncio
+    try:
+        return await asyncio.to_thread(extension_service.set_source_alias,payload.get('alias'),payload.get('source_key'))
+    except ValueError as error:
+        raise HTTPException(400,str(error)) from error
+
+
 @router.get('/api/extensions/backup')
 async def backup_extensions_api(include_artifacts: bool = False):
     import asyncio

@@ -1,4 +1,4 @@
-from animelab.services.source_registry import source_registry
+from animelab.services.source_registry import source_registry, source_identity
 from animelab.api_contracts import ContractRoute
 from animelab.services.source_http import VerificationRequired
 import asyncio
@@ -187,7 +187,7 @@ async def api_home_feed():
     for idx, ext in enumerate(enabled_extensions):
         res = all_res[3 + idx]
         if not isinstance(res, Exception) and res:
-            ext_releases[getattr(ext,'source_id',ext.pkg)] = {
+            ext_releases[source_identity(ext,ext.pkg)] = {
                 "name": ext.name,
                 "releases": [r.model_dump() for r in res[:24]],
             }
@@ -223,12 +223,12 @@ async def api_home_feed():
         "recentHistory": history_items,
         "enabledExtensions": [
             {
-                "id": getattr(ext,'source_id',ext.pkg),
+                "id": source_identity(ext,ext.pkg),
                 "pkg": ext.pkg,
                 "name": ext.name,
                 "lang": getattr(ext, "lang", "fr"),
                 "baseUrl": getattr(ext, "base_url", ""),
-                "supportsLatest": source_registry.describe(getattr(ext,'source_id',ext.pkg), ext).capabilities.latest,
+                "supportsLatest": source_registry.describe(source_identity(ext,ext.pkg), ext).capabilities.latest,
             }
             for ext in enabled_extensions
         ],

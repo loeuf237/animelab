@@ -913,6 +913,7 @@ class ExtensionService:
                             source._diagnostics_db_path = self.db_path
                             loaded[source.source_id] = source
                         descriptor.update(enabled=bool(state['enabled']), hidden=bool(state['hidden']), pinned=bool(state['pinned']))
+                        descriptor['aliases']=[alias['alias'] for alias in conn.execute('SELECT alias FROM extension_source_aliases WHERE source_key=?',(source.source_id,))]
                     package['enabled'] = bool(row['is_enabled'])
                     package['extension_id'] = row['id']
             self._native_packages = packages
@@ -933,6 +934,19 @@ class ExtensionService:
     def retained_source_descriptors(self):
         with self._get_conn() as conn:
             return [dict(row) for row in conn.execute('SELECT * FROM extension_sources')]
+
+    def set_source_alias(self, alias, source_key):
+        if not isinstance(alias,str) or not re.fullmatch(r'[a-z0-9_]+(?:\.[a-z0-9_]+)+',alias) or len(alias)>255:
+            raise ValueError('Ancien identifiant de package invalide.')
+        target=self._active_container_sources.get(source_key)
+        if target is None or getattr(target,'runtime','')!='android-apk':
+            raise ValueError('Choisissez une source APK chargée.')
+        with self._get_conn() as conn:
+            if not conn.execute('SELECT 1 FROM imported_extensions WHERE pkg=?',(alias,)).fetchone():
+                raise ValueError('Aucune ancienne référence connue pour ce package.')
+            conn.execute('INSERT INTO extension_source_aliases(alias,source_key) VALUES (?,?) ON CONFLICT(alias) DO UPDATE SET source_key=excluded.source_key',(alias,source_key))
+        self.sync_android_extensions()
+        return {'success':True,'alias':alias,'source_key':source_key,'libraryRowsDeleted':0}
 
     async def android_operation_states(self):
         from animelab.services import android_extensions
@@ -1018,6 +1032,10 @@ class ExtensionService:
         sid = source_id.lower().strip()
         if sid in self._active_container_sources:
             return self._active_container_sources[sid]
+        with self._get_conn() as conn:
+            alias=conn.execute('SELECT source_key FROM extension_source_aliases WHERE alias=?',(sid,)).fetchone()
+        if alias:
+            return self._active_container_sources.get(alias['source_key'])
         matches = [src for src in self._active_container_sources.values()
                    if src.name.lower() == sid or src.pkg.lower() == sid]
         return matches[0] if len(matches) == 1 else None
