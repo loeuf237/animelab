@@ -222,16 +222,18 @@ class SourceHTTPService:
                 state.last_used = time.monotonic()
                 state.condition.notify_all()
 
-    def pause_for_webview(self, url, owner, timeout=30):
+    def pause_for_webview(self, url, owner, timeout=30, cancelled=None):
         """Drain existing handles before opening; forbid new HTTP/stream leases."""
         state=self.state(url)
         with state.condition:
+            if cancelled is not None and cancelled.is_set():
+                raise ValueError('La vérification WebView a été annulée.')
             if state.verification_owner not in (None,owner):
                 raise ValueError('Une WebView utilise déjà cette session.')
             state.verification_owner=owner
             deadline=time.monotonic()+timeout
             while state.leased:
-                if state.verification_owner!=owner:
+                if state.verification_owner!=owner or (cancelled is not None and cancelled.is_set()):
                     raise ValueError('La vérification WebView a été annulée.')
                 remaining=deadline-time.monotonic()
                 if remaining<=0:

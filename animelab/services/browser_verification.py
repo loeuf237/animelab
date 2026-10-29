@@ -6,6 +6,7 @@ from pathlib import Path
 import shutil
 import sys
 import time
+import threading
 import uuid
 from urllib.parse import urlparse
 
@@ -112,26 +113,33 @@ class BrowserVerificationService:
             job["routeGeneration"] = state.generation
             initial = snapshot(self.transport, url, visible_only=mode == "webview")
             job['engineCookies'], job['browserCookies'] = initial, initial
+            opening_cancelled=threading.Event()
             try:
                 if mode=='webview':
-                    await asyncio.to_thread(self.transport.pause_for_webview,url,job['id'])
+                    await asyncio.to_thread(self.transport.pause_for_webview,url,job['id'],cancelled=opening_cancelled)
                 await mechanism.open(self, job, state, browser)
             except BaseException:
-                try:
-                    await mechanism.close(job)
-                finally:
-                    self.transport.release_webview(url,job['id'])
+                opening_cancelled.set()
+                await self._abort_open(job)
                 raise
             if (job["routeProxy"], job["routeGeneration"]) != (state.proxy, state.generation):
-                try:
-                    await mechanism.close(job)
-                finally:
-                    self.transport.release_webview(url,job['id'])
+                await self._abort_open(job)
                 from animelab.api_errors import APIProblem
                 raise APIProblem("verification_route_changed", status=409, category="protection", action="verify")
             job["needsProbe"] = mode!='webview'
             self.jobs[job["id"]] = job
             return {"id": job["id"], "domain": domain, "mode": mode}
+
+    async def _abort_open(self, job):
+        try:
+            await self.mechanisms[job['mode']].close(job)
+        except BaseException:
+            # Keep ownership until native shutdown actually succeeds; the next
+            # watcher tick or an explicit cancel can retry the cleanup.
+            job['openingFailed']=True
+            self.jobs[job['id']]=job
+            raise
+        self.transport.release_webview(job['url'],job['id'])
 
     async def _cdp(self, job, command, params=None):
         process = job["process"]
@@ -276,6 +284,9 @@ class BrowserVerificationService:
                 await self.expire()
                 for job_id, job in list(self.jobs.items()):
                     try:
+                        if job.get('openingFailed'):
+                            await self.cancel(job_id)
+                            continue
                         changed = await self.synchronize(job)
                         if job['mode']=='webview':
                             window=job.get('window')

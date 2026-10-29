@@ -239,7 +239,7 @@ contrôle de flux, **pas des captures de paquets du téléphone**.
 uv run --locked python docs/studies/aniyomi-anikku/audit_webview_concurrency.py
 ```
 
-Les **78 tests Python ciblés** couvrent transport, cookies et vérification :
+Les **80 tests Python ciblés** couvrent transport, cookies et vérification :
 absence de sonde, import, reprise après fermeture, verrou des requêtes/flux,
 annulation, expiration et changements de route. La suite complète du commit
 précédent `e0718ea` compte **1 013 réussites, 5 ignorés** ; ses
@@ -247,11 +247,15 @@ précédent `e0718ea` compte **1 013 réussites, 5 ignorés** ; ses
 et [5 jobs Android](https://github.com/loeuf237/animelab/actions/runs/40844963382)
 réussissent. Le patch WebView passe ensuite la suite Python complète :
 **1 019 réussites, 5 ignorés**. Après ajout des champs publics de résultat et
-du verrou de rotation, la campagne ciblée finale réussit **89 tests**.
+du verrou de rotation, la campagne ciblée finale réussit **91 tests**.
 Un essai Playwright hors ligne réussit aussi : retour de session, un seul
 rechargement du catalogue et absence de fausse annonce d'accès vérifié.
 Le navigateur Chrome déjà installé a été utilisé, sans téléchargement de navigateur.
 Ces résultats locaux ne remplacent pas la CI ni une réception sur le téléphone.
+
+Les tests supplémentaires vérifient aussi qu'un échec de fermeture native
+conserve le verrou, qu'une ouverture partielle reste récupérable et qu'un
+ancien travail de drainage annulé ne peut pas réacquérir une session orpheline.
 
 Réception physique encore requise, avec APK construits dans GitHub Actions :
 

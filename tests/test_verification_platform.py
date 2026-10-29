@@ -215,6 +215,33 @@ async def test_failed_native_close_keeps_the_gate_and_job_until_close_is_confirm
 
 
 @pytest.mark.asyncio
+async def test_partial_open_with_failed_close_remains_owned_until_cleanup_succeeds(service,monkeypatch):
+    browser,state=service
+    monkeypatch.setattr('animelab.services.browser_verification.is_safe_url',lambda url:True)
+    mechanism=browser.mechanisms['webview']
+    monkeypatch.setattr(mechanism,'open',AsyncMock(side_effect=ValueError('Partial native open')))
+    close=AsyncMock(side_effect=RuntimeError('Native shutdown not confirmed'))
+    monkeypatch.setattr(mechanism,'close',close)
+    with pytest.raises(RuntimeError):
+        await browser.start('source.example',mode='webview')
+    job=next(iter(browser.jobs.values()))
+    assert job['openingFailed'] and state.verification_owner==job['id']
+    close.side_effect=None
+    await browser.cancel(job['id'])
+    assert not browser.jobs and state.verification_owner is None
+
+
+def test_cancelled_drain_cannot_later_claim_an_orphaned_gate(service):
+    import threading
+    browser,state=service
+    cancelled=threading.Event()
+    cancelled.set()
+    with pytest.raises(ValueError,match='annulée'):
+        browser.transport.pause_for_webview(state.blocked_url,'old-job',cancelled=cancelled)
+    assert state.verification_owner is None
+
+
+@pytest.mark.asyncio
 async def test_remote_client_options_do_not_offer_server_windows(service, monkeypatch):
     from animelab.routers.network import router
     browser, _ = service
