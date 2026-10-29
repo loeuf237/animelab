@@ -207,6 +207,10 @@ Stop it with `docker compose down`. See the [Docker guide](docs/docker.md) for v
 
 ## Development and contributions
 
+Start with the contribution guide ([English](CONTRIBUTING.en.md) /
+[Français](CONTRIBUTING.md)) for bug reports, setup, validation and pull requests.
+Contributions in French and English are welcome.
+
 The Python engine lives in `animelab/`; desktop packaging uses `animelab.spec`.
 See the [package namespace and compatibility notes](docs/package-namespace.md).
 
