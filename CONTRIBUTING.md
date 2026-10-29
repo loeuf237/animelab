@@ -37,7 +37,17 @@ les objectifs et critères de validation de chaque chantier :
 - téléchargement et édition audio depuis des extensions, puis création de
   MKV multipistes audio ;
 - ergonomie et présentation de la page Extensions, inspirées de Mihon/Aniyomi ;
-- amélioration du README et de la documentation.
+- amélioration du README et de la documentation ;
+- création de thèmes et choix d’une apparence personnalisée ;
+- choix d’un dossier externe Android dès le premier démarrage ;
+- amélioration du lecteur vidéo Android ;
+- organisation, recherche et gestion de la bibliothèque ;
+- lecture vidéo hors ligne et accès fiable aux médias locaux sur Android.
+
+Retrouvez les tâches publiées et leurs liens dans le
+[suivi des contributions #12](https://github.com/loeuf237/animelab/issues/12).
+Les petites tâches portent le label `good first issue` ; les chantiers complets
+sont ouverts sous `help wanted`.
 
 Les propositions de fonctionnalités et d’architecture sont les bienvenues.
 Vous pouvez contacter le mainteneur sur

@@ -174,6 +174,91 @@ claimed and a clear distinction between available, experimental and planned
 features. A tutorial followed and corrected by someone new to the project is
 particularly useful.
 
+## 9. Create application themes
+
+**Goal:** let contributors offer themes and let users choose AnimeLab’s
+appearance beyond the existing light/dark modes.
+
+Define a palette format reusing existing style variables, previews and a theme
+selector. Initial deliverables can be a documented palette and mockups, followed
+by an integrated theme. Support persistent selection, restoring the default and
+consistency across Android, desktop and web screens. Any theme import should
+use validated declarative data with resources available offline.
+
+**Expected validation:** screenshots of the player, library, extensions and
+settings; readable contrast, focus, error states and text on mobile and desktop.
+Verify selection survives restart, invalid palettes fall back to the default,
+and existing themes keep working.
+
+## 10. Choose an external folder on first Android launch
+
+**Goal:** offer a user-selected AnimeLab folder for media, subtitles and exports
+on first launch, reusing the folder selection already available in Android
+settings.
+
+Add this step to initial onboarding: explain the destination, open the system
+picker, confirm the selection or keep the default. Preserve the persistent
+permission and allow changing the folder later. Clearly define exported data;
+databases, cookies and secrets remain in private application storage.
+
+**Expected validation:** first launch, picker cancellation, an authorized,
+unwritable or unavailable folder, restart and revoked permission. Respect the
+Android picker's restrictions and offer a valid folder or the default
+destination. Changing the folder must not silently move or delete existing
+media; any migration needs an explicit, verified user flow.
+
+## 11. Improve the Android video player
+
+**Goal:** make playback more comfortable on phones, for streaming and downloaded
+files, with accessible touch controls.
+
+Propose and test a better control layout: play/pause, seeking, fullscreen,
+orientation, speed, audio, subtitles and next episode. Additional gestures can
+be separate small proposals. Reuse existing playback progress and media
+contracts; justify any change to the playback engine.
+
+**Expected validation:** small screens, portrait/landscape, usable controls and
+menus, position restoration after closing or Activity recreation, decoding
+errors and unavailable local media. Check which tracks actually work and state
+format/codec limitations explicitly. Include local playback without a network
+and preserve desktop/web behavior.
+
+## 12. Improve library management
+
+**Goal:** make series, episodes and downloaded media easier to find and organize
+as the library grows.
+
+Proposals may cover sorting, search, source or watch-state filters, categories,
+bulk actions and local availability indicators. Distinguish a favorite, a
+library entry and a file that is actually available. Preserve source, episode
+and edition identities, playback progress and existing preferences.
+
+**Expected validation:** empty and large libraries, same-name series from
+different sources, VF/VOSTFR/VO editions, accented search, restart and bulk
+operations with appropriate confirmation. Removing a series from the library
+and deleting its files must remain clearly distinct actions. Schema changes
+need a lossless migration; local media should remain discoverable offline.
+
+## 13. Improve offline video use on Android
+
+**Goal:** let users open AnimeLab, browse available episodes and play them
+without Internet access, with useful metadata retained locally.
+
+Identify startup, library and player network dependencies. Local playback must
+not wait for a catalogue, update check or remote stream resolution. Clearly
+show episodes that are actually available, their progress, audio tracks and
+local subtitles. Support resuming after closing and reconnecting without
+duplicating tasks.
+
+**Expected validation:** download first, fully close the app, enable airplane
+mode, reopen, browse and play local media with seeking and position restoration.
+Also test a deleted file, unavailable external folder and partial download
+without advertising them as available. Distinguish private media, exports and
+authorized folder URIs; do not promise support for every format.
+
+Issues and first tasks for all thirteen areas are linked from the
+[contribution tracker #12](https://github.com/loeuf237/animelab/issues/12).
+
 ## Propose another idea
 
 These areas do not exclude other relevant proposals. Describe the need, an

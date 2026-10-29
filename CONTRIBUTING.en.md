@@ -37,7 +37,17 @@ describes the goals and validation criteria for each area:
   MKV files;
 - improving the Extensions page’s usability and appearance, inspired by
   Mihon/Aniyomi;
-- improving the README and documentation.
+- improving the README and documentation;
+- contributing themes and a customizable appearance;
+- choosing an external Android folder on first launch;
+- improving the Android video player;
+- organizing, searching and managing the library;
+- offline video playback and reliable local-media access on Android.
+
+Find published tasks and their links in the
+[contribution tracker #12](https://github.com/loeuf237/animelab/issues/12).
+Small tasks use `good first issue`; complete workstreams are open under
+`help wanted`.
 
 Feature and architecture proposals are welcome. You can contact the maintainer
 on [Telegram — @loeuf237](https://t.me/loeuf237). Record useful decisions and

@@ -222,11 +222,16 @@ détection des mises à jour et téléchargement automatique, correction des
 téléchargements en double (French-Manga et autres sources affectées), validation
 des extensions Aniyomi/Anikku, nouvel onglet **Outils** pour le sous-titrage et
 la création de MKV multipistes audio, refonte de la page Extensions et documentation.
+Nous recherchons aussi des thèmes, un choix de dossier Android au premier
+démarrage, des améliorations du lecteur vidéo, une meilleure gestion de la
+bibliothèque et une lecture hors ligne fiable sur Android.
 Il s’agit de chantiers ouverts : leurs objectifs et critères de validation sont
 décrits dans l’appel à contributions ([Français](docs/contribution-priorities.md) /
 [English](docs/contribution-priorities.en.md)). Les propositions de fonctionnalités
 et d’architecture sont les bienvenues. Contactez le mainteneur sur
 [Telegram — @loeuf237](https://t.me/loeuf237).
+Les tâches publiées sont regroupées dans le
+[suivi des contributions #12](https://github.com/loeuf237/animelab/issues/12).
 
 Le moteur Python se trouve dans `animelab/` ; le packaging desktop utilise
 `animelab.spec`. Consultez les [notes sur le nom du paquet et la compatibilité](docs/package-namespace.md).
