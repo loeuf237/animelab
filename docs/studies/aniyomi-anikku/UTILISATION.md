@@ -92,3 +92,53 @@ un travail distinct à achever ; ce format initial ne prétend pas les restaurer
 Linux et Windows conservent le moteur de recettes Python. Le runtime APK Android
 n'est pas chargé sur ces plateformes. Un moteur JVM de bureau reste à évaluer :
 une extraction de constantes DEX n'est pas une exécution équivalente à Android.
+
+## Reproduire les essais Android sur appareil
+
+Les APK sont construits dans le workflow **Android extension APK runtime**.
+Télécharger l'artefact `extension-animelab-integration-arm64` d'une exécution
+réussie et vérifier son empreinte ZIP contre le digest publié par GitHub Actions.
+Installer ses deux APK, `app-validation.apk` et `app-validation-androidTest.apk`,
+sur un appareil ARM64 Android 10 ou plus récent avec débogage USB autorisé.
+Ils utilisent les packages distincts `com.animan.app.a11test` et `.test`.
+Ne pas remplacer une installation existante d'identité inconnue pour faire passer un test.
+
+Depuis la racine du dépôt, avec les APK extraits sous `/chemin/artefacts-ci` :
+
+```sh
+python3 scripts/android_extension_verify.py /chemin/artefacts-ci
+```
+
+Ce parcours nécessite que la seule fixture synthétique
+`eu.kanade.tachiyomi.animeextension.all.animelabfixture.api17` soit absente.
+Le script refuse de la supprimer automatiquement. Il vérifie d'abord que
+l'application et son instrumentation installées correspondent exactement aux
+APK fournis. Il autorise l'installation pour cette seule application de test
+avant de lancer l'instrumentation, car changer cette autorisation en cours
+d'essai peut terminer le processus sur Android 11.
+
+L'instrumentation soumet alors l'APK original inclus dans son banc à l'API
+Python d'AnimeLab. Android garde ses vérifications et confirmations normales.
+Après succès système, elle compare les octets installés et vérifie catalogue,
+préférences, filtres et JavaScript dans le vrai moteur. Déverrouiller l'appareil
+avant le lancement ; la fenêtre de test reste éveillée. Un refus ou une attente
+du système ne constitue jamais une preuve d'installation réussie.
+
+Pour tester explicitement une extension communautaire déjà installée, sans
+installation ni mise à jour du paquet :
+
+```sh
+python3 scripts/android_extension_verify.py /chemin/artefacts-ci \
+  --community-package eu.kanade.tachiyomi.animeextension.fr.animesama
+```
+
+Cette option peut être répétée pour trois paquets au maximum. Les approbations
+sont propres à l'application AnimeLab de validation. Le parcours tente les
+filtres, préférences, catalogue, détails/épisodes, hébergeurs et métadonnées
+vidéo ; il ne demande pas de téléchargement ni de lecture du média. Les essais
+bloqués par un site ou une vérification restent identifiés séparément dans la preuve.
+Un test exécuté ne signifie pas que tous ses sites sont compatibles.
+
+Les rapports vont dans `artifacts/extension-device/` par défaut (`--output`
+permet de choisir un autre dossier). L'option `--device` choisit un transport
+ADB s'il y en a plusieurs ; cet identifiant n'est pas écrit dans les rapports.
