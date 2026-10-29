@@ -22,9 +22,28 @@ les changements proposés.
 - Une correction limitée, une traduction ou une clarification de documentation
   peut faire directement l’objet d’une pull request.
 
-Les retours sur le launcher Linux/Windows, les essais Android et macOS, les
-sessions WebView et la compatibilité des extensions sont particulièrement utiles.
-Précisez toujours ce que vous avez réellement testé.
+## Chantiers pour lesquels nous recherchons de l’aide
+
+L’[appel à contributions détaillé](docs/contribution-priorities.md) présente
+les objectifs et critères de validation de chaque chantier :
+
+- refonte de l’écran de chargement Android ;
+- détection des nouvelles versions et téléchargement automatique configurable ;
+- correction des téléchargements/enregistrements en double dans French-Manga
+  et les autres sources affectées ;
+- validation des extensions APK Aniyomi/Anikku ;
+- nouvel onglet **Outils** et atelier complet de sous-titrage, avec
+  recherche, téléchargement et traduction via des clés d’API personnelles ;
+- téléchargement et édition audio depuis des extensions, puis création de
+  MKV multipistes audio ;
+- ergonomie et présentation de la page Extensions, inspirées de Mihon/Aniyomi ;
+- amélioration du README et de la documentation.
+
+Les propositions de fonctionnalités et d’architecture sont les bienvenues.
+Vous pouvez contacter le mainteneur sur
+[Telegram — @loeuf237](https://t.me/loeuf237). Consignez les décisions et
+résultats utiles dans une issue ou une PR. Précisez toujours ce que vous avez
+réellement testé.
 
 ## Signaler un bug
 
@@ -58,8 +77,8 @@ base de données ou une sauvegarde personnelle complète.
 
 Si vous découvrez une vulnérabilité, ne publiez pas ses détails exploitables
 dans une issue. Utilisez **Report a vulnerability** dans l’onglet **Security** si
-cette option est disponible ; sinon, recherchez un moyen de contact privé indiqué
-sur le [profil du mainteneur](https://github.com/loeuf237).
+cette option est disponible ; sinon, contactez le mainteneur en privé sur
+[Telegram](https://t.me/loeuf237).
 
 ## Préparer l’environnement
 

@@ -21,9 +21,27 @@ problems clearly and keep discussions focused on the proposed changes.
 - A small fix, translation or documentation clarification can be submitted
   directly as a pull request.
 
-Feedback on the Linux/Windows launcher, Android and macOS testing, WebView
-sessions and extension compatibility is particularly useful. Always state what
-you actually tested.
+## Areas where we are looking for help
+
+The [detailed call for contributors](docs/contribution-priorities.en.md)
+describes the goals and validation criteria for each area:
+
+- redesigning the Android loading screen;
+- detecting new versions and offering configurable automatic downloads;
+- fixing duplicate downloads/saved files in French-Manga and other affected
+  sources;
+- validating Aniyomi/Anikku extension APKs;
+- adding a **Tools** tab and a complete subtitle workspace, including
+  search, downloads and translation using personal API keys;
+- downloading and editing audio from extensions, then creating multi-audio
+  MKV files;
+- improving the Extensions page’s usability and appearance, inspired by
+  Mihon/Aniyomi;
+- improving the README and documentation.
+
+Feature and architecture proposals are welcome. You can contact the maintainer
+on [Telegram — @loeuf237](https://t.me/loeuf237). Record useful decisions and
+results in an issue or PR. Always state what you actually tested.
 
 ## Reporting a bug
 
@@ -57,8 +75,8 @@ database or backup.
 
 If you discover a vulnerability, do not publish exploitable details in an issue.
 Use **Report a vulnerability** in the **Security** tab if that option is
-available; otherwise, look for a private contact method listed on the
-[maintainer’s profile](https://github.com/loeuf237).
+available; otherwise, contact the maintainer privately on
+[Telegram](https://t.me/loeuf237).
 
 ## Setting up your environment
 

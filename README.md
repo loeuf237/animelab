@@ -1,5 +1,7 @@
 # AnimeLab
 
+[English](README.md) | [Français](README.fr.md)
+
 <img src="docs/branding/animelab-wordmark.png" alt="AnimeLab" width="360" />
 
 [![CI](https://github.com/loeuf237/animelab/actions/workflows/ci.yml/badge.svg)](https://github.com/loeuf237/animelab/actions/workflows/ci.yml)
@@ -27,7 +29,7 @@ Desktop packages include Python, the compiled interface, FFmpeg and ffprobe. Win
 
 Desktop builds open a native tabbed launcher. Choose your interface, port, folders and download settings, then click **Launch**. It also provides diagnostics, proxy settings, backups and graceful shutdown. See the [0.1.4 release notes](docs/releases/v0.1.4.md) and [desktop tools and recovery](docs/desktop-distribution.md).
 
-Android device coverage remains **beta**. The [0.1.6-beta.1 release notes](docs/releases/v0.1.6-beta.3.md) explain the experimental APK runtime, emulator coverage and pending physical-device validation. Release assets include checksums and build information.
+Android device coverage remains **beta**. The [0.1.6-beta.3 release notes](docs/releases/v0.1.6-beta.3.md) explain the experimental APK runtime, emulator coverage and pending physical-device validation. Release assets include checksums and build information.
 
 In supporting browsers, install the web interface as a PWA using the browser's install or **Add to Home Screen** option. The AnimeLab server must remain available.
 
@@ -210,6 +212,15 @@ Stop it with `docker compose down`. See the [Docker guide](docs/docker.md) for v
 Start with the contribution guide ([English](CONTRIBUTING.en.md) /
 [Français](CONTRIBUTING.md)) for bug reports, setup, validation and pull requests.
 Contributions in French and English are welcome.
+
+**We are looking for contributors:** Android loading-screen design, automatic
+update detection and downloads, duplicate-download fixes (French-Manga and other
+affected sources), Aniyomi/Anikku extension validation, a new **Tools** tab for
+subtitles and multi-audio MKV workflows, Extensions page design and documentation.
+These are contribution opportunities; see the goals and validation criteria in
+the call for contributors ([English](docs/contribution-priorities.en.md) /
+[Français](docs/contribution-priorities.md)). Feature and architecture proposals
+are welcome. Contact the maintainer on [Telegram — @loeuf237](https://t.me/loeuf237).
 
 The Python engine lives in `animelab/`; desktop packaging uses `animelab.spec`.
 See the [package namespace and compatibility notes](docs/package-namespace.md).
