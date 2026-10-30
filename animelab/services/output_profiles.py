@@ -20,7 +20,7 @@ class OutputProfile(BaseModel):
     mode: Literal['ORIGINAL', 'SIDECAR', 'MKV_SOFT', 'MP4_HARD'] = 'ORIGINAL'
     selections: list[TrackSelection] = Field(default_factory=list, max_length=100)
     burnTrackId: str | None = Field(default=None, max_length=128)
-    keepOriginals: bool = True
+    keepOriginals: bool = False
     strict: bool = True
 
     @model_validator(mode='after')

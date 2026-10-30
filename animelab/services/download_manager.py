@@ -1077,7 +1077,7 @@ class DownloadManagerService:
         profile_json = snapshot(value)
         profile = require_available(profile_json)
         if profile.mode == 'ORIGINAL':
-            raise ValueError('Choisissez un format de traitement ; le master original reste conservé')
+            raise ValueError('Choisissez un format de traitement pour modifier les pistes')
         await self.output_inventory(task_id)
         async with self.media_pipeline.inventory_budget:
             inventory, _ = await asyncio.to_thread(self.media_pipeline.output_processor.inventory, task)

@@ -921,6 +921,8 @@
   "Forcé": "Forced",
   "Conserver les fichiers sources visibles": "Keep visible source files",
   "Un master privé est conservé pour changer de format. Il utilise de l’espace disque.": "A private master is retained for format changes. It uses disk space.",
+  "Conserver les originaux et la copie de travail": "Keep originals and the working copy",
+  "Sans conservation, seule la sortie vérifiée est gardée ; les traitements suivants utilisent ses pistes disponibles.": "Without retention, only the verified output is kept; later processing uses its available tracks.",
   "Impossible de charger les pistes": "Unable to load tracks",
   "Choisissez une seule piste de sous-titres pour l’incrustation.": "Choose one subtitle track to burn in.",
   "Le traitement a échoué": "Processing failed",
