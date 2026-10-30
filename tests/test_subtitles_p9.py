@@ -284,7 +284,7 @@ async def test_corrected_track_is_muxed_and_restored_with_actual_ffmpeg(output_c
     corrected=await service.transform(task.id,TimingCorrection(importId=original['importId'],entryId=original['entries'][0]['id'],offsetSeconds=.3))
     added=await service.attach(task.id,corrected['importId'],corrected['entries'][0]['id'],'fr','Timing corrigé',True)
     async def produce(track_id,expected):
-        await manager.reprocess_output(task.id,{'mode':'MKV_SOFT','selections':[{'trackId':'embedded:audio:1'},{'trackId':track_id}]})
+        await manager.reprocess_output(task.id,{'mode':'MKV_SOFT','keepOriginals':True,'selections':[{'trackId':'embedded:audio:1'},{'trackId':track_id}]})
         await manager._execute_download(task)
         assert task.status==DownloadStatus.COMPLETED,task.error
         packet=json.loads(subprocess.run(['ffprobe','-v','error','-select_streams','s','-show_packets','-of','json',task.savePath],check=True,capture_output=True,text=True).stdout)['packets'][0]

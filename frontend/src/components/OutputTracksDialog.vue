@@ -105,13 +105,15 @@
       <label class="output-field"
         ><span
           ><input type="checkbox" v-model="keepOriginals" />{{
-            tx('Conserver les fichiers sources visibles')
+            tx('Conserver les originaux et la copie de travail')
           }}</span
         ></label
       >
       <p class="source-hint">
         {{
-          tx('Un master privé est conservé pour changer de format. Il utilise de l’espace disque.')
+          tx(
+            'Sans conservation, seule la sortie vérifiée est gardée ; les traitements suivants utilisent ses pistes disponibles.',
+          )
         }}
       </p>
       <p v-for="warning in warnings" :key="warning" role="status">{{ tx(warning) }}</p>
@@ -142,7 +144,7 @@ const loading = ref(true),
 const profiles = ref<OutputProfileCapability[]>([]),
   rows = ref<Row[]>([]),
   warnings = ref<string[]>([])
-const keepOriginals = ref(true),
+const keepOriginals = ref(false),
   sourcesBusy = ref(false),
   refreshing = ref(false)
 const labels = {

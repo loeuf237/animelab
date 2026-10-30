@@ -5505,6 +5505,10 @@ textarea {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .palette-backdrop,
+  .palette-card {
+    animation: none !important;
+  }
   *,
   *::before,
   *::after {

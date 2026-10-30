@@ -85,15 +85,17 @@ class MediaPipeline:
         if modern_output:
             verification = None
             try:
-                await self.output_processor.acquire_inputs(task)
-                if task.paused or task.cancelled:
-                    raise ValueError('Traitement interrompu')
-                transition(task, DownloadStatus.MUXING)
-                task.phase = 'burning' if profile['mode'] == 'MP4_HARD' else 'muxing'
-                task.mediaProgressSeconds = 0
-                ctx.broadcast_update(task)
-                library_service.save_task(task)
-                await self.budget.run(task, self.jobs, self.output_processor.process, task)
+                recovered = await self.budget.run(task, self.jobs, self.output_processor.recover, task)
+                if not recovered:
+                    await self.output_processor.acquire_inputs(task)
+                    if task.paused or task.cancelled:
+                        raise ValueError('Traitement interrompu')
+                    transition(task, DownloadStatus.MUXING)
+                    task.phase = 'burning' if profile['mode'] == 'MP4_HARD' else 'muxing'
+                    task.mediaProgressSeconds = 0
+                    ctx.broadcast_update(task)
+                    library_service.save_task(task)
+                    await self.budget.run(task, self.jobs, self.output_processor.process, task)
             except (VerificationRequired, RateLimited):
                 raise
             except Exception as exc:
@@ -179,6 +181,12 @@ class MediaPipeline:
             ctx.broadcast_update(task)
             return
         if verif.valid:
+            try:
+                await self.budget.run(task, self.jobs, self.output_processor.release_originals, task)
+            except Exception:
+                # Windows locks or cleanup errors must not turn a verified file
+                # into a failed download. Keep the job busy until cleanup ends.
+                logger.warning('Working files cleanup deferred for task %s', task.id, exc_info=True)
             task.error = None
             # A verified private file is complete even if publication is paused,
             # denied or interrupted. EXPORTING keeps Android's service alive.

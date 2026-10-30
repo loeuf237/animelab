@@ -97,7 +97,7 @@ async def test_mkv_two_audio_two_subtitles_exact_selection_and_dispositions(outp
     inventory, _ = processor.inventory(task)
     selections = [dict(trackId=t.id, default=(t.kind == 'audio' and t.lang == 'jpn') or (t.kind == 'subtitle' and t.lang in ('fra', 'fr')),
                        forced=t.kind == 'subtitle' and t.lang == 'en') for t in inventory]
-    task.outputProfileJson = snapshot({'mode': 'MKV_SOFT', 'selections': selections})
+    task.outputProfileJson = snapshot({'mode': 'MKV_SOFT', 'selections': selections, 'keepOriginals': True})
     await manager._finalize_task(task)
     assert task.status == DownloadStatus.COMPLETED, task.error
     streams = probe(task.savePath)['streams']
@@ -120,7 +120,7 @@ async def test_sidecar_offsets_keep_ass_style_and_source(output_case):
     manager, task, files, requests = output_case
     inventory, _ = manager.media_pipeline.output_processor.inventory(task)
     sub = next(t for t in inventory if t.kind == 'subtitle' and t.remote is None)
-    task.outputProfileJson = snapshot({'mode': 'SIDECAR', 'selections': [{'trackId': sub.id, 'offsetSeconds': .5}]})
+    task.outputProfileJson = snapshot({'mode': 'SIDECAR', 'selections': [{'trackId': sub.id, 'offsetSeconds': .5}], 'keepOriginals': True})
     await manager._finalize_task(task)
     assert task.status == DownloadStatus.COMPLETED, task.error
     sidecars = json.loads(task.savePathSubtitle)
@@ -144,7 +144,7 @@ async def test_hardsub_mp4_renders_pixels_and_chosen_audio(output_case):
     inventory, _ = processor.inventory(task)
     sub = next(t for t in inventory if t.kind == 'subtitle' and t.remote is None)
     audio = next(t for t in inventory if t.kind == 'audio' and t.lang == 'eng')
-    task.outputProfileJson = snapshot({'mode': 'MP4_HARD', 'burnTrackId': sub.id, 'selections': [
+    task.outputProfileJson = snapshot({'mode': 'MP4_HARD', 'keepOriginals': True, 'burnTrackId': sub.id, 'selections': [
         {'trackId': audio.id, 'default': True}, {'trackId': sub.id, 'offsetSeconds': .3}]})
     await manager._finalize_task(task)
     assert task.status == DownloadStatus.COMPLETED, task.error
@@ -247,7 +247,7 @@ async def test_hardsub_converts_pcm_audio_to_aac(output_case):
 async def test_cancelled_encode_retains_master_and_restarts_without_video_download(output_case, monkeypatch):
     from animelab.services.media_execution import MediaInterrupted
     manager, task, files, requests = output_case
-    task.outputProfileJson = snapshot({'mode': 'MP4_HARD'})
+    task.outputProfileJson = snapshot({'mode': 'MP4_HARD', 'keepOriginals': True})
     run = manager.media_pipeline._run_media
     def interrupt(task, args, **kwargs):
         if '-vf' in args:

@@ -8,7 +8,6 @@ from dataclasses import dataclass, replace
 import asyncio
 import hashlib
 import json
-import logging
 import os
 from pathlib import Path
 import shutil
@@ -117,6 +116,50 @@ class OutputProcessor:
         task.mediaJson = json.dumps(info)
         library_service.save_task(task)
 
+    def write_receipt(self, task, state):
+        directory = self.workspace(task)
+        receipt = directory / ('receipt-' + profile_hash(task) + '.json')
+        staging = directory / 'receipt.partial'
+        with staging.open('w', encoding='utf-8') as stream:
+            json.dump(state, stream)
+            stream.flush()
+            os.fsync(stream.fileno())
+        staging.replace(receipt)
+
+    def release_originals(self, task):
+        """Retire only this job's inputs, after the published video was verified."""
+        state = self.state(task)
+        profile = OutputProfile.model_validate_json(task.outputProfileJson)
+        if (profile.keepOriginals or not state.get('completed') or state.get('profileHash') != profile_hash(task)
+                or task.verificationStatus != 'VALID'):
+            return
+        artifact = Path(task.savePath)
+        published = next((item for item in state.get('published', []) if item['path'] == str(artifact)), None)
+        if not published or not artifact.is_file():
+            return
+        current = artifact.stat()
+        if current.st_size != published['size'] or current.st_mtime_ns != published['mtimeNs']:
+            return
+        directory = self.workspace(task)
+        protected = {Path(item['path']).resolve() for item in state['published']}
+        source = Path(state['source'])
+        # A filename may have been reused by another task or edited by the user.
+        # Never remove it merely because it was our initial download pathname.
+        if (source.is_file() and not source.is_symlink() and source.resolve() not in protected
+                and is_safe_path(source, [self.manager.download_dir])
+                and digest(source, task) == state.get('masterHash')):
+            source.unlink()
+        private = [state.get('master'), *(row.get('path') for row in state.get('resources', {}).values())]
+        for name in private:
+            if not name:
+                continue
+            path = Path(name)
+            if path.resolve() not in protected and is_safe_path(path, [directory]) and not path.is_symlink():
+                path.unlink(missing_ok=True)
+        state.update(master=None, masterSize=0, resources={}, originalsDiscarded=True)
+        self.write_receipt(task, state)
+        self.save_state(task, state)
+
     def workspace(self, task):
         state = self.state(task)
         source = Path(state.get('source') or task.savePath or '').absolute()
@@ -184,7 +227,9 @@ class OutputProcessor:
         finally:
             staging.unlink(missing_ok=True)
         state.update(source=str(source), master=str(master), masterHash=digest(master, task),
-                     masterSize=size, resources={}, completed=False)
+                     masterSize=size, resources={}, completed=False,
+                     inputIsOutput=bool(state.get('originalsDiscarded') or state.get('inputIsOutput')),
+                     originalsDiscarded=False)
         task.videoDuration = float(data.get('format', {}).get('duration') or 0) or None
         self.save_state(task, state)
         return master
@@ -221,7 +266,9 @@ class OutputProcessor:
         subs = normalize_subtitles(task.subtitlesJson, task.downloadPageUrl or task.fileUrl)
         if not subs and task.subtitleUrl:
             subs = normalize_subtitles([{'url': task.subtitleUrl}], task.downloadPageUrl or task.fileUrl)
-        for kind, values in (('subtitle', subs), ('audio', info.get('audioTracks', []))):
+        external = [] if state.get('originalsDiscarded') or state.get('inputIsOutput') else [
+            ('subtitle', subs), ('audio', info.get('audioTracks', []))]
+        for kind, values in external:
             for row in normalize_tracks(values, task.downloadPageUrl or task.fileUrl, kind=kind):
                 tracks.append(LocalTrack(id=row['id'], kind=kind, path=Path(), lang=row['lang'], label=row['label'],
                     codec=row.get('format', ''), automatic=bool(row.get('automatic')), default=bool(row.get('default')),
@@ -443,8 +490,13 @@ class OutputProcessor:
             path = Path(artifact['path'])
             if not is_safe_path(path, [self.manager.download_dir]) or not path.is_file() or digest(path, task) != artifact['sha256']:
                 return False
-        if digest(Path(state['master']), task) != state['masterHash']:
-            return False
+        if state.get('master'):
+            master = Path(state['master'])
+            if master.is_file():
+                if not is_safe_path(master, [directory]) or digest(master, task) != state['masterHash']:
+                    return False
+            elif OutputProfile.model_validate_json(task.outputProfileJson).keepOriginals:
+                return False
         self.adopt(task, state)
         return True
 
@@ -597,25 +649,12 @@ class OutputProcessor:
                 state.update(taskId=task.id, profileHash=profile_hash(task), artifact=published[0]['path'],
                     sidecars=[item['path'] for item in published[1:]], published=published,
                     sidecarTracks=sidecar_tracks, warnings=warnings, completed=True)
-                receipt = directory / ('receipt-' + profile_hash(task) + '.json')
-                temp_receipt = directory / 'receipt.partial'
-                with temp_receipt.open('w') as stream:
-                    json.dump(state, stream)
-                    stream.flush()
-                    os.fsync(stream.fileno())
-                temp_receipt.replace(receipt)
+                self.write_receipt(task, state)
                 self.adopt(task, state)
             except BaseException:
                 for artifact in published:
                     Path(artifact['path']).unlink(missing_ok=True)
                 raise
-        if not profile.keepOriginals and source != Path(task.savePath):
-            try:
-                source.unlink(missing_ok=True)
-            except OSError:
-                # A valid published artifact must not become a failed download
-                # because Windows or a media player still holds the source open.
-                logging.getLogger(__name__).warning('Source cleanup deferred for task %s', task.id)
 
     def verify_output(self, task, path, selected, master_data, mode):
         result = self.probe(path)

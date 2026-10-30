@@ -51,8 +51,14 @@ for (const width of [360, 1280]) {
     await picker.selectOption('MKV_SOFT')
     await page.getByTitle("Télécharger l'épisode", { exact: true }).click()
     await expect.poll(() => queued.length).toBe(1)
-    expect(queued[0].outputProfile).toEqual({ version: 1, mode: 'MKV_SOFT', keepOriginals: true })
+    expect(queued[0].outputProfile).toEqual({ version: 1, mode: 'MKV_SOFT', keepOriginals: false })
     expect(queued[0].downloadSubtitles).toBe(true)
+    const keepOriginals = page.getByLabel('Conserver les originaux et la copie de travail')
+    await expect(keepOriginals).not.toBeChecked()
+    await keepOriginals.check()
+    await page.getByTitle("Télécharger l'épisode", { exact: true }).click()
+    await expect.poll(() => queued.length).toBe(2)
+    expect(queued[1].outputProfile.keepOriginals).toBe(true)
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       width,
     )
