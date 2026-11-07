@@ -142,3 +142,14 @@ Un test exécuté ne signifie pas que tous ses sites sont compatibles.
 Les rapports vont dans `artifacts/extension-device/` par défaut (`--output`
 permet de choisir un autre dossier). L'option `--device` choisit un transport
 ADB s'il y en a plusieurs ; cet identifiant n'est pas écrit dans les rapports.
+
+## Rapport de compatibilité reproductible
+
+Le [formulaire GitHub](../../../.github/ISSUE_TEMPLATE/extension_compatibility.yml)
+est un résumé d'intake. Le compte rendu détaillé, une ligne par étape avec
+statut `passed`, `failed`, `blocked` ou `not-tested` et sa preuve, est le
+[modèle de rapport APK](RAPPORT_COMPATIBILITE_APK.md). L'[exemple
+synthétique](RAPPORT_COMPATIBILITE_APK_EXEMPLE.md) consigne un blocage de site
+sans le présenter comme une réussite. Ces deux documents ne remplacent pas les
+résultats ni les limites déjà inscrits dans le
+[registre](IMPLEMENTATION_STATUS.md).
