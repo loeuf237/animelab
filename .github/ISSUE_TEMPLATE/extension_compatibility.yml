@@ -3,6 +3,18 @@ description: Partager le résultat d'un test d'extension APK ou de source intég
 title: "[Extension]: "
 labels: ["extensions", "testing"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Ce formulaire est un **résumé d'intake**, pas le compte rendu détaillé.
+        This form is an intake summary, not the detailed test record.
+        Remplissez et joignez le
+        [modèle Markdown](https://github.com/loeuf237/animelab/blob/main/docs/studies/aniyomi-anikku/RAPPORT_COMPATIBILITE_APK.md)
+        (`passed` / `failed` / `blocked` / `not-tested`, preuve par étape).
+        L'[exemple synthétique](https://github.com/loeuf237/animelab/blob/main/docs/studies/aniyomi-anikku/RAPPORT_COMPATIBILITE_APK_EXEMPLE.md)
+        montre un blocage sans le compter comme un succès.
+        Ne créez pas un second formulaire. Retirez numéros de série, cookies,
+        jetons et URL signées : ces données ne sont pas demandées.
   - type: dropdown
     id: runtime
     attributes:
@@ -35,4 +47,4 @@ body:
     id: details
     attributes:
       label: Détails, appareil et erreurs observées / Device details & observed errors
-      placeholder: "Précisez le modèle du téléphone/version Android (ou OS desktop), l'anime/épisode testé et le message affiché."
+      placeholder: "Résumé seulement : modèle ou OS, anime/épisode et message. Joignez le rapport Markdown. Pas de cookie, jeton, URL signée ni numéro de série."
