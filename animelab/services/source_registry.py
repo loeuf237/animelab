@@ -196,7 +196,7 @@ class SourceRegistry:
         if not host:
             return fallback
         aliases = {'animepahe': ('animepahe.com', 'animepahe.pw', 'animepahe.si', 'kwik.cx', 'kwik.si', 'pahe.win'),
-                   'voir-anime': ('voir-anime.to', 'voiranime.to', 'voiranime.io', 'voiranime.homes'),
+                   'voir-anime': ('voiranime.cx', 'voir-anime.to', 'voiranime.to', 'voiranime.io', 'voiranime.homes'),
                    'french-manga': ('french-manga.net',)}
         providers = self.all()
         preferred_id = fallback.strip().lower()

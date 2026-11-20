@@ -591,8 +591,8 @@
                 "
                 @click="openSpeedLimitModal(task)"
               >
-                <span
-                  >⚡
+                <span style="display: inline-flex; align-items: center; gap: 4px"
+                  ><Zap :size="13" aria-hidden="true" />
                   {{
                     tx(
                       task.maxSpeedLimit && task.maxSpeedLimit > 0
@@ -1017,10 +1017,23 @@
         </button>
       </div>
     </ConfirmDialog>
+
+    <ConfirmDialog
+      :open="cancelAllDialogOpen"
+      :title="tx('Annuler tous les téléchargements ?')"
+      :confirm-label="tx('Tout annuler')"
+      :busy="cancellingAll"
+      danger
+      @cancel="cancelAllDialogOpen = false"
+      @confirm="executeCancelAll"
+    >
+      <p>{{ tx('Annuler tous les téléchargements actifs et en attente ?') }}</p>
+    </ConfirmDialog>
   </div>
 </template>
 
 <script setup lang="ts">
+import { Zap } from 'lucide-vue-next'
 import { language, tx } from '@/utils/locale'
 import ProxyRotationButton from '@/components/ProxyRotationButton.vue'
 import VerificationPrompt from '@/components/VerificationPrompt.vue'
@@ -1525,16 +1538,26 @@ async function retryAllErrors() {
   }
 }
 
-async function confirmCancelAll() {
-  if (!window.confirm(tx('Annuler tous les téléchargements actifs et en attente ?'))) return
+const cancelAllDialogOpen = ref(false)
+const cancellingAll = ref(false)
+
+function confirmCancelAll() {
+  cancelAllDialogOpen.value = true
+}
+
+async function executeCancelAll() {
+  cancellingAll.value = true
   try {
     await downloadStore.cancelAll()
+    cancelAllDialogOpen.value = false
     showToast('Téléchargements annulés.', 'info')
   } catch (error) {
     showToast(
       error instanceof Error ? error.message : 'Impossible d’annuler les téléchargements.',
       'error',
     )
+  } finally {
+    cancellingAll.value = false
   }
 }
 
@@ -1930,8 +1953,8 @@ async function applyTaskSpeedLimit() {
   font-size: 10px;
   padding: 2px 6px;
   border-radius: 4px;
-  background: rgba(157, 111, 255, 0.15);
-  color: var(--accent);
+  background: var(--accent-container);
+  color: var(--on-accent-container);
   font-weight: 700;
   letter-spacing: 0.5px;
 }

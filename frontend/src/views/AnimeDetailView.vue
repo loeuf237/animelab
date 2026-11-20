@@ -155,15 +155,15 @@
         <div class="tachiyomi-meta">
           <h1 class="tachiyomi-main-title">{{ tx(detail.anime.title) }}</h1>
           <div class="tachiyomi-meta-line">
-            <span class="tachiyomi-meta-icon">👤</span>
+            <Building2 :size="15" class="tachiyomi-meta-icon" aria-hidden="true" />
             <span>{{ tx(detail.anime.studio || detail.anime.type || 'Auteur inconnu') }}</span>
           </div>
           <div class="tachiyomi-meta-line">
-            <span class="tachiyomi-meta-icon">✏️</span>
+            <Languages :size="15" class="tachiyomi-meta-icon" aria-hidden="true" />
             <span>{{ tx(detail.anime.version || 'VOSTFR / VF') }}</span>
           </div>
           <div class="tachiyomi-meta-line">
-            <span class="tachiyomi-meta-icon">🕒</span>
+            <Clock :size="15" class="tachiyomi-meta-icon" aria-hidden="true" />
             <span
               >{{ tx(detail.anime.status || nativeStatus) }} •
               {{ tx(detail.sourceName || detail.source) }}</span
@@ -678,6 +678,7 @@
 import { tx } from '@/utils/locale'
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { Building2, Clock, Languages } from 'lucide-vue-next'
 import { useAnimeStore } from '@/stores/anime'
 import { usePlayerStore } from '@/stores/player'
 import { useDownloadStore } from '@/stores/downloads'
@@ -1333,7 +1334,7 @@ async function markAll(watched: boolean) {
 }
 
 .toast-info {
-  border-left: 4px solid #6366f1;
+  border-left: 4px solid var(--accent);
 }
 
 @keyframes slideUp {

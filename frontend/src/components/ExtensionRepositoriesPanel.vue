@@ -27,10 +27,26 @@
       </div>
     </article>
     <p v-if="error" role="alert">{{ error }}</p>
+    <ConfirmDialog
+      :open="Boolean(pendingApproval)"
+      :title="tx('Approuver ce changement de signataire du dépôt ?')"
+      :confirm-label="tx('Approuver')"
+      :busy="busy"
+      @cancel="pendingApproval = null"
+      @confirm="confirmApprove"
+    >
+      <template v-if="pendingApproval">
+        <p>
+          <strong>{{ pendingApproval.name }}</strong>
+        </p>
+        <p>{{ pendingApproval.signing_key }} → {{ pendingApproval.pending_signing_key }}</p>
+      </template>
+    </ConfirmDialog>
   </section>
 </template>
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { api } from '@/api/client'
 import { tx } from '@/utils/locale'
 import type { ExtensionRepository } from '@/types/api'
@@ -38,6 +54,7 @@ const emit = defineEmits<{ changed: [] }>()
 const repositories = ref<ExtensionRepository[]>([])
 const busy = ref(false),
   error = ref('')
+const pendingApproval = ref<ExtensionRepository | null>(null)
 async function reload() {
   repositories.value = (await api.extensionRepositories()).repositories.filter((r) =>
     /^https?:/.test(r.url),
@@ -56,18 +73,19 @@ async function toggle(id: number, enabled: boolean) {
     busy.value = false
   }
 }
-async function approve(repository: ExtensionRepository) {
-  const key = repository.pending_signing_key
-  if (
-    !key ||
-    !window.confirm(
-      `${tx('Approuver ce changement de signataire du dépôt ?')}\n${repository.name}\n${repository.signing_key}\n→ ${key}`,
-    )
-  )
-    return
+function approve(repository: ExtensionRepository) {
+  if (!repository.pending_signing_key) return
+  pendingApproval.value = repository
+}
+
+async function confirmApprove() {
+  const repository = pendingApproval.value
+  const key = repository?.pending_signing_key
+  if (!repository || !key) return
   busy.value = true
   try {
     await api.approveExtensionRepositoryKey(repository.id, key)
+    pendingApproval.value = null
     await reload()
     emit('changed')
   } catch (failure) {

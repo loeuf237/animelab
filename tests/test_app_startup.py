@@ -190,6 +190,31 @@ def test_folder_picker_rejects_foreign_pages_and_handles_cancel(monkeypatch):
     assert picker.choose_download_directory() is None
 
 
+def test_desktop_bridge_native_actions_require_local_origin():
+    from animelab.desktop.window import DesktopBridge
+    bridge = DesktopBridge('http://127.0.0.1:8080/spa/')
+    titles = []
+    bridge._window = SimpleNamespace(
+        get_current_url=lambda: 'https://untrusted.example/phishing',
+        set_title=titles.append,
+    )
+    for fn in (
+        bridge.platform_info,
+        lambda: bridge.set_title('Malicious'),
+        lambda: bridge.set_theme('light'),
+    ):
+        with pytest.raises(PermissionError):
+            fn()
+    bridge._window.get_current_url = lambda: 'http://127.0.0.1:8080/spa/home'
+    info = bridge.platform_info()
+    assert info['runtime'] == 'desktop'
+    assert info['os'] in ('windows', 'macos', 'linux')
+    assert bridge.set_title('AnimeLab   —   Bibliothèque\n\n') == 'AnimeLab — Bibliothèque'
+    assert titles == ['AnimeLab — Bibliothèque']
+    assert bridge.set_theme('dark') is True
+    assert bridge.set_theme('light') is True
+
+
 def test_new_launcher_directory_overrides_a_previous_setup_choice(installation, tmp_path, monkeypatch):
     app_preferences.save({'downloadDirectory': str(tmp_path / 'wizard'), 'downloadDirectoryOrigin': '/old-launcher-choice'})
     monkeypatch.setenv('ANIMELAB_DOWNLOAD_DIR', '/old-launcher-choice')
@@ -218,3 +243,15 @@ async def test_active_media_processing_prevents_directory_changes(installation, 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app(), client=('127.0.0.1', 1)), base_url='http://test') as client:
         assert (await client.post('/api/app/directory', json={'path': str(tmp_path / 'new')})).status_code == 409
     assert not (tmp_path / 'new').exists()
+
+
+@pytest.mark.asyncio
+async def test_android_prefixed_release_tags_and_compact_github_feed_size(monkeypatch):
+    assert version_key('android-v0.1.6-beta.5') == version_key('v0.1.6-beta.5')
+    assert version_key('android-v0.1.7-beta.1') > version_key('v0.1.6-beta.5')
+    monkeypatch.setenv('ANIMELAB_RELEASE_VERSION', '0.1.6-beta.5')
+    calls = mock_feed(monkeypatch, httpx.Response(200, json=[release('android-v0.1.7-beta.1')]))
+    result = await AppUpdates().check('beta')
+    assert result['status'] == 'available'
+    assert result['release']['version'] == 'android-v0.1.7-beta.1'
+    assert 'per_page=10' in str(calls[0].url)

@@ -1,0 +1,81 @@
+/* Responsive Native Bottom Sheets for Mobile Modals & Dialogs */
+@media (max-width: 768px) {
+  .dialog-overlay {
+    align-items: flex-end;
+    padding: 12px 0 0;
+    background: rgba(0, 0, 0, 0.62);
+  }
+
+  .confirmation-dialog {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - 12px);
+    border-radius: 24px 24px 0 0;
+    border-bottom: none;
+    border-left: none;
+    border-right: none;
+    padding: 12px 18px max(18px, env(safe-area-inset-bottom, 0px));
+    animation: nativeSheetUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .confirmation-dialog::before {
+    content: '';
+    display: block;
+    width: 36px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--line-strong);
+    margin: 0 auto 14px;
+  }
+
+  /* Keep Search Command Palette ergonomic in both portrait (360x640) and landscape (740x360) */
+  .palette-backdrop {
+    align-items: flex-end !important;
+    padding: 8px 0 0 !important;
+  }
+
+  .palette-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: calc(100dvh - 8px) !important;
+    border-radius: 24px 24px 0 0 !important;
+    border: 1px solid var(--line-strong) !important;
+    border-bottom: none !important;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    animation: nativeSheetUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .palette-close-button {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--panel-subtle);
+    color: var(--text);
+    border: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+}
+
+@keyframes nativeSheetUp {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confirmation-dialog,
+  .palette-card {
+    animation: none !important;
+  }
+}

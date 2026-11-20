@@ -69,7 +69,11 @@
                 :aria-pressed="preferences.pinned.includes(item.id)"
                 @click="preferences.toggle(item.id)"
               >
-                {{ preferences.pinned.includes(item.id) ? '★' : '☆' }}
+                <Star
+                  :size="18"
+                  :fill="preferences.pinned.includes(item.id) ? 'currentColor' : 'none'"
+                  aria-hidden="true"
+                />
               </button>
             </div>
           </article>
@@ -227,15 +231,31 @@
         </p>
         <div class="catalogue-result-heading">
           <h2>{{ tx(currentSource.views.find((v) => v.id === mode)?.label) }}</h2>
-          <span>{{ tx(results.length) }} {{ tx('résultat(s) chargé(s)') }}</span>
+          <span>
+            <template v-if="loading && results.length">
+              {{ tx(results.length) }} {{ tx('résultat(s) chargé(s)') }} · {{ tx('chargement…') }}
+            </template>
+            <template v-else-if="loading">
+              {{ tx('Chargement du catalogue…') }}
+            </template>
+            <template v-else> {{ tx(results.length) }} {{ tx('résultat(s) chargé(s)') }} </template>
+          </span>
         </div>
-        <p v-if="loading && !results.length" role="status">{{ tx('Chargement du catalogue…') }}</p>
-        <div class="anime-grid">
+        <div v-if="loading" class="catalogue-progress-bar" aria-hidden="true">
+          <span />
+        </div>
+        <SkeletonGrid
+          v-if="loading && !results.length"
+          :count="8"
+          :label="tx('Chargement des animés en cours…')"
+        />
+        <div v-else-if="results.length || loading" class="anime-grid">
           <AnimeCard
             v-for="anime in results"
             :key="`${anime.source}:${anime.url}`"
             :anime="anime"
           />
+          <SkeletonGrid v-if="loading" inline :count="4" />
         </div>
         <p
           v-if="!loading && !results.length && !pageError && !pageChallenges.length"
@@ -270,9 +290,10 @@
 </template>
 
 <script setup lang="ts">
-import { SlidersHorizontal } from 'lucide-vue-next'
+import { SlidersHorizontal, Star } from 'lucide-vue-next'
 import ExplorerNavigation from '@/components/ExplorerNavigation.vue'
 import ExtensionAvatar from '@/components/ExtensionAvatar.vue'
+import SkeletonGrid from '@/components/SkeletonGrid.vue'
 import { tx } from '@/utils/locale'
 import { ref, computed, watch, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -333,6 +354,8 @@ let generation = 0,
   pageSequence = 0,
   filterSequence = 0,
   disposed = false
+let pageAbort: AbortController | null = null
+const loadedFiltersSource = ref('')
 const groups = computed(() => {
   const visible = sources.value.filter((s) =>
     `${s.name} ${s.lang}`.toLocaleLowerCase().includes(sourceQuery.value.toLocaleLowerCase()),
@@ -373,6 +396,8 @@ function host(url: string) {
 }
 function invalidatePending() {
   pageSequence++
+  pageAbort?.abort()
+  pageAbort = null
   loading.value = false
   verification.clearPending('source-page')
   pageChallenges.value = []
@@ -473,9 +498,13 @@ async function loadFilters() {
   try {
     const response = await api.getCatalogueFilters(source)
     if (current === generation && sequence === filterSequence && !disposed) {
+      const wasUntouched = criteria.value === appliedCriteria.value
       filters.value = response
-      if (!nativeFilters.value.length)
-        nativeFilters.value = JSON.parse(JSON.stringify(response.nativeFilters || []))
+      loadedFiltersSource.value = source
+      if (!nativeFilters.value.length && response.nativeFilters?.length) {
+        nativeFilters.value = JSON.parse(JSON.stringify(response.nativeFilters))
+        if (wasUntouched) appliedCriteria.value = criteria.value
+      }
     }
   } catch (exc) {
     if (current !== generation || sequence !== filterSequence || disposed) return
@@ -494,6 +523,9 @@ async function fetchPage(cursor?: string | null, append = false) {
   const current = generation,
     source = sourceId.value,
     sequence = ++pageSequence
+  pageAbort?.abort()
+  const controller = new AbortController()
+  pageAbort = controller
   const params = {
     mode: mode.value,
     q: query.value.trim(),
@@ -510,16 +542,29 @@ async function fetchPage(cursor?: string | null, append = false) {
     results.value = []
     nextCursor.value = null
   }
+  const seenUrls = new Set(results.value.map((x) => x.url))
   try {
-    const response = await api.browseCatalogue(source, params)
+    const response = await api.browseCatalogueStream(source, params, {
+      signal: controller.signal,
+      onItems(batch) {
+        if (current !== generation || sequence !== pageSequence || disposed) return
+        const fresh: AnimeResult[] = []
+        for (const item of batch) {
+          if (item && item.url && !seenUrls.has(item.url)) {
+            seenUrls.add(item.url)
+            fresh.push(item)
+          }
+        }
+        if (fresh.length) {
+          results.value = [...results.value, ...fresh]
+        }
+      },
+    })
     if (current !== generation || sequence !== pageSequence || disposed) return
-    const combined = append ? [...results.value, ...response.results] : response.results
-    results.value = combined.filter(
-      (item, index) => combined.findIndex((x) => x.url === item.url) === index,
-    )
     nextCursor.value = response.nextCursor
     queryScope.value = response.queryScope
   } catch (exc) {
+    if (exc instanceof Error && exc.name === 'AbortError') return
     if (current !== generation || sequence !== pageSequence || disposed) return
     const challenge = challengeFromError(exc)
     if (challenge) {
@@ -530,6 +575,7 @@ async function fetchPage(cursor?: string | null, append = false) {
       })
     } else pageError.value = exc instanceof Error ? exc.message : 'Catalogue indisponible.'
   } finally {
+    if (pageAbort === controller) pageAbort = null
     if (current === generation && sequence === pageSequence) loading.value = false
   }
 }
@@ -537,9 +583,13 @@ let lastReadPath = ''
 async function readRoute() {
   if (route.name !== 'sources') return
   lastReadPath = route.fullPath
+  const prevSource = loadedFiltersSource.value
+  const targetSource = sourceId.value
   generation++
   pageSequence++
   filterSequence++
+  pageAbort?.abort()
+  pageAbort = null
   verification.clearPending('source-page')
   verification.clearPending('source-filters')
   pageChallenges.value = []
@@ -564,11 +614,30 @@ async function readRoute() {
       /* Invalid URL state is replaced with the source defaults. */
     }
   }
+  const sameSourceFiltersCached =
+    Boolean(targetSource) &&
+    prevSource === targetSource &&
+    (filters.value.tags.length > 0 || (filters.value.nativeFilters?.length || 0) > 0)
+  if (
+    sameSourceFiltersCached &&
+    !nativeFilters.value.length &&
+    filters.value.nativeFilters?.length
+  ) {
+    nativeFilters.value = JSON.parse(JSON.stringify(filters.value.nativeFilters))
+  } else if (!sameSourceFiltersCached) {
+    loadedFiltersSource.value = ''
+    filters.value = { tags: [], orders: [{ id: 'source', label: 'Ordre de la source' }] }
+  }
   appliedCriteria.value = criteria.value
-  filters.value = { tags: [], orders: [{ id: 'source', label: 'Ordre de la source' }] }
   if (currentSource.value?.isEnabled) {
-    await loadFilters()
-    appliedCriteria.value = criteria.value
+    const needsFiltersBeforeFetch =
+      selectedTags.value.length > 0 || order.value !== 'source' || nativeFilters.value.length > 0
+    if (needsFiltersBeforeFetch && !sameSourceFiltersCached) {
+      await loadFilters()
+      appliedCriteria.value = criteria.value
+    } else if (!sameSourceFiltersCached) {
+      void loadFilters()
+    }
     await fetchPage()
   }
 }
@@ -603,6 +672,8 @@ onDeactivated(() => {
   pageSequence++
   filterSequence++
   generation++
+  pageAbort?.abort()
+  pageAbort = null
   loading.value = false
   filtersLoading.value = false
   verification.clearPending('source-page')
@@ -611,6 +682,8 @@ onDeactivated(() => {
 onUnmounted(() => {
   disposed = true
   generation++
+  pageAbort?.abort()
+  pageAbort = null
   verification.clearPending('source-page')
   verification.clearPending('source-filters')
 })
@@ -1022,5 +1095,35 @@ select:focus {
 .source-enable {
   color: var(--accent);
   font-size: 0.8rem;
+}
+.catalogue-progress-bar {
+  position: relative;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.catalogue-progress-bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 38%;
+  border-radius: 999px;
+  background: var(--accent);
+  animation: catalogueSlide 1.15s ease-in-out infinite;
+}
+@keyframes catalogueSlide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .catalogue-progress-bar > span {
+    animation: none;
+    width: 100%;
+    opacity: 0.55;
+  }
 }
 </style>

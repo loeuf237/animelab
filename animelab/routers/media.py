@@ -19,7 +19,7 @@ from animelab.media_policy import validate_media_url
 from animelab.services.download_manager import download_manager
 from animelab.services.proxy_service import proxy_service
 from animelab.services.library_service import library_service
-from animelab.services.voiranime_service import voiranime_service
+from animelab.services.voiranime_service import voiranime_service, normalize_voiranime_url
 from animelab.services.scraping_service import scraping_service
 from animelab.services.animepahe_service import animepahe_service
 from animelab.services.extension_service import extension_service
@@ -174,6 +174,7 @@ async def extension_resource(token: str, request: Request):
 async def proxy_image(url: str):
     if not url or not url.startswith("http"):
         raise HTTPException(status_code=400, detail="URL d'image invalide")
+    url = normalize_voiranime_url(url)
     await asyncio.to_thread(validate_media_url, url)
 
     # Protection SSRF
@@ -206,8 +207,8 @@ async def proxy_image(url: str):
             referer = "https://www.themoviedb.org/"
         elif is_animepahe:
             referer = f"{settings.ANIMEPAHE_URL}/"
-        elif any(host == d or host.endswith("." + d) for d in ["voir-anime.to", "voiranime.to", "voiranime.io", "voiranime.homes", "voembed.net", "vidmoly.to"]):
-            referer = "https://voir-anime.to/"
+        elif any(host == d or host.endswith("." + d) for d in ["voiranime.cx", "voir-anime.to", "voiranime.to", "voiranime.io", "voiranime.homes", "voembed.net", "vidmoly.to"]):
+            referer = f"{settings.VOIR_ANIME_URL.rstrip('/')}/"
         else:
             referer = "https://french-manga.net/"
             for cs in extension_service.get_enabled_container_sources():
@@ -732,14 +733,16 @@ async def proxy_subtitle(url: str = Query(...)):
     """
     if not url or not url.startswith("http"):
         raise HTTPException(status_code=400, detail="URL de sous-titre invalide")
+    url = normalize_voiranime_url(url)
     await asyncio.to_thread(validate_media_url, url)
     if not await is_safe_url_async(url):
         logger.warning("SSRF blocked on subtitle-proxy: %s", url)
         raise HTTPException(status_code=400, detail="URL de sous-titre non autorisée")
 
+    is_va_sub = "voiranime" in url.lower() or "voir-anime" in url.lower()
     headers = {
         "User-Agent": proxy_service.get_user_agent(),
-        "Referer": "https://voir-anime.to/" if "voir-anime" in url else "https://vidzy.org/",
+        "Referer": f"{settings.VOIR_ANIME_URL.rstrip('/')}/" if is_va_sub else "https://vidzy.org/",
     }
     try:
         async with _get_media_async_client(timeout=10.0) as client:

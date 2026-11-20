@@ -1,0 +1,180 @@
+/* Unified Material 3 / Native OS Design Tokens */
+:root {
+  --sidebar: 252px;
+  --rail-width: 72px;
+  --topbar: 60px;
+  --mobile-nav-height: 64px;
+
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-pill: 9999px;
+
+  --transition: 0.16s cubic-bezier(0.2, 0, 0, 1);
+
+  --surface-0: var(--bg);
+  --surface-1: var(--bg-soft);
+  --surface-2: var(--panel);
+  --surface-3: var(--panel-strong);
+  --surface-4: var(--surface);
+
+  --border-subtle: var(--line);
+  --border-strong: var(--line-strong);
+  --elevation-1: 0 1px 3px rgba(0, 0, 0, 0.14);
+  --elevation-2: 0 10px 28px rgba(0, 0, 0, 0.28);
+
+  --action-bg: var(--accent);
+  --action-hover: var(--accent-2);
+}
+
+html[data-theme='light'] {
+  --line: rgba(15, 23, 42, 0.1);
+  --line-strong: rgba(15, 23, 42, 0.22);
+  --input-border: rgba(15, 23, 42, 0.24);
+  --panel-subtle: rgba(15, 23, 42, 0.045);
+  --elevation-1: 0 1px 2px rgba(15, 23, 42, 0.08);
+  --elevation-2: 0 10px 28px rgba(15, 23, 42, 0.14);
+  --shadow: 0 14px 36px rgba(15, 23, 42, 0.12);
+}
+
+/* Complete Light & Dark Tonal Surfaces per Palette */
+html[data-theme='light'][data-palette='lavender'] {
+  --bg: #f8f6fc;
+  --bg-soft: #f2eef9;
+  --sidebar-bg: #eee8f6;
+  --topbar-bg: #f8f6fcf2;
+  --panel: #ffffff;
+  --panel-strong: #f2eef9;
+  --panel-alpha: #fffffffa;
+  --surface: #e8e0f5;
+  --input-bg: #ffffff;
+  --text: #1c1826;
+  --muted: #564f67;
+  --faint: #756c89;
+  --on-accent: #ffffff;
+}
+
+html[data-theme='light'][data-palette='ember'] {
+  --bg: #fcf7f4;
+  --bg-soft: #f5ede7;
+  --sidebar-bg: #f2e7df;
+  --topbar-bg: #fcf7f4f2;
+  --panel: #ffffff;
+  --panel-strong: #f5ede7;
+  --panel-alpha: #fffffffa;
+  --surface: #ece0d7;
+  --input-bg: #ffffff;
+  --text: #241912;
+  --muted: #655043;
+  --faint: #846c5e;
+  --on-accent: #ffffff;
+}
+
+html[data-theme='light'][data-palette='amoled'] {
+  --bg: #f4faf7;
+  --bg-soft: #eaf5f0;
+  --sidebar-bg: #e3f0ea;
+  --topbar-bg: #f4faf7f2;
+  --panel: #ffffff;
+  --panel-strong: #e9f5ef;
+  --panel-alpha: #fffffffa;
+  --surface: #dcece5;
+  --input-bg: #ffffff;
+  --text: #10241c;
+  --muted: #406154;
+  --faint: #5e7e71;
+  --on-accent: #ffffff;
+}
+
+/* Eliminate hardcoded violet overrides across buttons, badges, and cards */
+.btn-primary {
+  background: var(--accent) !important;
+  color: var(--on-accent) !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.btn-primary:hover {
+  background: var(--accent-2) !important;
+  color: var(--on-accent) !important;
+  box-shadow: none !important;
+}
+
+.side-badge,
+.bottom-nav-badge {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.chip:not(.chip-auto):not(.chip-source),
+.version-badge:not(.ver-vf),
+.ep-badge,
+.fav-badge,
+.status-badge:not(.badge-ok):not(.badge-err):not(.badge-other):not(.status-done):not(
+    .status-error
+  ):not(.status-paused),
+.episode-version-badge:not(.ver-vf),
+.ver-vostfr {
+  color: var(--on-accent-container);
+  background: var(--accent-container);
+  border: 1px solid rgba(var(--accent-rgb), 0.22);
+}
+
+html[data-theme='light'] .chip:not(.chip-auto):not(.chip-source),
+html[data-theme='light'] .version-badge:not(.ver-vf),
+html[data-theme='light'] .ep-badge,
+html[data-theme='light'] .fav-badge,
+html[data-theme='light']
+  .status-badge:not(.badge-ok):not(.badge-err):not(.badge-other):not(.status-done):not(
+    .status-error
+  ):not(.status-paused),
+html[data-theme='light'] .episode-version-badge:not(.ver-vf),
+html[data-theme='light'] .ver-vostfr {
+  color: var(--on-accent-container);
+  background: var(--accent-container);
+  border: 1px solid rgba(var(--accent-rgb), 0.24);
+}
+
+.palette-card {
+  background: var(--panel-strong);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--elevation-2);
+}
+
+html[data-theme='light'] .palette-card {
+  background: var(--panel);
+  border-color: var(--line-strong);
+  box-shadow: var(--elevation-2);
+}
+
+.palette-tab-chip.active {
+  background: var(--accent-container);
+  border-color: var(--accent);
+  color: var(--on-accent-container);
+  box-shadow: none;
+}
+
+.palette-tab-chip:hover {
+  background: rgba(var(--accent-rgb), 0.14);
+  border-color: rgba(var(--accent-rgb), 0.35);
+}
+
+.kbd-shortcut-badge:hover {
+  background: var(--accent-container);
+  border-color: var(--accent);
+  color: var(--on-accent-container);
+}
+
+.pwa-install-banner {
+  box-shadow: var(--elevation-2);
+}
+
+.dl-task-bottom-fill {
+  background: var(--accent);
+}
+
+.dl-task-row:hover {
+  box-shadow: var(--elevation-1);
+}

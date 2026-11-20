@@ -13,7 +13,7 @@ from urllib.parse import parse_qs, quote, quote_plus, urlencode, urljoin, urlpar
 from bs4 import BeautifulSoup
 
 from animelab.models.anime import AnimeDetail, AnimeResult, Episode
-from animelab.services.source_http import source_http
+from animelab.services.source_http import VerificationRequired, source_http
 
 
 def field(data, path, default=None):
@@ -114,21 +114,57 @@ class RecipeRuntime:
         voice = urlparse(url).path.rstrip('/').split('/')[-1].lower()
         return 'VOSTFR' if voice == 'vostfr' else 'VF' if re.fullmatch(r'vf\d*', voice) else voice.upper()
 
+    async def _expand_roots(self, items):
+        def work_root(item):
+            root = self.section_root(item.url)
+            return root if root and urlparse(item.url).path.rstrip('/') == urlparse(root).path.rstrip('/') else None
+
+        roots = []
+        by_root = {}
+        passthrough = []
+        for item in items:
+            root = work_root(item)
+            if root:
+                if root not in by_root:
+                    roots.append(root)
+                    by_root[root] = []
+                by_root[root].append(item)
+            else:
+                passthrough.append(item)
+
+        semaphore = asyncio.Semaphore(5)
+
+        async def expand(root):
+            async with semaphore:
+                _, sections = await self.section_data(root)
+                return root, [item.model_copy(deep=True) for item in sections]
+
+        return work_root, roots, by_root, passthrough, expand
+
     async def expand_listing(self, items):
         if self.plan.get('listing_expansion', {}).get('kind') != 'script_sections':
             return items
         # Release feeds already point to a season/language. Keep that exact entry;
         # expanding it would lose the selected voice and repeat unrelated seasons.
-        def work_root(item):
-            root = self.section_root(item.url)
-            return root if root and urlparse(item.url).path.rstrip('/') == urlparse(root).path.rstrip('/') else None
-        roots = list(dict.fromkeys(root for item in items if (root := work_root(item))))
-        semaphore = asyncio.Semaphore(3)
-        async def expand(root):
-            async with semaphore:
-                _, sections = await self.section_data(root)
-                return [item.model_copy(deep=True) for item in sections]
-        expanded = dict(zip(roots, await asyncio.gather(*(expand(root) for root in roots))))
+        work_root, roots, by_root, _, expand = await self._expand_roots(items)
+
+        async def safe_expand(root):
+            try:
+                _, sections = await expand(root)
+                return sections, None
+            except VerificationRequired as exc:
+                return None, exc
+            except Exception:
+                return by_root[root], None
+
+        outcome = await asyncio.gather(*(safe_expand(root) for root in roots))
+        first_verification = next((exc for _, exc in outcome if exc is not None), None)
+        if first_verification and not any(secs for secs, exc in outcome if exc is None and secs):
+            raise first_verification
+        expanded = {
+            root: (secs if secs is not None else by_root[root])
+            for root, (secs, _) in zip(roots, outcome)
+        }
         results, seen = [], set()
         for item in items:
             for entry in expanded.get(work_root(item), [item]):
@@ -136,6 +172,60 @@ class RecipeRuntime:
                     results.append(entry)
                     seen.add(entry.url)
         return results
+
+    async def expand_listing_stream(self, items, batch_size: int = 12):
+        if self.plan.get('listing_expansion', {}).get('kind') != 'script_sections':
+            for index in range(0, len(items), batch_size):
+                batch = items[index : index + batch_size]
+                if batch:
+                    yield batch
+            return
+        _, roots, by_root, passthrough, expand = await self._expand_roots(items)
+        seen = set()
+        if passthrough:
+            unique_passthrough = []
+            for entry in passthrough:
+                if entry.url not in seen:
+                    seen.add(entry.url)
+                    unique_passthrough.append(entry)
+            if unique_passthrough:
+                yield unique_passthrough
+        if not roots:
+            return
+
+        async def guarded_expand(root):
+            try:
+                _, sections = await expand(root)
+                return root, sections, None
+            except VerificationRequired as exc:
+                return root, None, exc
+            except Exception:
+                return root, by_root[root], None
+
+        tasks = [asyncio.create_task(guarded_expand(root)) for root in roots]
+        yielded_sections = False
+        pending_verification = None
+        try:
+            for fut in asyncio.as_completed(tasks):
+                root, sections, exc = await fut
+                if exc is not None:
+                    if pending_verification is None:
+                        pending_verification = exc
+                    continue
+                yielded_sections = True
+                batch = []
+                for entry in sections:
+                    if entry.url not in seen:
+                        seen.add(entry.url)
+                        batch.append(entry)
+                if batch:
+                    yield batch
+            if pending_verification is not None and not yielded_sections:
+                raise pending_verification
+        finally:
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
 
     async def section_detail(self, url):
         root = self.section_root(url)

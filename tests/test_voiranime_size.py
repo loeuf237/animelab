@@ -52,7 +52,7 @@ def test_get_headers_for_url_domains():
     # Moon (Byse / gn1r5n)
     moon_hdrs = download_manager.get_headers_for_url("https://gn1r5n.org/api/videos/stream/xyz")
     assert moon_hdrs["Referer"] == "https://gn1r5n.org/"
-    assert moon_hdrs["X-Embed-Origin"] == "voir-anime.to"
+    assert moon_hdrs["X-Embed-Origin"] == "voiranime.cx"
 
     # Vidzy
     vidzy_hdrs = download_manager.get_headers_for_url("https://vidzy.live/stream/video.mp4")

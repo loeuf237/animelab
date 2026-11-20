@@ -5,7 +5,7 @@ import queue
 import sys
 import threading
 from PySide6.QtCore import QTimer, Qt, QTranslator, QLibraryInfo
-from PySide6.QtGui import QIcon, QKeySequence, QShortcut
+from PySide6.QtGui import QIcon, QKeySequence, QPalette, QShortcut
 from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QGridLayout, QToolButton, QButtonGroup, QStackedWidget, QLabel, QPushButton,
     QFrame, QMessageBox)
@@ -92,6 +92,16 @@ class NativeLauncher(QWidget):
         self.tab_group = QButtonGroup(tabbar)
         self.tab_group.setExclusive(True)
         columns = math.ceil(len(TABS) / math.ceil(len(TABS) / 5))
+        dark_mode = app.palette().color(QPalette.ColorRole.Window).lightness() < 128
+        tab_style = (
+            'QToolButton { color: #afbec1; border: none; border-bottom: 1px solid #26373a; padding: 5px 2px; background: #0f1b1e; }'
+            'QToolButton:checked { background: #18272a; color: #dce7e9; border-bottom: 2px solid #80d3dc; }'
+            'QToolButton:hover { background: #18272a; color: #dce7e9; } QToolButton:focus { border: 1px solid #80d3dc; }'
+            if dark_mode else
+            'QToolButton { color: #000000; border: none; border-bottom: 1px solid #d6d8db; padding: 5px 2px; }'
+            'QToolButton:checked { background: #ffffff; color: #000000; border-bottom: 2px solid #006874; }'
+            'QToolButton:hover { background: #eaf2f3; } QToolButton:focus { border: 1px solid #006874; }'
+        )
         for index, name in enumerate(TABS):
             tab = QToolButton(tabbar)
             tab.setText(self.t(name))
@@ -102,9 +112,7 @@ class NativeLauncher(QWidget):
             tab.setMinimumSize(0, 29)
             from PySide6.QtWidgets import QSizePolicy
             tab.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
-            tab.setStyleSheet('QToolButton { color: #000000; border: none; border-bottom: 1px solid #d6d8db; padding: 5px 2px; }'
-                'QToolButton:checked { background: white; color: #000000; border-bottom: 2px solid #6299cc; }'
-                'QToolButton:hover { background: #e8edf2; } QToolButton:focus { border: 1px solid #4389ce; }')
+            tab.setStyleSheet(tab_style)
             tab.clicked.connect(lambda checked=False, name=name: self.select_tab(name))
             self.tab_group.addButton(tab, index)
             self.tabs.append(tab)

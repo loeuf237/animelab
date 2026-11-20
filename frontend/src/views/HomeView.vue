@@ -1,102 +1,143 @@
 <template>
   <div class="home-container">
-    <!-- Hero Section -->
-    <section class="hero fade-in compact-home-hero" id="search-panel">
-      <div class="hero-panel">
-        <h1 class="hero-title">{{ tx('Regardez vos animés sans interruption.') }}</h1>
-        <p class="hero-subtitle">
-          {{ tx('Recherchez, téléchargez et organisez vos séries préférées en VF et VOSTFR.') }}
+    <!-- Native Media Header & Quick Status -->
+    <header class="page-header home-top-header fade-in">
+      <div>
+        <h1 class="page-title">{{ tx('Accueil') }}</h1>
+        <p class="page-sub">
+          {{ tx('Vos séries suivies, activités récentes et dernières sorties.') }}
         </p>
-
-        <div class="home-search-actions">
-          <SourceSelector
-            v-model="selectedSource"
-            :sources="sourceOptions"
-            @update:model-value="preferences.setDefault"
-          />
-          <button type="button" class="btn btn-primary" @click="emitOpenPalette">
-            {{ tx('Rechercher dans cette sélection') }}
-          </button>
-        </div>
       </div>
 
-      <aside class="quick-panel">
-        <div class="quick-row">
-          <span>{{ tx('Favoris') }}</span>
-          <strong>{{ tx(animeStore.homeFeed ? favoritesCount : '…') }}</strong>
+      <div class="home-header-tools">
+        <div class="native-summary-pills">
+          <router-link to="/library" class="metric-pill">
+            <strong>{{ tx(animeStore.homeFeed ? favoritesCount : '…') }}</strong>
+            <span>{{ tx('Favoris') }}</span>
+          </router-link>
+          <router-link to="/sources" class="metric-pill">
+            <strong>{{ tx(animeStore.homeFeed ? activeSourcesCount : '…') }}</strong>
+            <span>{{ tx('Sources') }}</span>
+          </router-link>
+          <router-link to="/downloads" class="metric-pill">
+            <strong>{{ tx(downloadStore.stats.activeCount) }}</strong>
+            <span>{{ tx('Actifs') }}</span>
+          </router-link>
         </div>
-        <div class="quick-row">
-          <span>{{ tx('Sources actives') }}</span>
-          <strong style="color: var(--green)">{{
-            tx(animeStore.homeFeed ? `${activeSourcesCount} actives` : 'Chargement…')
+
+        <button type="button" class="btn btn-primary" @click="emitOpenPalette">
+          <Search :size="16" aria-hidden="true" />
+          <span>{{ tx('Rechercher') }}</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Continue / Recent Activity Shelf -->
+    <section v-if="recentHistory.length > 0" class="section fade-in" style="margin-top: 0">
+      <div class="home-section-head">
+        <h2 class="section-title" style="margin: 0">
+          <Clock :size="18" aria-hidden="true" />
+          {{ tx('Reprendre et récents') }}
+        </h2>
+        <router-link to="/history" class="btn btn-sm">{{ tx('Historique') }}</router-link>
+      </div>
+
+      <div class="native-shelf-row">
+        <router-link
+          v-for="item in recentHistory.slice(0, 8)"
+          :key="`${item.id || item.animeUrl}-${item.episodeNumber}`"
+          :to="
+            item.animeUrl
+              ? {
+                  path: '/anime',
+                  query: { url: item.animeUrl, source: item.source || 'french-manga' },
+                }
+              : '/history'
+          "
+          class="native-shelf-card"
+        >
+          <div class="shelf-card-top">
+            <span class="badge badge-source">{{ tx(item.source || 'Animé') }}</span>
+            <span v-if="item.episodeNumber" class="ep-badge">
+              {{ tx('Ép.') }} {{ tx(item.episodeNumber) }}
+            </span>
+          </div>
+          <strong class="shelf-card-title">{{
+            tx(item.animeName || item.animeTitle || 'Animé')
           }}</strong>
-        </div>
-        <div class="quick-row">
-          <span>{{ tx('Téléchargements') }}</span>
-          <router-link to="/downloads" class="btn btn-sm">{{
-            tx('Ouvrir le gestionnaire')
-          }}</router-link>
-        </div>
-      </aside>
+          <span class="shelf-card-sub">{{ tx(item.status || 'Récent') }}</span>
+        </router-link>
+      </div>
     </section>
 
     <!-- Quick Favorites Section -->
-    <section v-if="favorites.length > 0" class="section fade-in">
-      <div
-        style="
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 14px;
-        "
-      >
+    <section v-if="favorites.length > 0" class="section fade-in" style="margin-top: 0">
+      <div class="home-section-head">
         <h2 class="section-title" style="margin: 0">
-          <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" /></svg>
+          <Bookmark :size="18" aria-hidden="true" />
           {{ tx('Accès rapide aux favoris') }}
         </h2>
-        <router-link to="/library" class="btn btn-sm" style="color: var(--accent)">{{
-          tx('Voir tout')
-        }}</router-link>
+        <router-link to="/library" class="btn btn-sm">{{ tx('Voir tout') }}</router-link>
       </div>
       <div class="results-grid">
-        <article v-for="fav in favorites.slice(0, 10)" :key="fav.url" class="anime-card">
-          <router-link
-            :to="{ path: '/anime', query: { url: fav.url, source: fav.source || 'french-manga' } }"
-            class="card-link"
-          >
-            <div class="card-poster">
-              <img :src="fav.imageUrl" :alt="tx(fav.title)" loading="lazy" />
-              <div class="card-overlay">
-                <span class="fav-badge">{{ tx('Favori') }}</span>
-                <span v-if="fav.autoDownload" class="chip chip-auto">Auto-DL</span>
-              </div>
-            </div>
-            <div class="card-info">
-              <h3 class="card-title">{{ tx(fav.title) }}</h3>
-              <span class="card-sub">{{ tx(fav.source || 'french-manga') }}</span>
-            </div>
-          </router-link>
-        </article>
+        <PosterCard
+          v-for="fav in favorites.slice(0, 10)"
+          :key="fav.url"
+          :title="fav.title"
+          :image-url="fav.imageUrl"
+          :to="{ path: '/anime', query: { url: fav.url, source: fav.source || 'french-manga' } }"
+          :subtitle="fav.source || 'french-manga'"
+          :favorite="true"
+          :auto-download="fav.autoDownload"
+        />
       </div>
     </section>
 
-    <!-- Latest Releases Section with Tabs -->
-    <section class="section fade-in">
+    <!-- Latest Releases Section with Source Chips -->
+    <section class="section fade-in" style="margin-top: 0">
       <p v-if="animeStore.error" role="alert">
         {{ tx(animeStore.error) }}
         <button class="btn" @click="refreshFeed">{{ tx('Réessayer') }}</button>
       </p>
-      <div class="releases-tabs-header">
+
+      <div class="releases-tabs-header home-releases-head">
         <h2 class="section-title">
-          <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" /></svg> {{ tx('Dernières Sorties') }}
+          <Sparkles :size="18" aria-hidden="true" />
+          {{ tx('Dernières Sorties') }}
         </h2>
-        <SourceSelector
-          v-model="releaseTab"
-          @update:model-value="preferences.setDefault"
-          :sources="sourceOptions"
-          :label="tx('Sorties de')"
-          :include-all="false"
-        />
+        <div class="home-releases-controls">
+          <SourceSelector
+            v-model="releaseTab"
+            :sources="sourceOptions"
+            :label="tx('Sorties de')"
+            :include-all="false"
+            @update:model-value="preferences.setDefault"
+          />
+          <button
+            type="button"
+            class="icon-button"
+            :title="tx('Actualiser le flux')"
+            :aria-label="tx('Actualiser le flux')"
+            @click="refreshFeed"
+          >
+            <RefreshCw :size="16" aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+
+      <div class="source-filter-chips" role="tablist" :aria-label="tx('Sources')">
+        <button
+          v-for="src in sourceOptions"
+          :key="src.id"
+          type="button"
+          role="tab"
+          class="source-chip-btn"
+          :class="{ active: releaseTab === src.id }"
+          :aria-selected="releaseTab === src.id"
+          @click="selectReleaseSource(src.id)"
+        >
+          {{ tx(src.name) }}
+        </button>
       </div>
 
       <p v-if="feedChallenges.length" class="source-feed-notice">
@@ -117,38 +158,25 @@
         <button class="btn" @click="refreshFeed">{{ tx('Réessayer') }}</button>
         <ProxyRotationButton v-if="warning.domain" :domain="warning.domain" :retry="refreshFeed" />
       </p>
+
       <!-- Releases Content -->
-      <div v-if="isLoadingReleases" class="empty-state">
-        <div class="spinner"></div>
-        <h3>{{ tx('Chargement des sorties...') }}</h3>
-      </div>
+      <SkeletonGrid
+        v-if="isLoadingReleases"
+        :count="10"
+        :label="tx('Chargement des dernières sorties…')"
+      />
 
       <div v-else-if="currentReleases.length > 0" class="results-grid animate-fade-in">
-        <article v-for="anime in currentReleases" :key="anime.url" class="anime-card">
-          <router-link
-            :to="{ path: '/anime', query: { url: anime.url, source: anime.source || releaseTab } }"
-            class="card-link"
-          >
-            <div class="card-poster">
-              <img
-                :src="anime.imageUrl"
-                :alt="tx(anime.title)"
-                loading="lazy"
-                @error="onImgError"
-              />
-              <div class="card-overlay">
-                <span v-if="anime.version" class="version-badge">{{ tx(anime.version) }}</span>
-                <span v-if="anime.latestEpisode || anime.episodeInfo" class="ep-badge">
-                  {{ tx(anime.latestEpisode || anime.episodeInfo) }}
-                </span>
-              </div>
-            </div>
-            <div class="card-info">
-              <h3 class="card-title">{{ tx(anime.title) }}</h3>
-              <span class="card-type">{{ tx(anime.type || 'Anime') }}</span>
-            </div>
-          </router-link>
-        </article>
+        <PosterCard
+          v-for="anime in currentReleases"
+          :key="anime.url"
+          :title="anime.title"
+          :image-url="anime.imageUrl"
+          :to="{ path: '/anime', query: { url: anime.url, source: anime.source || releaseTab } }"
+          :subtitle="anime.type || 'Anime'"
+          :version="anime.version"
+          :episode-info="anime.latestEpisode || anime.episodeInfo"
+        />
       </div>
 
       <div
@@ -166,16 +194,21 @@
 </template>
 
 <script setup lang="ts">
+import { Bookmark, Clock, RefreshCw, Search, Sparkles } from 'lucide-vue-next'
 import { language, tx } from '@/utils/locale'
 import { ref, computed, watch, onMounted, onActivated } from 'vue'
 import { useSourcePreferences } from '@/stores/sourcePreferences'
+import { useDownloadStore } from '@/stores/downloads'
 import SourceSelector from '@/components/SourceSelector.vue'
 import ProxyRotationButton from '@/components/ProxyRotationButton.vue'
+import PosterCard from '@/components/PosterCard.vue'
+import SkeletonGrid from '@/components/SkeletonGrid.vue'
 import { useAnimeStore } from '@/stores/anime'
-import type { AnimeResult, FavoriteItem } from '@/types'
+import type { AnimeResult, FavoriteItem, HistoryItem } from '@/types'
 
 defineOptions({ name: 'HomeView' })
 const animeStore = useAnimeStore()
+const downloadStore = useDownloadStore()
 let firstActivation = true
 onActivated(() => {
   if (firstActivation) firstActivation = false
@@ -219,6 +252,10 @@ const favorites = computed<FavoriteItem[]>(() => {
   return animeStore.homeFeed?.favorites || []
 })
 
+const recentHistory = computed<HistoryItem[]>(() => {
+  return animeStore.homeFeed?.recentHistory || []
+})
+
 const favoritesCount = computed(() => {
   return favorites.value.length
 })
@@ -237,12 +274,9 @@ const currentReleases = computed<AnimeResult[]>(() => {
   const feed = animeStore.homeFeed
   if (!feed) return []
 
-  // Check normalized map first
   if (feed.latestReleases && feed.latestReleases[releaseTab.value]) {
     return feed.latestReleases[releaseTab.value]
   }
-
-  // Fallback to direct keys
   if (releaseTab.value === 'french-manga') {
     return feed.latestFrenchManga || []
   }
@@ -252,8 +286,6 @@ const currentReleases = computed<AnimeResult[]>(() => {
   if (releaseTab.value === 'animepahe') {
     return feed.latestAnimePahe || []
   }
-
-  // Check extensions
   if (feed.extensionsReleases && feed.extensionsReleases[releaseTab.value]) {
     return feed.extensionsReleases[releaseTab.value].releases || []
   }
@@ -269,6 +301,12 @@ const sourceOptions = computed(() => [
     .filter((ext) => ext.supportsLatest !== false)
     .map((ext) => ({ id: String(ext.id || ext.pkg), name: ext.name.replace(/^Aniyomi:\s*/i, '') })),
 ])
+
+function selectReleaseSource(id: string) {
+  releaseTab.value = id
+  preferences.setDefault(id)
+}
+
 function emitOpenPalette() {
   emit('open-palette', '', selectedSource.value)
 }
@@ -276,34 +314,65 @@ function emitOpenPalette() {
 async function refreshFeed() {
   await animeStore.fetchHomeFeed(true)
 }
-
-function onImgError(e: Event) {
-  const target = e.target as HTMLImageElement
-  target.src = 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80'
-}
 </script>
 
 <style scoped>
 .home-container {
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 24px;
 }
 
-.spinner {
-  width: 36px;
-  height: 36px;
-  border: 3px solid var(--panel-subtle);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+.home-top-header {
+  margin-bottom: 0;
+  flex-wrap: wrap;
+}
+
+.home-header-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.home-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 12px;
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+.home-releases-head {
+  margin-bottom: 12px;
+}
+
+.home-releases-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shelf-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.shelf-card-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.shelf-card-sub {
+  font-size: 11.5px;
+  color: var(--muted);
 }
 
 .empty-state {

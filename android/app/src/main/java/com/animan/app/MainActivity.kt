@@ -15,8 +15,10 @@ import android.os.Bundle
 import android.view.View
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.WindowCompat
 import android.webkit.*
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -36,6 +38,27 @@ class MainActivity : AppCompatActivity() {
     private var customCallback: WebChromeClient.CustomViewCallback? = null
     private var fileCallback: ValueCallback<Array<Uri>>? = null
     private var connectJob: Job? = null
+    private lateinit var nativeUiBridge: NativeUiBridge
+    private val backCallback = object : OnBackPressedCallback(true) {
+        override fun handleOnBackPressed() {
+            if (customView != null) {
+                binding.webView.webChromeClient?.onHideCustomView()
+                return
+            }
+            binding.webView.evaluateJavascript(
+                "(function(){return window.__animelabHandleBack ? Boolean(window.__animelabHandleBack()) : false;})()"
+            ) { result ->
+                if (result == "true") return@evaluateJavascript
+                if (binding.webView.canGoBack()) {
+                    binding.webView.goBack()
+                } else {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                    isEnabled = true
+                }
+            }
+        }
+    }
     private val filePicker = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         fileCallback?.onReceiveValue(uris.toTypedArray()); fileCallback = null
     }
@@ -83,11 +106,19 @@ class MainActivity : AppCompatActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        NativeUiBridge.applySavedChrome(
+            this,
+            binding.root,
+            binding.loadingLayout,
+            binding.loadingTitle,
+            binding.loadingStatus,
+        )
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
             view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
             insets
         }
+        onBackPressedDispatcher.addCallback(this, backCallback)
         setupWebView()
         EngineHost.start(applicationContext, BuildConfig.DEBUG && intent.getBooleanExtra("test_mode", false))
         StorageAccess.actionHandler = permissionAction
@@ -132,6 +163,13 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
+        binding.webView.apply {
+            overScrollMode = View.OVER_SCROLL_NEVER
+            isVerticalScrollBarEnabled = false
+            isHorizontalScrollBarEnabled = false
+        }
+        nativeUiBridge = NativeUiBridge(this, binding.webView, binding.root)
+        binding.webView.addJavascriptInterface(nativeUiBridge, "AnimeLabAndroid")
         binding.webView.settings.apply {
             javaScriptEnabled = true; domStorageEnabled = true
             allowFileAccess = false; allowContentAccess = true
@@ -155,10 +193,20 @@ class MainActivity : AppCompatActivity() {
             }
             override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
                 if (request?.isForMainFrame == true) {
+                    val detail = error?.description?.toString() ?: "webview_error"
+                    CrashReporter.recordWebViewError(applicationContext, "webview_error", detail)
                     binding.loadingLayout.visibility = View.VISIBLE
                     binding.loadingStatus.text = getString(R.string.engine_error, error?.description ?: "")
                     binding.retryButton.visibility = View.VISIBLE
                 }
+            }
+            override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
+                val reason = if (detail?.didCrash() == true) "crashed" else "killed"
+                CrashReporter.recordWebViewError(applicationContext, "webview_render_gone", reason)
+                binding.loadingLayout.visibility = View.VISIBLE
+                binding.loadingStatus.text = getString(R.string.engine_error, reason)
+                binding.retryButton.visibility = View.VISIBLE
+                return true
             }
         }
         binding.webView.webChromeClient = object : WebChromeClient() {
@@ -172,11 +220,33 @@ class MainActivity : AppCompatActivity() {
                 return true
             }
             override fun onCreateWindow(view: WebView?, dialog: Boolean, gesture: Boolean, result: android.os.Message?): Boolean {
-                val hit = view?.hitTestResult?.extra ?: return false
-                val uri = Uri.parse(hit)
-                if (uri.scheme !in listOf("http", "https")) return false
-                try { startActivity(Intent(Intent.ACTION_VIEW, uri)) } catch (_: Exception) { return false }
-                return false
+                val hit = view?.hitTestResult?.extra
+                if (hit != null) {
+                    val uri = Uri.parse(hit)
+                    if (uri.scheme !in listOf("http", "https")) return false
+                    try { startActivity(Intent(Intent.ACTION_VIEW, uri)) } catch (_: Exception) { }
+                    return false
+                }
+                val transport = result?.obj as? WebView.WebViewTransport ?: return false
+                val context = view?.context ?: return false
+                val tempWebView = WebView(context)
+                tempWebView.webViewClient = object : WebViewClient() {
+                    override fun shouldOverrideUrlLoading(w: WebView?, request: WebResourceRequest?): Boolean {
+                        val uri = request?.url
+                        if (uri != null && uri.scheme in listOf("http", "https")) {
+                            try { startActivity(Intent(Intent.ACTION_VIEW, uri)) } catch (_: Exception) { }
+                        }
+                        w?.destroy()
+                        return true
+                    }
+                    override fun onPageStarted(w: WebView?, url: String?, favicon: Bitmap?) {
+                        w?.stopLoading()
+                        w?.destroy()
+                    }
+                }
+                transport.webView = tempWebView
+                result.sendToTarget()
+                return true
             }
             override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
                 if (customView != null || view == null) { callback?.onCustomViewHidden(); return }
@@ -185,22 +255,19 @@ class MainActivity : AppCompatActivity() {
                 binding.customViewContainer.visibility = View.VISIBLE
                 binding.customViewContainer.addView(view)
                 requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                WindowInsetsControllerCompat(window, window.decorView).apply {
+                    systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    hide(WindowInsetsCompat.Type.systemBars())
+                }
             }
             override fun onHideCustomView() {
                 customView?.let { binding.customViewContainer.removeView(it) }
                 customView = null; customCallback?.onCustomViewHidden(); customCallback = null
                 binding.customViewContainer.visibility = View.GONE; binding.webView.visibility = View.VISIBLE
                 requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
+                WindowInsetsControllerCompat(window, window.decorView).show(WindowInsetsCompat.Type.systemBars())
             }
         }
-    }
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        if (customView != null) binding.webView.webChromeClient?.onHideCustomView()
-        else if (binding.webView.canGoBack()) binding.webView.goBack()
-        else super.onBackPressed()
     }
     override fun onDestroy() {
         if (StorageAccess.actionHandler === permissionAction) StorageAccess.actionHandler = null

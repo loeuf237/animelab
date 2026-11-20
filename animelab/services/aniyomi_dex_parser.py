@@ -488,7 +488,7 @@ class AniyomiDexParser:
             elif "franime" in pkg_lower:
                 recipe.base_url = "https://franime.fr"
             elif "voiranime" in pkg_lower:
-                recipe.base_url = "https://voir-anime.to"
+                recipe.base_url = "https://voiranime.cx"
             elif "vostfree" in pkg_lower:
                 recipe.base_url = "https://vostfree.ws"
             elif "aniworld" in pkg_lower:
@@ -762,7 +762,7 @@ class AniyomiDexParser:
                     {"id": "films", "label": "Films Animes", "path": "/films/", "selector": "div.content article"},
                 ]
 
-        elif "voiranime" in pkg_lower or "voir-anime" in base_lower:
+        elif "voiranime" in pkg_lower or "voir-anime" in base_lower or "voiranime" in base_lower:
             recipe.multisrc_theme = "madara"
             recipe.multi_tags = True
             current_cards = ".page-item-detail.video, .page-item-detail, .c-tabs-item__content"

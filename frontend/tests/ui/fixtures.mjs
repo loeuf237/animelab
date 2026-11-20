@@ -1,6 +1,6 @@
 // All browser tests are offline: no requests reach user data or remote sources.
 export const sources = [
-  ['voir-anime', 'VoirAnime', 'fr', 'https://voir-anime.to/'],
+  ['voir-anime', 'VoirAnime', 'fr', 'https://voiranime.cx/'],
   ['animepahe', 'AnimePahe', 'en', 'https://animepahe.pw/'],
   ['french-manga', 'French-Manga', 'fr', 'https://w16.french-manga.net/'],
   [

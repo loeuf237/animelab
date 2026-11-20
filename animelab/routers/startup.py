@@ -61,7 +61,7 @@ async def check_application_updates(refresh: bool = False):
     prefs = await asyncio.to_thread(app_preferences.load)
     # A total deadline also bounds DNS and a peer which drips an endless body.
     try:
-        return await asyncio.wait_for(app_updates.check(prefs['updateChannel'], refresh=refresh), timeout=6)
+        return await asyncio.wait_for(app_updates.check(prefs['updateChannel'], refresh=refresh), timeout=12)
     except TimeoutError:
         return {'status': 'offline', 'currentVersion': current_version(),
                 'channel': prefs['updateChannel'], 'release': None}

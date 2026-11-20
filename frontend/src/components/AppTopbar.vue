@@ -1,5 +1,42 @@
 <template>
   <header class="app-topbar">
+    <!-- Desktop Window Navigation Cluster -->
+    <div v-if="platformRuntime === 'desktop'" class="topbar-nav-cluster">
+      <button
+        type="button"
+        class="icon-button"
+        :aria-label="tx('Précédent')"
+        :title="tx('Précédent')"
+        @click="router.back()"
+      >
+        <ArrowLeft :size="17" aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        class="icon-button"
+        :aria-label="tx('Suivant')"
+        :title="tx('Suivant')"
+        @click="router.forward()"
+      >
+        <ArrowRight :size="17" aria-hidden="true" />
+      </button>
+    </div>
+
+    <!-- Mobile Contextual App Bar Leading Area -->
+    <div class="topbar-mobile-leading">
+      <button
+        v-if="isMobileSubPage"
+        type="button"
+        class="icon-button"
+        :aria-label="tx('Retour')"
+        :title="tx('Retour')"
+        @click="goBack"
+      >
+        <ArrowLeft :size="19" aria-hidden="true" />
+      </button>
+      <span class="topbar-mobile-title">{{ tx(mobileTitle) }}</span>
+    </div>
+
     <router-link to="/" class="brand-mark-mobile" aria-label="AnimeLab">
       <img :src="brandIcon" :alt="tx('AnimeLab Logo')" class="brand-logo-img" />
     </router-link>
@@ -11,12 +48,9 @@
       aria-keyshortcuts="Control+K Meta+K"
       @click="emitOpenPalette"
     >
-      <svg viewBox="0 0 24 24" class="search-icon">
-        <circle cx="11" cy="11" r="7" />
-        <path d="m20 20-4-4" />
-      </svg>
-      <span>{{ tx('Rechercher') }}</span
-      ><kbd class="search-shortcut">Ctrl + K</kbd>
+      <Search :size="17" class="search-icon" aria-hidden="true" />
+      <span>{{ tx('Rechercher') }}</span>
+      <kbd class="search-shortcut">{{ searchShortcut }}</kbd>
     </button>
 
     <div class="top-actions">
@@ -27,16 +61,15 @@
         :title="i18nStore.currentLang === 'fr' ? 'Mon compte' : 'My account'"
         :aria-label="i18nStore.currentLang === 'fr' ? 'Mon compte' : 'My account'"
       >
-        <svg viewBox="0 0 24 24">
-          <circle cx="12" cy="8" r="4" />
-          <path d="M4 21v-2a8 8 0 0 1 16 0v2" />
-        </svg>
+        <User :size="18" aria-hidden="true" />
       </a>
-      <!-- Language toggle -->
+
+      <!-- Language toggle (hidden on mobile; reachable inside MoreView) -->
       <button
         class="icon-button lang-toggle-btn"
         type="button"
         :title="tx('Changer de langue')"
+        :aria-label="tx('Changer de langue')"
         @click="toggleLang"
       >
         <span style="font-size: 12px; font-weight: 800; letter-spacing: 0.5px">{{
@@ -49,35 +82,33 @@
         class="icon-button"
         type="button"
         :title="tx('Basculer le thème')"
+        :aria-label="tx('Basculer le thème')"
         @click="toggleTheme"
       >
-        <svg v-if="theme === 'dark'" viewBox="0 0 24 24">
-          <path d="M21 13a8 8 0 1 1-10-10 7 7 0 0 0 10 10Z" />
-        </svg>
-        <svg v-else viewBox="0 0 24 24">
-          <circle cx="12" cy="12" r="4" />
-          <path
-            d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"
-          />
-        </svg>
+        <Moon v-if="theme === 'dark'" :size="18" aria-hidden="true" />
+        <Sun v-else :size="18" aria-hidden="true" />
       </button>
 
-      <!-- Settings shortcut -->
-      <router-link to="/settings" class="icon-button" :title="tx('Paramètres')">
-        <svg viewBox="0 0 24 24">
-          <circle cx="12" cy="12" r="3" />
-          <path
-            d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.4 1a7 7 0 0 0-1.8-1L14.4 3H9.6L9.2 6.1a7 7 0 0 0-1.8 1L5 6.1l-2 3.4L5 11a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.4-1a7 7 0 0 0 1.8 1l.4 3.1h4.8l.4-3.1a7 7 0 0 0 1.8-1l2.4 1 2-3.4-2-1.5a7 7 0 0 0 .1-1Z"
-          />
-        </svg>
+      <!-- Settings shortcut (desktop) -->
+      <router-link
+        to="/settings"
+        class="icon-button settings-shortcut-link"
+        :title="tx('Paramètres')"
+        :aria-label="tx('Paramètres')"
+      >
+        <Settings :size="18" aria-hidden="true" />
       </router-link>
     </div>
   </header>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ArrowLeft, ArrowRight, Moon, Search, Settings, Sun, User } from 'lucide-vue-next'
 import brandIcon from '@/assets/brand-icon.png'
 import { tx } from '@/utils/locale'
+import { formatShortcut, platformRuntime } from '@/utils/platform'
 import { effectiveTheme as theme, palette, setAppearance } from '@/stores/appearance'
 import { api } from '@/api/client'
 import { useI18nStore } from '@/stores/i18n'
@@ -87,10 +118,21 @@ const emit = defineEmits<{
   (e: 'open-palette'): void
 }>()
 
+const route = useRoute()
+const router = useRouter()
 const i18nStore = useI18nStore()
+
+const searchShortcut = computed(() => formatShortcut('K'))
+const isMobileSubPage = computed(() => Boolean(route.meta?.isSubPage || route.params?.sourceId))
+const mobileTitle = computed(() => String(route.meta?.titleKey || 'AnimeLab'))
 
 function emitOpenPalette() {
   emit('open-palette')
+}
+
+function goBack() {
+  if (window.history.length > 1) router.back()
+  else void router.push('/')
 }
 
 function toggleTheme() {

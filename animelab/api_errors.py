@@ -121,7 +121,9 @@ def install_error_handlers(app):
     @app.exception_handler(Exception)
     async def unexpected_error(request, exc):
         import logging
+        from animelab.diagnostics import telemetry
         logging.getLogger('animelab.api').error('Unhandled API failure at %s', request.url.path, exc_info=exc)
+        telemetry.event('server_error', code=type(exc).__name__, route=request.url.path[:120])
         problem = problem_for(500, {})
         return JSONResponse(status_code=500, content={'error': MESSAGES['internal'], 'problem': problem.model_dump()},
                             headers={'X-Animan-API-Version': '1'})

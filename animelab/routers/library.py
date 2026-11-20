@@ -136,7 +136,7 @@ async def clear_history(
     return {"success": True, "message": "Historique nettoyé"}
 
 # -------------------------------------------------------------------------
-# voir-anime.to API
+# voiranime.cx API
 # -------------------------------------------------------------------------
 
 @router.get("/api/voiranime/search")

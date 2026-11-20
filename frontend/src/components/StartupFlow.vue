@@ -392,7 +392,8 @@ const displayRelease = computed(() => {
   const release = flow.update?.release
   if (
     flow.screen === 'updated' &&
-    release?.version.replace(/^v/, '') !== flow.snapshot?.currentVersion.replace(/^v/, '')
+    release?.version.replace(/^(?:android-)?v/, '') !==
+      flow.snapshot?.currentVersion.replace(/^(?:android-)?v/, '')
   )
     return null
   return release

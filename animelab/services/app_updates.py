@@ -9,12 +9,13 @@ from pathlib import Path
 from urllib.parse import urlsplit
 import httpx
 from animelab import __version__
+from animelab.diagnostics import telemetry
 from animelab.environment import getenv
 from animelab.security import is_safe_url_async
 
-GITHUB_FEED = 'https://api.github.com/repos/loeuf237/animelab/releases?per_page=20'
+GITHUB_FEED = 'https://api.github.com/repos/loeuf237/animelab/releases?per_page=10'
 MAX_FEED_BYTES = 512 * 1024
-VERSION = re.compile(r'^v?(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta|rc)[.-]?(\d+))?(?:\+[\w.-]+)?$')
+VERSION = re.compile(r'^(?:android-)?v?(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta|rc)[.-]?(\d+))?(?:\+[\w.-]+)?$')
 
 
 def current_version():
@@ -111,7 +112,7 @@ class AppUpdates:
             try:
                 if not public_https(feed) or not await is_safe_url_async(feed):
                     raise ValueError('Update feed must be public HTTPS')
-                async with httpx.AsyncClient(timeout=httpx.Timeout(4, connect=2), follow_redirects=False) as client:
+                async with httpx.AsyncClient(timeout=httpx.Timeout(10.0, connect=5.0), follow_redirects=False) as client:
                     async with client.stream('GET', feed, headers={'Accept': 'application/json', 'User-Agent': 'AnimeLab-update-check'}) as response:
                         response.raise_for_status()
                         data = bytearray()
@@ -125,10 +126,10 @@ class AppUpdates:
                     result['status'] = 'available' if version_key(release['version']) > version_key(current) else 'current'
                 else:
                     result['status'] = 'empty'
-            except (httpx.HTTPError, ValueError, TypeError, KeyError):
+            except (httpx.HTTPError, ValueError, TypeError, KeyError) as exc:
                 # Offline startup is usable; never expose URLs with credentials,
                 # upstream response bodies or untrusted HTML in the interface.
-                pass
+                telemetry.event('update_check_failed', code=type(exc).__name__)
             checked_at = time.monotonic()
             self.cache[key] = (checked_at + (3600 if result['status'] != 'offline' else 60), result, checked_at)
             return result

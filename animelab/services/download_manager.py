@@ -608,7 +608,10 @@ class DownloadManagerService:
                 if matched_container:
                     is_imported = True
 
-                is_voir_anime = not is_imported and (source == "voir-anime" or "voir-anime" in download_page_url)
+                dl_url_lower = download_page_url.lower()
+                is_voir_anime = not is_imported and (
+                    source == "voir-anime" or "voir-anime" in dl_url_lower or "voiranime" in dl_url_lower
+                )
                 is_animepahe = not is_imported and (source == "animepahe" or any(k in download_page_url for k in ["animepahe", "kwik.", "pahe."]))
 
                 if is_imported:

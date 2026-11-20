@@ -58,7 +58,7 @@ class Settings:
 
     # Sources anime
     BASE_URL: str = getenv("ANIMAN_BASE_URL", "https://w16.french-manga.net")
-    VOIR_ANIME_URL: str = getenv("ANIMAN_VOIR_ANIME_URL", "https://voir-anime.to")
+    VOIR_ANIME_URL: str = getenv("ANIMAN_VOIR_ANIME_URL", "https://voiranime.cx")
     ANIMEPAHE_URL: str = getenv("ANIMAN_ANIMEPAHE_URL", "https://animepahe.pw")
     ANIMEPAHE_BACKUP_URLS: list = [
         "https://animepahe.pw",

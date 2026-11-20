@@ -83,7 +83,7 @@ class EmbeddedEngineTest {
                 if (webView.url?.startsWith(EngineHost.baseUrl + "/spa/") != true ||
                     !activity.hasWindowFocus() ||
                     activity.findViewById<android.view.View>(R.id.loadingLayout).visibility != android.view.View.GONE) checked.countDown()
-                else webView.evaluateJavascript("Boolean(document.querySelector('#main-content .home-container .hero-panel'))") {
+                else webView.evaluateJavascript("Boolean(document.querySelector('#main-content .home-container .home-top-header, #main-content .home-container .hero-panel'))") {
                     rendered.set(it == "true"); checked.countDown()
                 }
             }
@@ -137,6 +137,17 @@ class EmbeddedEngineTest {
             val startup = JSONObject(request("/api/app/startup").second)
             assertTrue(startup.getJSONObject("preferences").getBoolean("onboardingCompleted"))
             assertEquals(BuildConfig.RELEASE_VERSION, startup.getString("currentVersion"))
+            val reportResp = request(
+                "/api/diagnostics/report",
+                body = "{\"kind\":\"manual\",\"code\":\"instrumentation_probe\",\"component\":\"EmbeddedEngineTest\",\"route\":\"/spa/\"}"
+            )
+            assertEquals(200, reportResp.first)
+            val diagResp = request("/api/diagnostics/export")
+            assertEquals(200, diagResp.first)
+            val diagJson = JSONObject(diagResp.second)
+            assertTrue(diagJson.optInt("recentErrorCount", 0) >= 1)
+            assertTrue(diagJson.has("platform"))
+            assertTrue(diagJson.has("lastCrash"))
             // Measure installed storage separately from APK size, before media
             // fixtures create downloads. Querying our own UID needs no extra grant.
             val storageManager = context.getSystemService(android.os.storage.StorageManager::class.java)

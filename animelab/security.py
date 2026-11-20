@@ -13,6 +13,7 @@ logger = logging.getLogger("animelab.security")
 ALLOWED_SCRAPING_DOMAINS = {
     "french-manga.net",
     "w16.french-manga.net",
+    "voiranime.cx",
     "voir-anime.to",
     "voiranime.to",
     "voiranime.io",

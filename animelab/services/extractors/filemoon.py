@@ -2,7 +2,9 @@ from animelab.services.source_http import VerificationRequired
 import logging
 import re
 from typing import Dict, Optional
+from urllib.parse import urlparse
 
+from animelab.config import settings
 from animelab.services.extractors.base import BaseVideoExtractor, ExtractorResult
 from animelab.services.unpacking import try_unpack
 
@@ -30,8 +32,9 @@ class FilemoonExtractor(BaseVideoExtractor):
         headers = super().get_headers(url)
         u = url.lower()
         if "gn1r5n" in u or "byse" in u or "weneverbeenfree" in u:
-            headers["X-Embed-Origin"] = "voir-anime.to"
-            headers["X-Embed-Referer"] = "https://voir-anime.to/"
+            va_base = settings.VOIR_ANIME_URL.rstrip("/")
+            headers["X-Embed-Origin"] = urlparse(va_base).hostname or "voiranime.cx"
+            headers["X-Embed-Referer"] = va_base + "/"
         return headers
 
     async def extract(

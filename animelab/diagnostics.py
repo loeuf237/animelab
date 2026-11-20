@@ -3,6 +3,7 @@ from collections import deque, OrderedDict
 from datetime import datetime, timezone
 import json
 import logging
+from pathlib import Path
 import re
 import threading
 import time
@@ -12,6 +13,7 @@ from urllib.parse import urlsplit
 _LOCK = threading.RLock()
 _SECRETS = deque(maxlen=256)
 _SAFE = re.compile(r'^[A-Za-z0-9_.:-]{1,255}$')
+_ROUTE = re.compile(r'^/[A-Za-z0-9_./-]{0,119}$')
 _URL = re.compile(r'https?://[^\s<>\"\']+')
 
 
@@ -69,11 +71,17 @@ class Telemetry:
 
     def event(self, event, **fields):
         row = {'time': datetime.now(timezone.utc).isoformat(), 'event': event if _SAFE.fullmatch(event) else 'event'}
-        for key in ('taskId','source','domain','phase','status','code','operation'):
+        for key in ('taskId','source','domain','phase','status','code','operation','errorType'):
             value = fields.get(key)
             if isinstance(value, str) and _SAFE.fullmatch(value):
                 with _LOCK:
                     row[key] = 'redacted' if any(secret in value for secret in _SECRETS) else value
+        route = fields.get('route')
+        if isinstance(route, str):
+            clean_route = route.split('?', 1)[0].split('#', 1)[0].strip()[:120]
+            if _ROUTE.fullmatch(clean_route) and '..' not in clean_route:
+                with _LOCK:
+                    row['route'] = 'redacted' if any(secret in clean_route for secret in _SECRETS) else clean_route
         for key in ('durationMs','waitMs','count','attempt'):
             value = fields.get(key)
             if isinstance(value, (int,float)) and 0 <= value < 1e12: row[key] = round(value, 2)
@@ -98,6 +106,30 @@ class Telemetry:
 
     def snapshot(self):
         with self.lock: return [dict(row) for row in self.events]
+
+
+def read_android_crash(data_dir):
+    """Read and redact the bounded Android crash summary file if present."""
+    if not data_dir:
+        return None
+    crash_file = Path(data_dir) / 'last_crash.json'
+    try:
+        if not crash_file.is_file() or crash_file.stat().st_size > 8192:
+            return None
+        raw = json.loads(crash_file.read_text(encoding='utf-8'))
+        if not isinstance(raw, dict):
+            return None
+        out = {}
+        for key in ('time', 'kind', 'thread', 'exception'):
+            val = raw.get(key)
+            if isinstance(val, str) and val.strip():
+                out[key] = redact_text(val.strip())[:300]
+        frames = raw.get('frames')
+        if isinstance(frames, list):
+            out['frames'] = [redact_text(str(f))[:240] for f in frames[:12]]
+        return out or None
+    except (OSError, ValueError, TypeError):
+        return None
 
 
 telemetry = Telemetry()

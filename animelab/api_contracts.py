@@ -438,6 +438,7 @@ RESPONSES = {
     'open_playback': PlaybackState,
     'save_playback': Result,
     'export_diagnostics': dict[str, JsonValue],
+    'report_client_error': dict[str, JsonValue],
 
     'get_all_status': list[DownloadTaskResponse], 'get_history': list[DownloadTaskResponse],
     'search_api': SearchResponse | list[AnimeResult], 'api_source_feed': SourceFeed,
@@ -472,7 +473,8 @@ for name in ('start_download', 'start_batch_download', 'set_global_speed_limit',
     RESPONSES[name] = Result
 
 BINARY = {'proxy_image', 'stream_video', 'stream_subtitle_default', 'stream_subtitle_at_index',
-          'proxy_subtitle', 'hls_proxy_playlist', 'hls_proxy_segment', 'stream_proxy', 'stream_download_updates'}
+          'proxy_subtitle', 'hls_proxy_playlist', 'hls_proxy_segment', 'stream_proxy', 'stream_download_updates',
+          'stream_catalogue'}
 # Custom source payloads are recursively typed JSON until A04 unifies providers.
 JSON_OBJECT = dict[str, JsonValue]
 

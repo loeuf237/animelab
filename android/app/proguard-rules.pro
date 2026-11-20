@@ -8,6 +8,11 @@
 -keep class com.animan.app.ExtensionBridge { *; }
 -keep class com.animan.app.ExtensionResponsePipe { *; }
 -keep class com.animan.app.ExtensionInstallReceiver { *; }
+-keep class com.animan.app.NativeUiBridge { *; }
+-keep class com.animan.app.CrashReporter { *; }
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
 
 # FFmpeg calls these classes from JNI. Retain callbacks as well as native methods.
 # Chaquopy adds its own consumer rules for com.chaquo.python and Kotlin functions.

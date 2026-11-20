@@ -206,6 +206,43 @@
         </button>
       </li>
     </ul>
+
+    <ConfirmDialog
+      :open="Boolean(confirmAction)"
+      :title="confirmTitle"
+      :confirm-label="confirmButtonLabel"
+      :busy="busy"
+      :danger="confirmAction?.kind === 'uninstall'"
+      @cancel="confirmAction = null"
+      @confirm="executeConfirmedAction"
+    >
+      <template v-if="confirmAction?.kind === 'trust'">
+        <p>
+          {{
+            tx(
+              'Cette extension exécutera du code avec accès aux données et au réseau de l’application. Approuver cette version ?',
+            )
+          }}
+        </p>
+        <p>
+          <strong>{{ confirmAction.extension.pkg }}</strong> · v{{
+            confirmAction.extension.version
+          }}
+        </p>
+        <p>
+          <code>SHA-256 {{ confirmAction.extension.signer }}</code>
+        </p>
+      </template>
+      <template v-else-if="confirmAction?.kind === 'uninstall'">
+        <p>
+          {{
+            tx(
+              'Désinstaller ce paquet Android affectera aussi Aniyomi et Anikku. La bibliothèque et les vidéos seront conservées. Continuer ?',
+            )
+          }}
+        </p>
+      </template>
+    </ConfirmDialog>
   </section>
 </template>
 
@@ -213,6 +250,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { api } from '@/api/client'
 import { tx } from '@/utils/locale'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import ExtensionAvatar from '@/components/ExtensionAvatar.vue'
 import type { ExtensionSource } from '@/types'
 import type {
@@ -299,25 +337,33 @@ async function run(work: () => Promise<unknown>) {
     busy.value = false
   }
 }
-async function trust(extension: NativeExtension) {
-  if (
-    !window.confirm(
-      `${tx('Cette extension exécutera du code avec accès aux données et au réseau de l’application. Approuver cette version ?')}\n${extension.pkg}\nv${extension.version}\nSHA-256 ${extension.signer}`,
-    )
-  )
-    return
-  await run(() => api.trustAndroidExtension(extension))
+const confirmAction = ref<{ kind: 'trust' | 'uninstall'; extension: NativeExtension } | null>(null)
+const confirmTitle = computed(() =>
+  confirmAction.value?.kind === 'uninstall'
+    ? tx('Désinstaller cette extension ?')
+    : tx('Approuver cette extension Android ?'),
+)
+const confirmButtonLabel = computed(() =>
+  confirmAction.value?.kind === 'uninstall' ? tx('Désinstaller') : tx('Approuver'),
+)
+
+function trust(extension: NativeExtension) {
+  confirmAction.value = { kind: 'trust', extension }
 }
-async function uninstall(extension: NativeExtension) {
-  if (
-    !window.confirm(
-      tx(
-        'Désinstaller ce paquet Android affectera aussi Aniyomi et Anikku. La bibliothèque et les vidéos seront conservées. Continuer ?',
-      ),
-    )
-  )
-    return
-  await run(() => api.uninstallAndroidExtension(extension.pkg))
+
+function uninstall(extension: NativeExtension) {
+  confirmAction.value = { kind: 'uninstall', extension }
+}
+
+async function executeConfirmedAction() {
+  const action = confirmAction.value
+  if (!action) return
+  confirmAction.value = null
+  if (action.kind === 'trust') {
+    await run(() => api.trustAndroidExtension(action.extension))
+  } else {
+    await run(() => api.uninstallAndroidExtension(action.extension.pkg))
+  }
 }
 async function importFile(event: Event) {
   const input = event.target as HTMLInputElement

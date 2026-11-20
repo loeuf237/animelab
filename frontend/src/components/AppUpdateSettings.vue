@@ -11,7 +11,11 @@
     >
     <label class="update-channel"
       >{{ tx('Canal des mises à jour')
-      }}<select :value="flow.snapshot?.preferences.updateChannel || 'beta'" @change="changeChannel">
+      }}<select
+        class="input-premium"
+        :value="flow.snapshot?.preferences.updateChannel || 'beta'"
+        @change="changeChannel"
+      >
         <option value="stable">{{ tx('Stable') }}</option>
         <option value="beta">{{ tx('Bêta') }}</option>
       </select></label
@@ -75,8 +79,13 @@ async function changeChannel(event: Event) {
 </script>
 <style scoped>
 .app-update-settings {
-  padding-block: 22px;
+  padding: 22px 24px;
   border-bottom: 1px solid var(--line);
+}
+@media (max-width: 768px) {
+  .app-update-settings {
+    padding: 14px;
+  }
 }
 .app-update-settings h2 {
   font-size: 18px;

@@ -48,17 +48,17 @@
       </button>
     </div>
 
-    <!-- Stats Bar -->
-    <div class="stats-grid" style="margin-bottom: 24px">
-      <div class="stat-card">
+    <!-- Compact Metrics Bar -->
+    <div class="native-summary-pills" style="margin-bottom: 18px">
+      <div class="metric-pill">
         <strong>{{ tx(favorites.length) }}</strong>
         <span>{{ tx('Séries suivies') }}</span>
       </div>
-      <div class="stat-card stat-blue">
+      <div class="metric-pill">
         <strong>{{ tx(autoDownloadCount) }}</strong>
         <span>{{ tx('Téléchargement auto actif') }}</span>
       </div>
-      <div class="stat-card stat-green">
+      <div class="metric-pill">
         <strong>{{ tx(distinctSourcesCount) }}</strong>
         <span>{{ tx('Sources représentées') }}</span>
       </div>
@@ -103,60 +103,41 @@
 
     <!-- Favorites Grid -->
     <div v-else class="results-grid animate-fade-in">
-      <article v-for="fav in visibleFavorites" :key="fav.url" class="anime-card">
-        <router-link
-          :to="{ path: '/anime', query: { url: fav.url, source: fav.source || 'french-manga' } }"
-          class="card-link"
-        >
-          <div class="card-poster">
-            <img :src="fav.imageUrl" :alt="tx(fav.title)" loading="lazy" />
-            <div class="card-overlay">
-              <span class="fav-badge">{{ tx('Favori') }}</span>
-              <span v-if="fav.autoDownload" class="chip chip-auto">Auto-DL</span>
+      <PosterCard
+        v-for="fav in visibleFavorites"
+        :key="fav.url"
+        :title="fav.title"
+        :image-url="fav.imageUrl"
+        :to="{ path: '/anime', query: { url: fav.url, source: fav.source || 'french-manga' } }"
+        :subtitle="fav.source || 'french-manga'"
+        :favorite="true"
+        :auto-download="fav.autoDownload"
+      >
+        <template #footer>
+          <div style="width: 100%">
+            <div
+              style="display: flex; justify-content: space-between; align-items: center; gap: 8px"
+            >
+              <label class="native-switch" style="font-size: 12px; color: var(--muted)">
+                <input type="checkbox" :checked="fav.autoDownload" @change="toggleAuto(fav)" />
+                <span class="native-switch-track" aria-hidden="true"></span>
+                <span>Auto-DL</span>
+              </label>
+
+              <button
+                class="icon-button"
+                style="width: 34px; height: 34px"
+                :title="tx('Retirer de la bibliothèque')"
+                :aria-label="tx(`Retirer ${fav.title} de la bibliothèque`)"
+                @click="removeFav(fav)"
+              >
+                <X :size="15" aria-hidden="true" />
+              </button>
             </div>
+            <AutoDownloadPreferences v-if="fav.autoDownload" :favorite="fav" />
           </div>
-          <div class="card-info">
-            <h3 class="card-title">{{ tx(fav.title) }}</h3>
-            <span class="card-sub">{{ tx(fav.source || 'french-manga') }}</span>
-          </div>
-        </router-link>
-
-        <!-- Card Footer Actions -->
-        <div
-          style="
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 14px;
-            border-top: 1px solid var(--line);
-          "
-        >
-          <label
-            style="
-              display: flex;
-              align-items: center;
-              gap: 6px;
-              font-size: 12px;
-              color: var(--muted);
-              cursor: pointer;
-            "
-          >
-            <input type="checkbox" :checked="fav.autoDownload" @change="toggleAuto(fav)" />
-            <span>Auto-DL</span>
-          </label>
-
-          <button
-            class="icon-button"
-            style="width: 32px; height: 32px"
-            :title="tx('Retirer de la bibliothèque')"
-            :aria-label="tx(`Retirer ${fav.title} de la bibliothèque`)"
-            @click="removeFav(fav)"
-          >
-            ✕
-          </button>
-        </div>
-        <AutoDownloadPreferences v-if="fav.autoDownload" :favorite="fav" />
-      </article>
+        </template>
+      </PosterCard>
     </div>
     <ConfirmDialog
       :open="clearDialogOpen"
@@ -178,6 +159,7 @@
 </template>
 
 <script setup lang="ts">
+import { X } from 'lucide-vue-next'
 import { tx } from '@/utils/locale'
 import { useStartupStore } from '@/stores/startup'
 const startup = useStartupStore()
@@ -185,6 +167,7 @@ import { ref, computed, onMounted, onActivated } from 'vue'
 import { useLibraryStore } from '@/stores/library'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import AutoDownloadPreferences from '@/components/AutoDownloadPreferences.vue'
+import PosterCard from '@/components/PosterCard.vue'
 import { useNotifications } from '@/stores/notifications'
 import type { FavoriteItem } from '@/types'
 

@@ -23,6 +23,32 @@ from animelab.security import is_safe_url
 
 logger = logging.getLogger("animelab.voiranime")
 
+LEGACY_VOIRANIME_HOSTS = frozenset({
+    "voir-anime.to",
+    "www.voir-anime.to",
+    "voiranime.to",
+    "www.voiranime.to",
+})
+
+
+def normalize_voiranime_url(url: str, base_url: Optional[str] = None) -> str:
+    """Rewrite deprecated voir-anime.to / voiranime.to URLs to the active VoirAnime host."""
+    if not url or not isinstance(url, str):
+        return url
+    stripped = url.strip()
+    try:
+        parsed = urlparse(stripped)
+    except Exception:
+        return url
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme not in ("http", "https") or host not in LEGACY_VOIRANIME_HOSTS:
+        return url
+    target = urlparse((base_url or settings.VOIR_ANIME_URL).rstrip("/"))
+    if not target.scheme or not target.netloc:
+        return url
+    return urllib.parse.urlunparse(parsed._replace(scheme=target.scheme, netloc=target.netloc))
+
+
 class VoirAnimeScrapingService:
     def __init__(self):
         self.base_url = settings.VOIR_ANIME_URL
@@ -32,14 +58,28 @@ class VoirAnimeScrapingService:
         self.is_refreshing: bool = False
         self._load_persistent_cache()
 
+    def _normalize_url(self, url: str) -> str:
+        return normalize_voiranime_url(url, self.base_url)
+
     def _load_persistent_cache(self):
         try:
             cache_file = settings.CACHE_DIR / "latest_voir_anime.json"
             if cache_file.exists():
                 with open(cache_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    self.latest_cache = [AnimeResult(**item) for item in data.get("items", [])]
-                    self.last_cache_time = float(data.get("timestamp", 0))
+                    items: List[AnimeResult] = []
+                    migrated = False
+                    for raw in data.get("items", []):
+                        item = AnimeResult(**raw)
+                        norm_url = self._normalize_url(item.url)
+                        norm_img = self._normalize_url(item.imageUrl)
+                        if norm_url != item.url or norm_img != item.imageUrl:
+                            item.url = norm_url
+                            item.imageUrl = norm_img
+                            migrated = True
+                        items.append(item)
+                    self.latest_cache = items
+                    self.last_cache_time = 0.0 if migrated else float(data.get("timestamp", 0))
                     logger.info("[voir-anime] Disk cache loaded (%d animes)", len(self.latest_cache))
         except Exception as e:
             logger.warning("[voir-anime] Error loading disk cache: %s", e)
@@ -279,7 +319,7 @@ class VoirAnimeScrapingService:
         logger.info("[voir-anime] Search: '%s'", query)
         results: List[AnimeResult] = []
         try:
-            # 1. Moteur officiel Ajax Search Pro (identique au moteur live du site voir-anime.to)
+            # 1. Moteur officiel Ajax Search Pro (identique au moteur live du site voiranime.cx)
             results = await self.search_via_asp(query)
         except VerificationRequired:
             raise
@@ -406,6 +446,7 @@ class VoirAnimeScrapingService:
         return results
 
     async def get_anime_detail(self, anime_url: str) -> Optional[AnimeDetail]:
+        anime_url = self._normalize_url(anime_url)
         if not is_safe_url(anime_url):
             logger.warning("[voir-anime] SSRF blocked for URL: %s", anime_url)
             return None
@@ -466,17 +507,51 @@ class VoirAnimeScrapingService:
             logger.error("[voir-anime] Erreur détail anime: %s", e)
             return None
 
+    def _parse_episode_range(self, title: str, url: str) -> Optional[Tuple[int, int]]:
+        """Recognize one source entry covering several episodes, e.g. 001x002."""
+        marker = r"\b(?:[eé]pisodes?|eps?)\.?\s*[:#-]?\s*"
+        separator = r"(?:[x×&+/–—-]|\bet\b|\band\b|\bà\b|\bto\b)"
+        numbers = rf"(\d+)(?:\s*{separator}\s*(?:{marker})?(\d+))?(?![\w.])"
+        # Prefer an explicit episode label or the usual "Series - 001...".
+        # A single number here also prevents mistaking season numbers or a
+        # resolution elsewhere in the title for a combined episode.
+        match = re.match(rf"{numbers}(?=\s*(?:(?:VOSTFR|VF)\b|$))", title.strip(), re.IGNORECASE)
+        if not match:
+            match = re.search(rf"(?:{marker}|[-–—:]\s*){numbers}", title, re.IGNORECASE)
+        if not match:
+            # Unambiguous compound notation also occurs without an Ep prefix.
+            match = re.search(
+                r"(?<![\w.])(\d+)\s*(?:[x×&+]|\bet\b|\band\b)\s*(\d+)(?![\w.])",
+                title, re.IGNORECASE,
+            )
+        if not match:
+            slug = urllib.parse.unquote(urlparse(url).path).rstrip("/").rsplit("/", 1)[-1]
+            match = re.search(
+                r"(?:^|[-_])(\d+)(?:[x×&+]|[-_](?:et|and|a|to)[-_]|[-_])(\d+)"
+                r"(?:[-_](?:vostfr|vf))?(?:\.html?)?$",
+                slug, re.IGNORECASE,
+            )
+        if match and match.group(2):
+            first, last = int(match.group(1)), int(match.group(2))
+            if first < last:
+                return first, last
+        return None
+
     def _parse_episode_number(self, title: str, url: str, fallback: int) -> int:
+        episode_range = self._parse_episode_range(title, url)
+        if episode_range:
+            return episode_range[0]
         # Pattern 1: format explicite dans le titre " - 11" ou "VOSTFR - 11"
-        m = re.search(r"(?:VOSTFR|VF|\bEp|\bEpisode|\bÉpisode|-)\s*[:#-]?\s*(\d+)\b", title, re.IGNORECASE)
+        m = re.search(r"(?:VOSTFR|VF|\b(?:[eé]pisodes?|eps?)\.?|[-–—])\s*[:#-]?\s*(\d+)\b", title, re.IGNORECASE)
         if m:
             return int(m.group(1))
         # Pattern 2: slug d'URL (ex: "...-11-vostfr/")
-        m_url = re.search(r"[-_](\d+)[-_](?:vostfr|vf)/?$", url, re.IGNORECASE)
+        path = urllib.parse.unquote(urlparse(url).path)
+        m_url = re.search(r"[-_](\d+)[-_](?:vostfr|vf)/?$", path, re.IGNORECASE)
         if m_url:
             return int(m_url.group(1))
         # Pattern 3: nombre en fin d'URL
-        m_url_end = re.search(r"[-_](\d+)/?$", url)
+        m_url_end = re.search(r"(?:^|[-_/])(\d+)/?$", path)
         if m_url_end:
             return int(m_url_end.group(1))
         # Pattern 4: dernier nombre trouvé dans le titre
@@ -508,10 +583,11 @@ class VoirAnimeScrapingService:
                     ep_url = urljoin(self.base_url, ep_url)
 
                 raw_title = link.get_text().strip()
-                ep_num = self._parse_episode_number(raw_title, ep_url, fallback=idx)
+                episode_range = self._parse_episode_range(raw_title, ep_url)
+                ep_num = episode_range[0] if episode_range else self._parse_episode_number(raw_title, ep_url, fallback=idx)
 
                 ep_version = "VF" if ("(vf)" in raw_title.lower() or "-vf" in ep_url.lower()) else "VOSTFR"
-                clean_title = f"Épisode {ep_num}"
+                clean_title = f"Épisodes {episode_range[0]}–{episode_range[1]}" if episode_range else f"Épisode {ep_num}"
                 if "film" in raw_title.lower():
                     clean_title = f"Film - {ep_num}"
                 elif "oav" in raw_title.lower():
@@ -542,6 +618,7 @@ class VoirAnimeScrapingService:
 
     def get_episode_servers(self, episode_url: str) -> Dict[str, Any]:
         """Retourne rapidement la liste des serveurs disponibles pour un épisode sans résoudre les flux vidéo."""
+        episode_url = self._normalize_url(episode_url)
         if not is_safe_url(episode_url):
             logger.warning("[voir-anime] SSRF bloqué pour l'URL épisode: %s", episode_url)
             return {"servers": ["myTV"], "defaultServer": self.default_server}
@@ -669,6 +746,7 @@ class VoirAnimeScrapingService:
         preferred_quality: Optional[str] = None,
         quality_strategy: Optional[str] = None,
     ) -> Dict[str, Any]:
+        episode_url = self._normalize_url(episode_url)
         if not is_safe_url(episode_url):
             logger.warning("[voir-anime] SSRF bloqué pour l'URL épisode dans extract_download_info: %s", episode_url)
             return {
@@ -1250,12 +1328,14 @@ class VoirAnimeScrapingService:
                 return "", {}
             code = m_code.group(1)
             base_moon = "https://gn1r5n.org"
+            va_base = self.base_url.rstrip("/")
+            embed_origin = urlparse(va_base).hostname or "voiranime.cx"
             headers = {
                 "User-Agent": proxy_service.get_user_agent(),
                 "Referer": ifr_url,
-                "X-Embed-Origin": "voir-anime.to",
-                "X-Embed-Referer": self.base_url + "/",
-                "X-Embed-Parent": self.base_url + "/",
+                "X-Embed-Origin": embed_origin,
+                "X-Embed-Referer": va_base + "/",
+                "X-Embed-Parent": va_base + "/",
             }
             det_url = f"{base_moon}/api/videos/{code}/embed/details"
             r_det = client.get(det_url, headers=headers, timeout=8)

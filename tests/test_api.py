@@ -171,6 +171,7 @@ def test_clear_history_memory_sync(client):
 
 def test_detect_source_from_url():
     from animelab.routers.anime import detect_source_from_url
+    assert detect_source_from_url("https://voiranime.cx/anime/toradora/") == "voir-anime"
     assert detect_source_from_url("https://voir-anime.to/anime/toradora/") == "voir-anime"
     assert detect_source_from_url("https://voiranime.to/anime/toradora/") == "voir-anime"
     assert detect_source_from_url("https://w16.french-manga.net/anime/naruto/") == "french-manga"

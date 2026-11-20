@@ -54,17 +54,32 @@
           <button
             class="icon-button"
             :title="tx('Supprimer cette entrée')"
+            :aria-label="tx('Supprimer cette entrée')"
             @click="deleteEntry(item.id)"
           >
-            ✕
+            <Trash2 :size="16" aria-hidden="true" />
           </button>
         </div>
       </div>
     </div>
+
+    <ConfirmDialog
+      :open="clearConfirmOpen"
+      :title="tx('Effacer l’historique ?')"
+      :confirm-label="tx('Effacer')"
+      :busy="clearingHistory"
+      danger
+      @cancel="clearConfirmOpen = false"
+      @confirm="confirmClearAllHistory"
+    >
+      <p>{{ tx("Voulez-vous vraiment effacer l'ensemble de l'historique ?") }}</p>
+    </ConfirmDialog>
   </div>
 </template>
 
 <script setup lang="ts">
+import { Trash2 } from 'lucide-vue-next'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { language, tx } from '@/utils/locale'
 import { ref, onMounted } from 'vue'
 import { api } from '@/api/client'
@@ -72,6 +87,8 @@ import type { HistoryItem } from '@/types'
 
 const historyItems = ref<HistoryItem[]>([])
 const isLoading = ref(false)
+const clearConfirmOpen = ref(false)
+const clearingHistory = ref(false)
 
 async function fetchHistory() {
   isLoading.value = true
@@ -93,10 +110,18 @@ async function deleteEntry(id?: string | number) {
   historyItems.value = historyItems.value.filter((h) => h.id !== id)
 }
 
-async function clearAllHistory() {
-  if (confirm(tx("Voulez-vous vraiment effacer l'ensemble de l'historique ?"))) {
+function clearAllHistory() {
+  clearConfirmOpen.value = true
+}
+
+async function confirmClearAllHistory() {
+  clearingHistory.value = true
+  try {
     await api.clearHistory()
     historyItems.value = []
+    clearConfirmOpen.value = false
+  } finally {
+    clearingHistory.value = false
   }
 }
 

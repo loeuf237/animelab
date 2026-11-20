@@ -182,7 +182,7 @@
               )
             "
           >
-            ⚡ Yuzono Anime Repo
+            <Zap :size="13" aria-hidden="true" /> Yuzono Anime Repo
           </button>
           <button
             type="button"
@@ -451,9 +451,12 @@
                     border-radius: 999px;
                     background: rgba(16, 185, 129, 0.14);
                     color: #6ee7b7;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 3px;
                   "
                 >
-                  🔥 {{ tx('Populaires') }}
+                  <Flame :size="11" aria-hidden="true" /> {{ tx('Populaires') }}
                 </span>
                 <span
                   v-if="(ext.capabilities_summary.tags_count || 0) > 0"
@@ -461,11 +464,15 @@
                     font-size: 0.68rem;
                     padding: 1px 6px;
                     border-radius: 999px;
-                    background: rgba(99, 102, 241, 0.15);
-                    color: #a5b4fc;
+                    background: var(--accent-container);
+                    color: var(--on-accent-container);
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 3px;
                   "
                 >
-                  🏷️ {{ tx(ext.capabilities_summary.tags_count) }} {{ tx('tags') }}
+                  <Tag :size="11" aria-hidden="true" />
+                  {{ tx(ext.capabilities_summary.tags_count) }} {{ tx('tags') }}
                 </span>
                 <span
                   v-for="feedLabel in (ext.capabilities_summary.custom_feeds || []).slice(0, 2)"
@@ -602,7 +609,8 @@
         class="btn btn-primary"
         @click="importDefaultRepo"
       >
-        {{ tx('⚡ Importer Yuzono Anime Repo en 1 clic') }}
+        <Zap :size="15" aria-hidden="true" />
+        <span>{{ tx('Importer Yuzono Anime Repo en 1 clic') }}</span>
       </button>
     </div>
 
@@ -644,7 +652,7 @@
 </template>
 
 <script setup lang="ts">
-import { Settings2 } from 'lucide-vue-next'
+import { Flame, Settings2, Tag, Zap } from 'lucide-vue-next'
 import RecipeHistory from '@/components/RecipeHistory.vue'
 import ExplorerNavigation from '@/components/ExplorerNavigation.vue'
 import ExtensionAvatar from '@/components/ExtensionAvatar.vue'
@@ -1056,7 +1064,7 @@ onMounted(() => {
 }
 
 .toast-info {
-  border-left: 4px solid #6366f1;
+  border-left: 4px solid var(--accent);
 }
 
 @keyframes slideUp {

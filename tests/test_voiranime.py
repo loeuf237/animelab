@@ -100,6 +100,62 @@ def test_voiranime_episode_number_parsing():
         parsed = voiranime_service._parse_episode_number(title, url, fallback=1)
         assert parsed == expected, f"Failed for {title}: expected {expected}, got {parsed}"
 
+
+@pytest.mark.parametrize("title, slug, expected", [
+    ("Gintama - 001x002 VOSTFR - 001x002", "gintama-001x002-vostfr", 1),
+    ("Gintama - 011x012 VOSTFR - 011x012", "gintama-011x012-vostfr", 11),
+    ("86 Eighty-Six - 001x002 VOSTFR", "86-eighty-six-001x002-vostfr", 1),
+    ("Épisodes 01 et 02", "gintama-01-et-02-vostfr", 1),
+    ("Episodes 01 & 02 VOSTFR", "gintama-01-02-vostfr", 1),
+    ("Ep. 01 + 02", "gintama-01-02-vostfr", 1),
+    ("Gintama - 01 × 02 VOSTFR", "gintama-01x02-vostfr", 1),
+    ("Gintama - 01-02 VOSTFR", "gintama-01-02-vostfr", 1),
+    ("Épisodes 01–02", "gintama-01-02-vostfr", 1),
+    ("Épisodes 01 à 02", "gintama-01-a-02-vostfr", 1),
+    ("01 / 02", "gintama-01-02-vostfr", 1),
+    ("Gintama 01 and 02 VOSTFR", "gintama-01-and-02-vostfr", 1),
+    ("Gintama", "gintama-001x002-vostfr", 1),
+    ("Gintama", "gintama-01-02-vostfr", 1),
+])
+def test_voiranime_grouped_episode_uses_first_number(title, slug, expected):
+    assert voiranime_service._parse_episode_number(
+        title, f"https://voir-anime.to/anime/gintama/{slug}/?ref=365", fallback=365,
+    ) == expected
+
+
+@pytest.mark.parametrize("title, slug, expected", [
+    ("Solo Leveling 2 - 13 VOSTFR - 13", "solo-leveling-2-13-vostfr", 13),
+    ("Épisode 3 - 720x1080", "test-03-vostfr", 3),
+    ("Épisodes 03 VOSTFR", "test-03-vostfr", 3),
+    ("Gintama - 003 VOSTFR - 003", "gintama-003-vostfr", 3),
+    ("(FILM VF) Movie 1", "movie-film-1-vf", 1),
+])
+def test_voiranime_grouped_parsing_preserves_single_episodes(title, slug, expected):
+    assert voiranime_service._parse_episode_number(
+        title, f"https://voir-anime.to/anime/test/{slug}/", fallback=365,
+    ) == expected
+
+
+@pytest.mark.asyncio
+async def test_voiranime_grouped_chapters_survive_number_deduplication():
+    # Voiranime's descending Gintama list uses these exact compound labels.
+    # An index fallback can collide with a normal episode already encountered.
+    labels = [f"{n:03d}" for n in range(20, 12, -1)]
+    labels += ["011x012"] + [f"{n:03d}" for n in range(10, 2, -1)] + ["001x002"]
+    chapters = "".join(
+        f'<li class="wp-manga-chapter"><a href="/anime/gintama/gintama-{label}-vostfr/">'
+        f'Gintama - {label} VOSTFR - {label}</a></li>' for label in labels
+    )
+    episodes = await voiranime_service.fetch_episodes(
+        "https://voir-anime.to/anime/gintama/", BeautifulSoup(chapters, "html.parser"),
+    )
+    assert [ep.number for ep in episodes] == [1, *range(3, 11), 11, *range(13, 21)]
+    assert episodes[0].title == "Épisodes 1–2"
+    assert episodes[9].title == "Épisodes 11–12"
+    assert episodes[0].playerUrl.endswith("gintama-001x002-vostfr/")
+    assert episodes[0].downloadPageUrl == episodes[0].playerUrl
+    assert len({ep.playerUrl for ep in episodes}) == len(labels)
+
 @pytest.mark.asyncio
 async def test_voiranime_fetch_episodes_chronological_order():
     soup = BeautifulSoup(SAMPLE_CHAPTERS_HTML, "html.parser")
@@ -195,5 +251,239 @@ def test_voiranime_parse_asp_html():
     assert items[0].url == "https://voir-anime.to/anime/monster-vf/"
     assert items[0].version == "VF"
     assert "thumb_5e10806794066.jpg" in items[0].imageUrl
+
+
+def test_voiranime_default_base_url_is_cx():
+    from animelab.config import settings
+
+    assert settings.VOIR_ANIME_URL == "https://voiranime.cx"
+    assert voiranime_service.base_url == "https://voiranime.cx"
+
+
+def test_normalize_voiranime_url():
+    from animelab.services.voiranime_service import normalize_voiranime_url
+
+    assert (
+        normalize_voiranime_url("https://voir-anime.to/anime/frieren/?ref=1")
+        == "https://voiranime.cx/anime/frieren/?ref=1"
+    )
+    assert (
+        normalize_voiranime_url("https://www.voir-anime.to/anime/frieren/")
+        == "https://voiranime.cx/anime/frieren/"
+    )
+    assert (
+        normalize_voiranime_url("https://voiranime.to/anime/frieren/")
+        == "https://voiranime.cx/anime/frieren/"
+    )
+    assert (
+        normalize_voiranime_url("https://voiranime.cx/anime/frieren/")
+        == "https://voiranime.cx/anime/frieren/"
+    )
+    assert (
+        normalize_voiranime_url("https://voiranime.io/anime/frieren/")
+        == "https://voiranime.io/anime/frieren/"
+    )
+    assert normalize_voiranime_url("ftp://voir-anime.to/file") == "ftp://voir-anime.to/file"
+    assert (
+        normalize_voiranime_url("https://example.com/anime/frieren/")
+        == "https://example.com/anime/frieren/"
+    )
+
+
+def test_voiranime_load_persistent_cache_migrates_legacy_urls(monkeypatch, tmp_path):
+    import json
+    from animelab.config import settings
+    from animelab.services.voiranime_service import VoirAnimeScrapingService
+
+    cache_file = tmp_path / "latest_voir_anime.json"
+    cache_file.write_text(
+        json.dumps(
+            {
+                "timestamp": 1700000000.0,
+                "items": [
+                    {
+                        "id": "frieren",
+                        "title": "Frieren",
+                        "imageUrl": "https://voir-anime.to/wp-content/uploads/frieren.jpg",
+                        "url": "https://voir-anime.to/anime/frieren/",
+                        "version": "VOSTFR",
+                        "type": "Anime",
+                        "episodeInfo": "Ep 28",
+                        "source": "voir-anime",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(settings, "CACHE_DIR", tmp_path)
+    svc = VoirAnimeScrapingService()
+    assert len(svc.latest_cache) == 1
+    assert svc.latest_cache[0].url == "https://voiranime.cx/anime/frieren/"
+    assert svc.latest_cache[0].imageUrl == "https://voiranime.cx/wp-content/uploads/frieren.jpg"
+    assert svc.last_cache_time == 0.0
+
+
+@pytest.mark.asyncio
+async def test_voiranime_service_methods_normalize_legacy_urls(monkeypatch):
+    from unittest.mock import MagicMock
+    from animelab.services.voiranime_service import VoirAnimeScrapingService
+
+    svc = VoirAnimeScrapingService()
+    requested_async: list[str] = []
+    requested_sync: list[str] = []
+
+    class DummyAsyncResp:
+        status_code = 200
+        text = "<html><h1>Frieren</h1></html>"
+
+    class DummyAsyncClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        async def get(self, url, **kwargs):
+            requested_async.append(url)
+            return DummyAsyncResp()
+
+    class DummySyncResp:
+        status_code = 200
+        text = '<script>const thisChapterSources = {"LECTEUR myTV": "https://voembed.net/embed-1.html"};</script>'
+
+    class DummySyncClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def get(self, url, **kwargs):
+            requested_sync.append(url)
+            return DummySyncResp()
+
+    monkeypatch.setattr(svc, "_get_async_client", lambda **kwargs: DummyAsyncClient())
+    monkeypatch.setattr(svc, "_get_client", lambda **kwargs: DummySyncClient())
+    monkeypatch.setattr(svc, "_resolve_mytv", lambda *args, **kwargs: ("", {}, "", {}))
+
+    detail = await svc.get_anime_detail("https://voir-anime.to/anime/frieren/")
+    assert detail is not None
+    assert detail.url == "https://voiranime.cx/anime/frieren/"
+    assert requested_async == ["https://voiranime.cx/anime/frieren/"]
+
+    servers = svc.get_episode_servers("https://voir-anime.to/anime/frieren/ep-1/")
+    assert servers["servers"] == ["myTV"]
+    assert requested_sync[-1] == "https://voiranime.cx/anime/frieren/ep-1/"
+
+    info = svc.extract_download_info("https://voir-anime.to/anime/frieren/ep-1/")
+    assert "myTV" in info["availableServers"]
+    assert requested_sync[-1] == "https://voiranime.cx/anime/frieren/ep-1/"
+
+
+@pytest.mark.asyncio
+async def test_download_manager_detects_voiranime_cx_without_explicit_source(monkeypatch):
+    import json
+    from animelab.services.download_manager import download_manager
+    from animelab.services.extension_service import extension_service
+
+    ep_url = "https://voiranime.cx/anime/test-cx/ep-unique-cx/"
+    called_with: list[str] = []
+
+    def fake_extract(url, **kwargs):
+        called_with.append(url)
+        return {
+            "videoUrl": "https://cdn.example.com/video.m3u8",
+            "videoQualities": json.dumps({"1080p": "https://cdn.example.com/video.m3u8"}),
+            "videoChunks": json.dumps(["https://cdn.example.com/video.m3u8"]),
+            "availableServers": json.dumps(["myTV"]),
+            "serverType": "myTV",
+            "selectedQuality": "1080p",
+            "size": 1234,
+            "formattedSize": "1.2 Ko",
+            "qualitiesSizes": "{}",
+            "subtitleUrl": "",
+            "subtitles": "[]",
+        }
+
+    monkeypatch.setattr(extension_service, "get_enabled_container_sources", lambda: [])
+    monkeypatch.setattr(voiranime_service, "extract_download_info", fake_extract)
+    download_manager.resolved_info_cache.clear()
+    try:
+        info = await download_manager.get_or_resolve_episode_info(ep_url, source=None)
+        assert info is not None
+        assert info.server_type == "myTV"
+        assert called_with == [ep_url]
+    finally:
+        download_manager.resolved_info_cache.clear()
+
+
+def test_media_proxies_normalize_legacy_voiranime_urls(monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from animelab.routers import media
+
+    seen_calls: list[tuple[str, str]] = []
+
+    class DummyStreamResp:
+        status_code = 200
+        headers = {"content-type": "image/jpeg"}
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        async def aiter_bytes(self, size):
+            yield b"JPEGDATA"
+
+    class DummyGetResp:
+        status_code = 200
+        text = "WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nTest"
+
+    class DummyClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        def stream(self, method, url, headers=None):
+            seen_calls.append((url, (headers or {}).get("Referer", "")))
+            return DummyStreamResp()
+
+        async def get(self, url, headers=None):
+            seen_calls.append((url, (headers or {}).get("Referer", "")))
+            return DummyGetResp()
+
+    monkeypatch.setattr(media, "_get_memory_cached_image", lambda url: None)
+    monkeypatch.setattr(media, "_get_disk_cached_image", lambda url: None)
+    monkeypatch.setattr(media, "_save_disk_cached_image", lambda *args: None)
+    monkeypatch.setattr(media, "_put_memory_cached_image", lambda *args: None)
+    monkeypatch.setattr(media, "_get_media_async_client", lambda **kwargs: DummyClient())
+
+    test_app = FastAPI()
+    test_app.include_router(media.router)
+    with TestClient(test_app) as client:
+        r_img = client.get(
+            "/api/media/image-proxy",
+            params={"url": "https://voir-anime.to/wp-content/uploads/poster.jpg"},
+        )
+        assert r_img.status_code == 200
+        assert r_img.content == b"JPEGDATA"
+
+        r_sub = client.get(
+            "/api/media/subtitle-proxy",
+            params={"url": "https://voir-anime.to/subs/ep1.vtt"},
+        )
+        assert r_sub.status_code == 200
+        assert "WEBVTT" in r_sub.text
+
+    assert seen_calls == [
+        ("https://voiranime.cx/wp-content/uploads/poster.jpg", "https://voiranime.cx/"),
+        ("https://voiranime.cx/subs/ep1.vtt", "https://voiranime.cx/"),
+    ]
+
 
 

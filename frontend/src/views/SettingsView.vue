@@ -10,22 +10,7 @@
       </div>
 
       <button type="button" class="btn btn-primary" :disabled="isSaving" @click="saveAll">
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          style="
-            stroke: currentColor;
-            fill: none;
-            stroke-width: 2;
-            vertical-align: middle;
-            margin-right: 6px;
-          "
-        >
-          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-          <polyline points="17 21 17 13 7 13 7 21" />
-          <polyline points="7 3 7 8 15 8" />
-        </svg>
+        <Save :size="16" aria-hidden="true" />
         <span>{{ tx(isSaving ? 'Enregistrement...' : 'Enregistrer les paramètres') }}</span>
       </button>
     </header>
@@ -41,804 +26,760 @@
         <option value="proxy">{{ tx('Proxy & Réseau') }}</option>
       </select>
     </label>
-    <nav class="settings-nav-tabs" :aria-label="tx('Section')">
-      <button
-        type="button"
-        class="settings-nav-tab"
-        :class="{ active: currentTab === 'general' }"
-        @click="currentTab = 'general'"
-      >
-        <svg
-          width="17"
-          height="17"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
+    <div class="settings-layout-grid">
+      <nav class="settings-nav-tabs" :aria-label="tx('Section')">
+        <button
+          type="button"
+          class="settings-nav-tab"
+          :class="{ active: currentTab === 'general' }"
+          @click="currentTab = 'general'"
         >
-          <circle cx="12" cy="12" r="10" />
-          <line x1="2" y1="12" x2="22" y2="12" />
-          <path
-            d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
-          />
-        </svg>
-        <span>{{ tx('Général') }}</span>
-      </button>
+          <Globe :size="17" aria-hidden="true" />
+          <span>{{ tx('Général') }}</span>
+        </button>
 
-      <button
-        type="button"
-        class="settings-nav-tab"
-        :class="{ active: currentTab === 'downloads' }"
-        @click="currentTab = 'downloads'"
-      >
-        <svg
-          width="17"
-          height="17"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
+        <button
+          type="button"
+          class="settings-nav-tab"
+          :class="{ active: currentTab === 'downloads' }"
+          @click="currentTab = 'downloads'"
         >
-          <path d="M12 3v11" />
-          <path d="m7 10 5 5 5-5" />
-          <path d="M5 20h14" />
-        </svg>
-        <span>{{ tx('Téléchargements') }}</span>
-      </button>
+          <Download :size="17" aria-hidden="true" />
+          <span>{{ tx('Téléchargements') }}</span>
+        </button>
 
-      <button
-        type="button"
-        class="settings-nav-tab"
-        :class="{ active: currentTab === 'sources' }"
-        @click="currentTab = 'sources'"
-      >
-        <svg
-          width="17"
-          height="17"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
+        <button
+          type="button"
+          class="settings-nav-tab"
+          :class="{ active: currentTab === 'sources' }"
+          @click="currentTab = 'sources'"
         >
-          <polygon points="23 7 16 12 23 17 23 7" />
-          <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-        </svg>
-        <span>Sources</span>
-      </button>
+          <Film :size="17" aria-hidden="true" />
+          <span>Sources</span>
+        </button>
 
-      <button
-        type="button"
-        class="settings-nav-tab"
-        :class="{ active: currentTab === 'storage' }"
-        @click="currentTab = 'storage'"
-      >
-        <svg
-          width="17"
-          height="17"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
+        <button
+          type="button"
+          class="settings-nav-tab"
+          :class="{ active: currentTab === 'storage' }"
+          @click="currentTab = 'storage'"
         >
-          <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
-          <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
-          <line x1="6" y1="6" x2="6.01" y2="6" />
-          <line x1="6" y1="18" x2="6.01" y2="18" />
-        </svg>
-        <span>{{ tx('Système & Stockage') }}</span>
-      </button>
+          <HardDrive :size="17" aria-hidden="true" />
+          <span>{{ tx('Système & Stockage') }}</span>
+        </button>
 
-      <button
-        type="button"
-        class="settings-nav-tab"
-        :class="{ active: currentTab === 'proxy' }"
-        @click="currentTab = 'proxy'"
-      >
-        <svg
-          width="17"
-          height="17"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
+        <button
+          type="button"
+          class="settings-nav-tab"
+          :class="{ active: currentTab === 'proxy' }"
+          @click="currentTab = 'proxy'"
         >
-          <rect x="16" y="16" width="6" height="6" rx="1" />
-          <rect x="2" y="16" width="6" height="6" rx="1" />
-          <rect x="9" y="2" width="6" height="6" rx="1" />
-          <path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3" />
-          <path d="M12 12V8" />
-        </svg>
-        <span>{{ tx('Proxy & Réseau') }}</span>
-      </button>
-    </nav>
+          <Network :size="17" aria-hidden="true" />
+          <span>{{ tx('Proxy & Réseau') }}</span>
+        </button>
+      </nav>
 
-    <!-- Onglet 1 : Général & Réseau HTTP -->
-    <div
-      v-show="currentTab === 'general'"
-      class="settings-tab-pane"
-      :class="{ active: currentTab === 'general' }"
-    >
-      <section class="settings-card-pro">
-        <div class="settings-card-header-pro">
-          <div class="settings-card-icon-pro">
-            <svg width="20" height="20" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="2" y1="12" x2="22" y2="12" />
-              <path
-                d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
-              />
-            </svg>
-          </div>
-          <div>
-            <h2 class="settings-card-title-pro">{{ tx('Général') }}</h2>
-            <p class="settings-card-sub-pro">
-              {{ tx("Langue de l'interface, identité HTTP et organisation des médias.") }}
-            </p>
-          </div>
-        </div>
-
-        <!-- Langue -->
-        <div class="setting-row-pro">
-          <div class="setting-meta-pro">
-            <label class="setting-title-pro" style="display: block; cursor: pointer">{{
-              tx("Langue de l'interface")
-            }}</label>
-            <div class="setting-desc-pro">
-              {{ tx("Choisissez la langue d'affichage globale d'AnimeLab.") }}
+      <div class="settings-panes-col">
+        <!-- Onglet 1 : Général & Réseau HTTP -->
+        <div
+          v-show="currentTab === 'general'"
+          class="settings-tab-pane"
+          :class="{ active: currentTab === 'general' }"
+        >
+          <section class="settings-card-pro">
+            <div class="settings-card-header-pro">
+              <div class="settings-card-icon-pro">
+                <svg width="20" height="20" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="2" y1="12" x2="22" y2="12" />
+                  <path
+                    d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+                  />
+                </svg>
+              </div>
+              <div>
+                <h2 class="settings-card-title-pro">{{ tx('Général') }}</h2>
+                <p class="settings-card-sub-pro">
+                  {{ tx("Langue de l'interface, identité HTTP et organisation des médias.") }}
+                </p>
+              </div>
             </div>
-          </div>
-          <div class="setting-ctrl-pro">
-            <select
-              :value="i18nStore.currentLang"
-              class="input-premium setting-select-pro"
-              @change="onLanguageChange(($event.target as HTMLSelectElement).value)"
-            >
-              <option value="fr">{{ tx('Français (French)') }}</option>
-              <option value="en">{{ tx('English (Anglais)') }}</option>
-            </select>
-          </div>
-        </div>
 
-        <AppUpdateSettings />
-
-        <!-- Thème d'affichage -->
-        <div class="setting-row-pro">
-          <div class="setting-meta-pro">
-            <label class="setting-title-pro" style="display: block; cursor: pointer">{{
-              tx("Thème d'affichage")
-            }}</label>
-            <div class="setting-desc-pro">
-              {{ tx("Palette de couleurs pour l'interface utilisateur.") }}
+            <!-- Langue -->
+            <div class="setting-row-pro">
+              <div class="setting-meta-pro">
+                <label class="setting-title-pro" style="display: block; cursor: pointer">{{
+                  tx("Langue de l'interface")
+                }}</label>
+                <div class="setting-desc-pro">
+                  {{ tx("Choisissez la langue d'affichage globale d'AnimeLab.") }}
+                </div>
+              </div>
+              <div class="setting-ctrl-pro">
+                <select
+                  :value="i18nStore.currentLang"
+                  class="input-premium setting-select-pro"
+                  @change="onLanguageChange(($event.target as HTMLSelectElement).value)"
+                >
+                  <option value="fr">{{ tx('Français (French)') }}</option>
+                  <option value="en">{{ tx('English (Anglais)') }}</option>
+                </select>
+              </div>
             </div>
-          </div>
-          <div class="setting-ctrl-pro">
-            <ThemePicker @change="onThemeChange" />
-          </div>
-        </div>
 
-        <div class="setting-row-pro">
-          <div class="setting-meta-pro">
-            <label class="setting-title-pro">{{ tx('Profil réseau des sources') }}</label>
-            <div class="setting-desc-pro">
-              {{
-                tx(
-                  'Profil Chrome stable ; l’identité HTTP correspond à l’empreinte TLS et reste la même pendant les sessions.',
-                )
-              }}
+            <AppUpdateSettings />
+
+            <!-- Thème d'affichage -->
+            <div class="setting-row-pro">
+              <div class="setting-meta-pro">
+                <label class="setting-title-pro" style="display: block; cursor: pointer">{{
+                  tx("Thème d'affichage")
+                }}</label>
+                <div class="setting-desc-pro">
+                  {{ tx("Palette de couleurs pour l'interface utilisateur.") }}
+                </div>
+              </div>
+              <div class="setting-ctrl-pro">
+                <ThemePicker @change="onThemeChange" />
+              </div>
             </div>
-          </div>
-        </div>
 
-        <!-- Organisation Plex / Jellyfin -->
-        <div class="setting-row-pro">
-          <div class="setting-meta-pro">
-            <label class="setting-title-pro" style="display: block; cursor: pointer">{{
-              tx('Organisation Plex / Jellyfin')
-            }}</label>
-            <div class="setting-desc-pro">
-              {{ tx('Crée une arborescence standard') }}
-              <code>{{ tx("Nom de l'Anime/Season 01/S01EXX.mp4") }}</code
-              >.
+            <div class="setting-row-pro">
+              <div class="setting-meta-pro">
+                <label class="setting-title-pro">{{ tx('Profil réseau des sources') }}</label>
+                <div class="setting-desc-pro">
+                  {{
+                    tx(
+                      'Profil Chrome stable ; l’identité HTTP correspond à l’empreinte TLS et reste la même pendant les sessions.',
+                    )
+                  }}
+                </div>
+              </div>
             </div>
-          </div>
-          <div class="setting-ctrl-pro">
-            <label class="toggle-switch">
-              <input v-model="plexOrganization" type="checkbox" />
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-        </div>
-      </section>
-    </div>
 
-    <!-- Onglet 2 : Téléchargements & Bande Passante -->
-    <div
-      v-show="currentTab === 'downloads'"
-      class="settings-tab-pane"
-      :class="{ active: currentTab === 'downloads' }"
-    >
-      <section class="settings-card-pro">
-        <div class="settings-card-header-pro">
-          <div class="settings-card-icon-pro">
-            <svg width="20" height="20" viewBox="0 0 24 24">
-              <path d="M12 3v11" />
-              <path d="m7 10 5 5 5-5" />
-              <path d="M5 20h14" />
-            </svg>
-          </div>
-          <div>
-            <h2 class="settings-card-title-pro">{{ tx('Téléchargements & Bande Passante') }}</h2>
-            <p class="settings-card-sub-pro">
-              {{ tx("Gérez le débit, le parallélisme et la file d'attente.") }}
-            </p>
-          </div>
-        </div>
-
-        <!-- Téléchargements simultanés -->
-        <div class="setting-row-pro">
-          <div class="setting-meta-pro">
-            <label class="setting-title-pro" style="display: block; cursor: pointer">{{
-              tx('Téléchargements simultanés max')
-            }}</label>
-            <div class="setting-desc-pro">
-              {{ tx('Nombre de tâches de téléchargement exécutées en parallèle (1 à 20).') }}
+            <!-- Organisation Plex / Jellyfin -->
+            <div class="setting-row-pro">
+              <div class="setting-meta-pro">
+                <label class="setting-title-pro" style="display: block; cursor: pointer">{{
+                  tx('Organisation Plex / Jellyfin')
+                }}</label>
+                <div class="setting-desc-pro">
+                  {{ tx('Crée une arborescence standard') }}
+                  <code>{{ tx("Nom de l'Anime/Season 01/S01EXX.mp4") }}</code
+                  >.
+                </div>
+              </div>
+              <div class="setting-ctrl-pro">
+                <label class="toggle-switch">
+                  <input v-model="plexOrganization" type="checkbox" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
             </div>
-          </div>
-          <div class="setting-ctrl-pro">
-            <input
-              v-model.number="maxConcurrentDownloads"
-              type="number"
-              class="input-premium setting-input-sm"
-              min="1"
-              max="20"
-            />
-          </div>
+          </section>
         </div>
 
-        <!-- Limite de vitesse globale -->
-        <div class="setting-row-pro">
-          <div class="setting-meta-pro">
-            <label class="setting-title-pro" style="display: block; cursor: pointer">{{
-              tx('Limite de vitesse globale')
-            }}</label>
-            <div class="setting-desc-pro">
-              {{ tx('Plafond total partagé par tous les téléchargements (0 = illimité).') }}
+        <!-- Onglet 2 : Téléchargements & Bande Passante -->
+        <div
+          v-show="currentTab === 'downloads'"
+          class="settings-tab-pane"
+          :class="{ active: currentTab === 'downloads' }"
+        >
+          <section class="settings-card-pro">
+            <div class="settings-card-header-pro">
+              <div class="settings-card-icon-pro">
+                <svg width="20" height="20" viewBox="0 0 24 24">
+                  <path d="M12 3v11" />
+                  <path d="m7 10 5 5 5-5" />
+                  <path d="M5 20h14" />
+                </svg>
+              </div>
+              <div>
+                <h2 class="settings-card-title-pro">
+                  {{ tx('Téléchargements & Bande Passante') }}
+                </h2>
+                <p class="settings-card-sub-pro">
+                  {{ tx("Gérez le débit, le parallélisme et la file d'attente.") }}
+                </p>
+              </div>
             </div>
-          </div>
-          <div class="setting-ctrl-pro">
-            <div class="speed-ctrl-group">
-              <div class="speed-input-box">
+
+            <!-- Téléchargements simultanés -->
+            <div class="setting-row-pro">
+              <div class="setting-meta-pro">
+                <label class="setting-title-pro" style="display: block; cursor: pointer">{{
+                  tx('Téléchargements simultanés max')
+                }}</label>
+                <div class="setting-desc-pro">
+                  {{ tx('Nombre de tâches de téléchargement exécutées en parallèle (1 à 20).') }}
+                </div>
+              </div>
+              <div class="setting-ctrl-pro">
                 <input
-                  v-model.number="globalSpeedKb"
+                  v-model.number="maxConcurrentDownloads"
                   type="number"
-                  class="input-premium setting-input-md"
-                  placeholder="0"
-                  min="0"
+                  class="input-premium setting-input-sm"
+                  min="1"
+                  max="20"
                 />
-                <span class="speed-unit-tag">{{ tx('Ko/s') }}</span>
-              </div>
-              <div class="speed-preset-chips">
-                <button type="button" class="speed-preset-chip" @click="globalSpeedKb = 0">
-                  0
-                </button>
-                <button type="button" class="speed-preset-chip" @click="globalSpeedKb = 1024">
-                  {{ tx('1 Mo/s') }}
-                </button>
-                <button type="button" class="speed-preset-chip" @click="globalSpeedKb = 3072">
-                  {{ tx('3 Mo/s') }}
-                </button>
-                <button type="button" class="speed-preset-chip" @click="globalSpeedKb = 5120">
-                  {{ tx('5 Mo/s') }}
-                </button>
-                <button type="button" class="speed-preset-chip" @click="globalSpeedKb = 10240">
-                  {{ tx('10 Mo/s') }}
-                </button>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-    </div>
 
-    <!-- Onglet 3 : Paramètres par Source -->
-    <div
-      v-show="currentTab === 'sources'"
-      class="settings-tab-pane"
-      :class="{ active: currentTab === 'sources' }"
-    >
-      <section class="settings-card-pro">
-        <div class="settings-card-header-pro">
-          <div class="settings-card-icon-pro">
-            <svg width="20" height="20" viewBox="0 0 24 24">
-              <polygon points="23 7 16 12 23 17 23 7" />
-              <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-            </svg>
-          </div>
-          <div>
-            <h2 class="settings-card-title-pro">{{ tx('Paramètres par Source') }}</h2>
-            <p class="settings-card-sub-pro">
-              {{
-                tx(
-                  'Configuration individualisée pour chaque source (VoirAnime, AnimePahe, French-Manga).',
-                )
-              }}
-            </p>
-          </div>
-        </div>
-
-        <!-- Sous-onglets sources -->
-        <div class="source-tabs-container">
-          <button
-            type="button"
-            class="source-tab-btn"
-            :class="{ active: activeSourceTab === 'voir-anime' }"
-            @click="activeSourceTab = 'voir-anime'"
-          >
-            <span>VoirAnime</span>
-            <span class="source-tab-badge">FR</span>
-          </button>
-
-          <button
-            type="button"
-            class="source-tab-btn"
-            :class="{ active: activeSourceTab === 'animepahe' }"
-            @click="activeSourceTab = 'animepahe'"
-          >
-            <span>AnimePahe</span>
-            <span class="source-tab-badge">VOST</span>
-          </button>
-
-          <button
-            type="button"
-            class="source-tab-btn"
-            :class="{ active: activeSourceTab === 'french-manga' }"
-            @click="activeSourceTab = 'french-manga'"
-          >
-            <span>French-Manga</span>
-            <span class="source-tab-badge">FR</span>
-          </button>
-        </div>
-
-        <!-- VoirAnime -->
-        <div v-show="activeSourceTab === 'voir-anime'" style="padding: 10px 0">
-          <div class="setting-row-pro">
-            <div class="setting-meta-pro">
-              <label class="setting-title-pro" style="display: block; cursor: pointer">{{
-                tx('Hébergeur tenté en priorité')
-              }}</label>
-              <div class="setting-desc-pro">
-                {{
-                  tx('Serveur vidéo sélectionné par défaut lors de la lecture ou téléchargement.')
-                }}
+            <!-- Limite de vitesse globale -->
+            <div class="setting-row-pro">
+              <div class="setting-meta-pro">
+                <label class="setting-title-pro" style="display: block; cursor: pointer">{{
+                  tx('Limite de vitesse globale')
+                }}</label>
+                <div class="setting-desc-pro">
+                  {{ tx('Plafond total partagé par tous les téléchargements (0 = illimité).') }}
+                </div>
+              </div>
+              <div class="setting-ctrl-pro">
+                <div class="speed-ctrl-group">
+                  <div class="speed-input-box">
+                    <input
+                      v-model.number="globalSpeedKb"
+                      type="number"
+                      class="input-premium setting-input-md"
+                      placeholder="0"
+                      min="0"
+                    />
+                    <span class="speed-unit-tag">{{ tx('Ko/s') }}</span>
+                  </div>
+                  <div class="speed-preset-chips">
+                    <button type="button" class="speed-preset-chip" @click="globalSpeedKb = 0">
+                      0
+                    </button>
+                    <button type="button" class="speed-preset-chip" @click="globalSpeedKb = 1024">
+                      {{ tx('1 Mo/s') }}
+                    </button>
+                    <button type="button" class="speed-preset-chip" @click="globalSpeedKb = 3072">
+                      {{ tx('3 Mo/s') }}
+                    </button>
+                    <button type="button" class="speed-preset-chip" @click="globalSpeedKb = 5120">
+                      {{ tx('5 Mo/s') }}
+                    </button>
+                    <button type="button" class="speed-preset-chip" @click="globalSpeedKb = 10240">
+                      {{ tx('10 Mo/s') }}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
-            <div class="setting-ctrl-pro">
-              <select v-model="voiranimeDefaultServer" class="input-premium setting-select-pro">
-                <option value="auto">{{ tx('Auto (Défaut / Default)') }}</option>
-                <option value="myTV">myTV (HLS)</option>
-                <option value="stape">Streamtape (Direct MP4)</option>
-                <option value="voe">VOE</option>
-                <option value="fhd1">FHD1</option>
-                <option value="moon">MOON</option>
-              </select>
-            </div>
-          </div>
+          </section>
         </div>
 
-        <!-- AnimePahe -->
+        <!-- Onglet 3 : Paramètres par Source -->
         <div
-          v-show="activeSourceTab === 'animepahe'"
-          style="padding: 28px 24px; text-align: center; color: var(--muted)"
+          v-show="currentTab === 'sources'"
+          class="settings-tab-pane"
+          :class="{ active: currentTab === 'sources' }"
         >
-          <div style="font-weight: 600; color: var(--text); margin-bottom: 6px">
-            AnimePahe (Kwik Stream)
-          </div>
-          <p>
-            {{ tx('Flux vidéo ultra-rapides et compacts. Aucun paramètre spécifique requis.') }}
-          </p>
-        </div>
-
-        <!-- French-Manga -->
-        <div
-          v-show="activeSourceTab === 'french-manga'"
-          style="padding: 28px 24px; text-align: center; color: var(--muted)"
-        >
-          <div style="font-weight: 600; color: var(--text); margin-bottom: 6px">
-            French-Manga (Vidzy)
-          </div>
-          <p>{{ tx('Flux directs Vidzy avec sous-titres FR synchronisés.') }}</p>
-        </div>
-      </section>
-    </div>
-
-    <!-- Onglet 4 : Stockage & Système -->
-    <div
-      v-show="currentTab === 'storage'"
-      class="settings-tab-pane"
-      :class="{ active: currentTab === 'storage' }"
-    >
-      <AndroidStorageSettings />
-      <DiagnosticsExport />
-      <section class="settings-card-pro">
-        <div class="settings-card-header-pro">
-          <div class="settings-card-icon-pro">
-            <svg width="20" height="20" viewBox="0 0 24 24">
-              <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
-              <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
-              <line x1="6" y1="6" x2="6.01" y2="6" />
-              <line x1="6" y1="18" x2="6.01" y2="18" />
-            </svg>
-          </div>
-          <div>
-            <h2 class="settings-card-title-pro">{{ tx('Système & Stockage') }}</h2>
-            <p class="settings-card-sub-pro">
-              {{ tx('Outils système et gestion du stockage local.') }}
-            </p>
-          </div>
-        </div>
-
-        <!-- FFmpeg status -->
-        <div class="setting-row-pro">
-          <div class="setting-meta-pro">
-            <div class="setting-title-pro">{{ tx('FFmpeg & Outils de transcodage') }}</div>
-            <div class="setting-desc-pro">
-              {{ tx('Muxing HLS, assemblage audio/vidéo et encapsulation MP4.') }}
-            </div>
-          </div>
-          <div class="setting-ctrl-pro">
-            <span
-              class="status-badge"
-              :class="ffmpegAvailable ? 'badge-ok' : 'badge-err'"
-              style="padding: 5px 12px; font-size: 0.82rem; border-radius: 6px"
-            >
-              {{ tx(ffmpegAvailable ? 'Opérationnel' : 'Non trouvé (Muxing désactivé)') }}
-            </span>
-          </div>
-        </div>
-
-        <!-- Répertoire de téléchargement -->
-        <div class="setting-row-pro">
-          <div class="setting-meta-pro">
-            <div class="setting-title-pro">{{ tx('Répertoire de téléchargement') }}</div>
-            <div class="setting-desc-pro">
-              {{ tx('Chemin absolu de destination sur le serveur.') }}
-            </div>
-          </div>
-          <div class="setting-ctrl-pro" style="flex: 1; max-width: 380px">
-            <input
-              type="text"
-              class="input-premium"
-              readonly
-              :value="storageInfo?.downloadDir || 'Chargement...'"
-              style="
-                width: 100%;
-                opacity: 0.85;
-                font-family: monospace;
-                font-size: 0.82rem;
-                cursor: default;
-              "
-            />
-          </div>
-        </div>
-
-        <!-- Espace disque -->
-        <div
-          class="setting-row-pro"
-          style="flex-direction: column; align-items: stretch; gap: 12px"
-        >
-          <div class="setting-meta-pro">
-            <div class="setting-title-pro">{{ tx('Espace disque') }}</div>
-            <div class="setting-desc-pro">
-              {{ tx('Capacité totale et espace disque disponible.') }}
-            </div>
-          </div>
-          <div class="storage-card-box">
-            <div class="storage-bar-labels">
-              <span class="storage-stat-highlight">
-                {{ tx(storageUsedGb) }} GB / {{ tx(storageTotalGb) }} GB ({{
-                  tx(storageInfo?.usedPercent || 0)
-                }}%)
-              </span>
-              <span class="storage-stat-muted">
-                {{ tx(storageFreeGb) }} {{ tx('GB libres') }}
-              </span>
-            </div>
-            <div class="storage-bar-track">
-              <div
-                class="storage-bar-fill"
-                :style="{ width: `${Math.min(100, Math.max(0, storageInfo?.usedPercent || 0))}%` }"
-              ></div>
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
-
-    <!-- Onglet 5 : Réseau & Proxy -->
-    <div
-      v-show="currentTab === 'proxy'"
-      class="settings-tab-pane"
-      :class="{ active: currentTab === 'proxy' }"
-    >
-      <BrowserVerificationSettings :active="currentTab === 'proxy'" />
-      <ProxyPoolSettings :active="currentTab === 'proxy'" />
-      <section class="settings-card-pro">
-        <div class="settings-card-header-pro">
-          <div class="settings-card-icon-pro">
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <rect x="16" y="16" width="6" height="6" rx="1" />
-              <rect x="2" y="16" width="6" height="6" rx="1" />
-              <rect x="9" y="2" width="6" height="6" rx="1" />
-              <path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3" />
-              <path d="M12 12V8" />
-            </svg>
-          </div>
-          <div>
-            <h2 class="settings-card-title-pro">{{ tx('Manuel · Votre serveur proxy') }}</h2>
-            <p class="settings-card-sub-pro">
-              {{
-                tx(
-                  'Acheminez vos requêtes via un proxy HTTP/SOCKS pour contourner les blocages FAI.',
-                )
-              }}
-            </p>
-          </div>
-        </div>
-
-        <!-- Switch principal -->
-        <div class="setting-row-pro">
-          <div class="setting-meta-pro">
-            <label class="setting-title-pro" style="display: block; cursor: pointer">{{
-              tx('Activer le serveur proxy')
-            }}</label>
-            <div class="setting-desc-pro">
-              {{
-                tx('Active le routage du scraping et des résolutions vidéo par le proxy configuré.')
-              }}
-            </div>
-          </div>
-          <div class="setting-ctrl-pro">
-            <label class="toggle-switch">
-              <input v-model="proxySettings.enabled" type="checkbox" />
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-        </div>
-
-        <!-- Champs configurables -->
-        <div style="display: flex; flex-direction: column">
-          <!-- Protocole / Type -->
-          <div class="setting-row-pro">
-            <div class="setting-meta-pro">
-              <label class="setting-title-pro" style="display: block; cursor: pointer">{{
-                tx('Protocole / Type de proxy')
-              }}</label>
-              <div class="setting-desc-pro">{{ tx('Type de serveur proxy utilisé.') }}</div>
-            </div>
-            <div class="setting-ctrl-pro">
-              <select v-model="proxySettings.proxy_type" class="input-premium setting-select-pro">
-                <option value="socks5">{{ tx('SOCKS5 (Recommandé / Rapide)') }}</option>
-                <option value="socks5h">{{ tx('SOCKS5h (DNS Distant / Anti-DNS Leak)') }}</option>
-                <option value="http">HTTP</option>
-                <option value="https">HTTPS</option>
-                <option value="socks4">SOCKS4</option>
-              </select>
-            </div>
-          </div>
-
-          <!-- Hôte et Port -->
-          <div class="setting-row-pro">
-            <div class="setting-meta-pro">
-              <label class="setting-title-pro" style="display: block; cursor: pointer">{{
-                tx('Hôte & Port')
-              }}</label>
-              <div class="setting-desc-pro">
-                {{ tx("Adresse IP ou nom de domaine du proxy et son port d'écoute.") }}
+          <section class="settings-card-pro">
+            <div class="settings-card-header-pro">
+              <div class="settings-card-icon-pro">
+                <svg width="20" height="20" viewBox="0 0 24 24">
+                  <polygon points="23 7 16 12 23 17 23 7" />
+                  <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                </svg>
+              </div>
+              <div>
+                <h2 class="settings-card-title-pro">{{ tx('Paramètres par Source') }}</h2>
+                <p class="settings-card-sub-pro">
+                  {{
+                    tx(
+                      'Configuration individualisée pour chaque source (VoirAnime, AnimePahe, French-Manga).',
+                    )
+                  }}
+                </p>
               </div>
             </div>
+
+            <!-- Sous-onglets sources -->
+            <div class="source-tabs-container">
+              <button
+                type="button"
+                class="source-tab-btn"
+                :class="{ active: activeSourceTab === 'voir-anime' }"
+                @click="activeSourceTab = 'voir-anime'"
+              >
+                <span>VoirAnime</span>
+                <span class="source-tab-badge">FR</span>
+              </button>
+
+              <button
+                type="button"
+                class="source-tab-btn"
+                :class="{ active: activeSourceTab === 'animepahe' }"
+                @click="activeSourceTab = 'animepahe'"
+              >
+                <span>AnimePahe</span>
+                <span class="source-tab-badge">VOST</span>
+              </button>
+
+              <button
+                type="button"
+                class="source-tab-btn"
+                :class="{ active: activeSourceTab === 'french-manga' }"
+                @click="activeSourceTab = 'french-manga'"
+              >
+                <span>French-Manga</span>
+                <span class="source-tab-badge">FR</span>
+              </button>
+            </div>
+
+            <!-- VoirAnime -->
+            <div v-show="activeSourceTab === 'voir-anime'" style="padding: 10px 0">
+              <div class="setting-row-pro">
+                <div class="setting-meta-pro">
+                  <label class="setting-title-pro" style="display: block; cursor: pointer">{{
+                    tx('Hébergeur tenté en priorité')
+                  }}</label>
+                  <div class="setting-desc-pro">
+                    {{
+                      tx(
+                        'Serveur vidéo sélectionné par défaut lors de la lecture ou téléchargement.',
+                      )
+                    }}
+                  </div>
+                </div>
+                <div class="setting-ctrl-pro">
+                  <select v-model="voiranimeDefaultServer" class="input-premium setting-select-pro">
+                    <option value="auto">{{ tx('Auto (Défaut / Default)') }}</option>
+                    <option value="myTV">myTV (HLS)</option>
+                    <option value="stape">Streamtape (Direct MP4)</option>
+                    <option value="voe">VOE</option>
+                    <option value="fhd1">FHD1</option>
+                    <option value="moon">MOON</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- AnimePahe -->
             <div
-              class="setting-ctrl-pro"
-              style="display: flex; gap: 10px; flex: 1; max-width: 440px"
+              v-show="activeSourceTab === 'animepahe'"
+              style="padding: 28px 24px; text-align: center; color: var(--muted)"
             >
-              <input
-                v-model="proxySettings.host"
-                type="text"
-                class="input-premium"
-                style="flex: 2; min-width: 0"
-                :placeholder="tx('127.0.0.1 ou proxy.example.com')"
-              />
-              <input
-                v-model.number="proxySettings.port"
-                type="number"
-                class="input-premium"
-                style="flex: 1; min-width: 80px; max-width: 110px"
-                placeholder="1080"
-                min="1"
-                max="65535"
-              />
+              <div style="font-weight: 600; color: var(--text); margin-bottom: 6px">
+                AnimePahe (Kwik Stream)
+              </div>
+              <p>
+                {{ tx('Flux vidéo ultra-rapides et compacts. Aucun paramètre spécifique requis.') }}
+              </p>
             </div>
-          </div>
 
-          <!-- Authentification -->
-          <div class="setting-row-pro">
-            <div class="setting-meta-pro">
-              <div class="setting-title-pro">{{ tx('Authentification (Optionnel)') }}</div>
-              <div class="setting-desc-pro">
-                {{ tx("Identifiants d'accès si le proxy exige une authentification.") }}
+            <!-- French-Manga -->
+            <div
+              v-show="activeSourceTab === 'french-manga'"
+              style="padding: 28px 24px; text-align: center; color: var(--muted)"
+            >
+              <div style="font-weight: 600; color: var(--text); margin-bottom: 6px">
+                French-Manga (Vidzy)
+              </div>
+              <p>{{ tx('Flux directs Vidzy avec sous-titres FR synchronisés.') }}</p>
+            </div>
+          </section>
+        </div>
+
+        <!-- Onglet 4 : Stockage & Système -->
+        <div
+          v-show="currentTab === 'storage'"
+          class="settings-tab-pane"
+          :class="{ active: currentTab === 'storage' }"
+        >
+          <AndroidStorageSettings />
+          <DiagnosticsExport />
+          <section class="settings-card-pro">
+            <div class="settings-card-header-pro">
+              <div class="settings-card-icon-pro">
+                <svg width="20" height="20" viewBox="0 0 24 24">
+                  <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
+                  <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
+                  <line x1="6" y1="6" x2="6.01" y2="6" />
+                  <line x1="6" y1="18" x2="6.01" y2="18" />
+                </svg>
+              </div>
+              <div>
+                <h2 class="settings-card-title-pro">{{ tx('Système & Stockage') }}</h2>
+                <p class="settings-card-sub-pro">
+                  {{ tx('Outils système et gestion du stockage local.') }}
+                </p>
               </div>
             </div>
+
+            <!-- FFmpeg status -->
+            <div class="setting-row-pro">
+              <div class="setting-meta-pro">
+                <div class="setting-title-pro">{{ tx('FFmpeg & Outils de transcodage') }}</div>
+                <div class="setting-desc-pro">
+                  {{ tx('Muxing HLS, assemblage audio/vidéo et encapsulation MP4.') }}
+                </div>
+              </div>
+              <div class="setting-ctrl-pro">
+                <span
+                  class="status-badge"
+                  :class="ffmpegAvailable ? 'badge-ok' : 'badge-err'"
+                  style="padding: 5px 12px; font-size: 0.82rem; border-radius: 6px"
+                >
+                  {{ tx(ffmpegAvailable ? 'Opérationnel' : 'Non trouvé (Muxing désactivé)') }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Répertoire de téléchargement -->
+            <div class="setting-row-pro">
+              <div class="setting-meta-pro">
+                <div class="setting-title-pro">{{ tx('Répertoire de téléchargement') }}</div>
+                <div class="setting-desc-pro">
+                  {{ tx('Chemin absolu de destination sur le serveur.') }}
+                </div>
+              </div>
+              <div class="setting-ctrl-pro" style="flex: 1; max-width: 380px">
+                <input
+                  type="text"
+                  class="input-premium"
+                  readonly
+                  :value="storageInfo?.downloadDir || 'Chargement...'"
+                  style="
+                    width: 100%;
+                    opacity: 0.85;
+                    font-family: monospace;
+                    font-size: 0.82rem;
+                    cursor: default;
+                  "
+                />
+              </div>
+            </div>
+
+            <!-- Espace disque -->
             <div
-              class="setting-ctrl-pro"
-              style="display: flex; gap: 10px; flex: 1; max-width: 440px"
+              class="setting-row-pro"
+              style="flex-direction: column; align-items: stretch; gap: 12px"
             >
-              <input
-                v-model="proxySettings.username"
-                type="text"
-                class="input-premium"
-                style="flex: 1; min-width: 0"
-                :placeholder="tx('Nom d\'utilisateur')"
-                autocomplete="off"
-              />
+              <div class="setting-meta-pro">
+                <div class="setting-title-pro">{{ tx('Espace disque') }}</div>
+                <div class="setting-desc-pro">
+                  {{ tx('Capacité totale et espace disque disponible.') }}
+                </div>
+              </div>
+              <div class="storage-card-box">
+                <div class="storage-bar-labels">
+                  <span class="storage-stat-highlight">
+                    {{ tx(storageUsedGb) }} GB / {{ tx(storageTotalGb) }} GB ({{
+                      tx(storageInfo?.usedPercent || 0)
+                    }}%)
+                  </span>
+                  <span class="storage-stat-muted">
+                    {{ tx(storageFreeGb) }} {{ tx('GB libres') }}
+                  </span>
+                </div>
+                <div class="storage-bar-track">
+                  <div
+                    class="storage-bar-fill"
+                    :style="{
+                      width: `${Math.min(100, Math.max(0, storageInfo?.usedPercent || 0))}%`,
+                    }"
+                  ></div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Onglet 5 : Réseau & Proxy -->
+        <div
+          v-show="currentTab === 'proxy'"
+          class="settings-tab-pane"
+          :class="{ active: currentTab === 'proxy' }"
+        >
+          <BrowserVerificationSettings :active="currentTab === 'proxy'" />
+          <ProxyPoolSettings :active="currentTab === 'proxy'" />
+          <section class="settings-card-pro">
+            <div class="settings-card-header-pro">
+              <div class="settings-card-icon-pro">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="16" y="16" width="6" height="6" rx="1" />
+                  <rect x="2" y="16" width="6" height="6" rx="1" />
+                  <rect x="9" y="2" width="6" height="6" rx="1" />
+                  <path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3" />
+                  <path d="M12 12V8" />
+                </svg>
+              </div>
+              <div>
+                <h2 class="settings-card-title-pro">{{ tx('Manuel · Votre serveur proxy') }}</h2>
+                <p class="settings-card-sub-pro">
+                  {{
+                    tx(
+                      'Acheminez vos requêtes via un proxy HTTP/SOCKS pour contourner les blocages FAI.',
+                    )
+                  }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Switch principal -->
+            <div class="setting-row-pro">
+              <div class="setting-meta-pro">
+                <label class="setting-title-pro" style="display: block; cursor: pointer">{{
+                  tx('Activer le serveur proxy')
+                }}</label>
+                <div class="setting-desc-pro">
+                  {{
+                    tx(
+                      'Active le routage du scraping et des résolutions vidéo par le proxy configuré.',
+                    )
+                  }}
+                </div>
+              </div>
+              <div class="setting-ctrl-pro">
+                <label class="toggle-switch">
+                  <input v-model="proxySettings.enabled" type="checkbox" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Champs configurables -->
+            <div style="display: flex; flex-direction: column">
+              <!-- Protocole / Type -->
+              <div class="setting-row-pro">
+                <div class="setting-meta-pro">
+                  <label class="setting-title-pro" style="display: block; cursor: pointer">{{
+                    tx('Protocole / Type de proxy')
+                  }}</label>
+                  <div class="setting-desc-pro">{{ tx('Type de serveur proxy utilisé.') }}</div>
+                </div>
+                <div class="setting-ctrl-pro">
+                  <select
+                    v-model="proxySettings.proxy_type"
+                    class="input-premium setting-select-pro"
+                  >
+                    <option value="socks5">{{ tx('SOCKS5 (Recommandé / Rapide)') }}</option>
+                    <option value="socks5h">
+                      {{ tx('SOCKS5h (DNS Distant / Anti-DNS Leak)') }}
+                    </option>
+                    <option value="http">HTTP</option>
+                    <option value="https">HTTPS</option>
+                    <option value="socks4">SOCKS4</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Hôte et Port -->
+              <div class="setting-row-pro">
+                <div class="setting-meta-pro">
+                  <label class="setting-title-pro" style="display: block; cursor: pointer">{{
+                    tx('Hôte & Port')
+                  }}</label>
+                  <div class="setting-desc-pro">
+                    {{ tx("Adresse IP ou nom de domaine du proxy et son port d'écoute.") }}
+                  </div>
+                </div>
+                <div
+                  class="setting-ctrl-pro"
+                  style="display: flex; gap: 10px; flex: 1; max-width: 440px"
+                >
+                  <input
+                    v-model="proxySettings.host"
+                    type="text"
+                    class="input-premium"
+                    style="flex: 2; min-width: 0"
+                    :placeholder="tx('127.0.0.1 ou proxy.example.com')"
+                  />
+                  <input
+                    v-model.number="proxySettings.port"
+                    type="number"
+                    class="input-premium"
+                    style="flex: 1; min-width: 80px; max-width: 110px"
+                    placeholder="1080"
+                    min="1"
+                    max="65535"
+                  />
+                </div>
+              </div>
+
+              <!-- Authentification -->
+              <div class="setting-row-pro">
+                <div class="setting-meta-pro">
+                  <div class="setting-title-pro">{{ tx('Authentification (Optionnel)') }}</div>
+                  <div class="setting-desc-pro">
+                    {{ tx("Identifiants d'accès si le proxy exige une authentification.") }}
+                  </div>
+                </div>
+                <div
+                  class="setting-ctrl-pro"
+                  style="display: flex; gap: 10px; flex: 1; max-width: 440px"
+                >
+                  <input
+                    v-model="proxySettings.username"
+                    type="text"
+                    class="input-premium"
+                    style="flex: 1; min-width: 0"
+                    :placeholder="tx('Nom d\'utilisateur')"
+                    autocomplete="off"
+                  />
+                  <div
+                    style="
+                      position: relative;
+                      flex: 1;
+                      min-width: 0;
+                      display: flex;
+                      align-items: center;
+                    "
+                  >
+                    <input
+                      v-model="proxySettings.password"
+                      :type="showProxyPassword ? 'text' : 'password'"
+                      class="input-premium"
+                      style="width: 100%; padding-right: 36px"
+                      :placeholder="tx('Mot de passe')"
+                      autocomplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      style="
+                        position: absolute;
+                        right: 8px;
+                        background: none;
+                        border: none;
+                        color: var(--muted);
+                        cursor: pointer;
+                        padding: 4px;
+                      "
+                      @click="showProxyPassword = !showProxyPassword"
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- URL Brute Override -->
+              <div class="setting-row-pro">
+                <div class="setting-meta-pro">
+                  <label class="setting-title-pro" style="display: block; cursor: pointer">{{
+                    tx('URL Brute Personnalisée (Override)')
+                  }}</label>
+                  <div class="setting-desc-pro">
+                    {{ tx("Remplace l'assemblage automatique hôte/port si renseignée.") }}
+                  </div>
+                </div>
+                <div class="setting-ctrl-pro" style="flex: 1; max-width: 440px">
+                  <input
+                    v-model="proxySettings.custom_url"
+                    type="text"
+                    class="input-premium"
+                    style="width: 100%; font-family: monospace; font-size: 0.84rem"
+                    placeholder="socks5://user:pass@127.0.0.1:1080"
+                  />
+                </div>
+              </div>
+
+              <!-- Live Resolved Proxy Preview Box -->
               <div
+                class="setting-row-pro"
                 style="
-                  position: relative;
-                  flex: 1;
-                  min-width: 0;
-                  display: flex;
-                  align-items: center;
+                  background: rgba(124, 58, 237, 0.05);
+                  border: 1px dashed var(--line);
+                  border-radius: 8px;
+                  padding: 12px 16px;
+                  margin: 8px 24px;
                 "
               >
-                <input
-                  v-model="proxySettings.password"
-                  :type="showProxyPassword ? 'text' : 'password'"
-                  class="input-premium"
-                  style="width: 100%; padding-right: 36px"
-                  :placeholder="tx('Mot de passe')"
-                  autocomplete="new-password"
-                />
-                <button
-                  type="button"
+                <div
                   style="
-                    position: absolute;
-                    right: 8px;
-                    background: none;
-                    border: none;
+                    font-size: 0.82rem;
                     color: var(--muted);
-                    cursor: pointer;
-                    padding: 4px;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
                   "
-                  @click="showProxyPassword = !showProxyPassword"
                 >
                   <svg
-                    width="16"
-                    height="16"
+                    width="15"
+                    height="15"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
                     stroke-width="2"
                   >
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                    <circle cx="12" cy="12" r="3" />
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="16" x2="12" y2="12" />
+                    <line x1="12" y1="8" x2="12.01" y2="8" />
                   </svg>
-                </button>
+                  <span>{{ tx('URL effective :') }}</span>
+                  <code style="color: var(--accent); font-weight: 600; word-break: break-all">
+                    {{ tx(effectiveProxyUrl) }}
+                  </code>
+                </div>
               </div>
-            </div>
-          </div>
 
-          <!-- URL Brute Override -->
-          <div class="setting-row-pro">
-            <div class="setting-meta-pro">
-              <label class="setting-title-pro" style="display: block; cursor: pointer">{{
-                tx('URL Brute Personnalisée (Override)')
-              }}</label>
-              <div class="setting-desc-pro">
-                {{ tx("Remplace l'assemblage automatique hôte/port si renseignée.") }}
-              </div>
-            </div>
-            <div class="setting-ctrl-pro" style="flex: 1; max-width: 440px">
-              <input
-                v-model="proxySettings.custom_url"
-                type="text"
-                class="input-premium"
-                style="width: 100%; font-family: monospace; font-size: 0.84rem"
-                placeholder="socks5://user:pass@127.0.0.1:1080"
-              />
-            </div>
-          </div>
-
-          <!-- Live Resolved Proxy Preview Box -->
-          <div
-            class="setting-row-pro"
-            style="
-              background: rgba(124, 58, 237, 0.05);
-              border: 1px dashed var(--line);
-              border-radius: 8px;
-              padding: 12px 16px;
-              margin: 8px 24px;
-            "
-          >
-            <div
-              style="
-                font-size: 0.82rem;
-                color: var(--muted);
-                display: flex;
-                align-items: center;
-                gap: 8px;
-              "
-            >
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="16" x2="12" y2="12" />
-                <line x1="12" y1="8" x2="12.01" y2="8" />
-              </svg>
-              <span>{{ tx('URL effective :') }}</span>
-              <code style="color: var(--accent); font-weight: 600; word-break: break-all">
-                {{ tx(effectiveProxyUrl) }}
-              </code>
-            </div>
-          </div>
-
-          <!-- Tester la connexion -->
-          <div class="setting-row-pro" style="border-bottom: none">
-            <div class="setting-meta-pro">
-              <div class="setting-title-pro">{{ tx('Tester la connexion') }}</div>
-              <div class="setting-desc-pro">
-                {{ tx('Envoie une requête HTTP de test via le proxy.') }}
-              </div>
-            </div>
-            <div
-              class="setting-ctrl-pro"
-              style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap"
-            >
-              <button
-                type="button"
-                class="btn btn-outline"
-                :disabled="isTestingProxy"
-                style="display: inline-flex; align-items: center; gap: 8px"
-                @click="testProxyConnection"
-              >
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
+              <!-- Tester la connexion -->
+              <div class="setting-row-pro" style="border-bottom: none">
+                <div class="setting-meta-pro">
+                  <div class="setting-title-pro">{{ tx('Tester la connexion') }}</div>
+                  <div class="setting-desc-pro">
+                    {{ tx('Envoie une requête HTTP de test via le proxy.') }}
+                  </div>
+                </div>
+                <div
+                  class="setting-ctrl-pro"
+                  style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap"
                 >
-                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                </svg>
-                <span>{{ tx(isTestingProxy ? 'Test en cours...' : 'Tester le proxy') }}</span>
-              </button>
-              <span
-                v-if="proxyTestResult"
-                class="status-badge"
-                :class="proxyTestResult.success ? 'badge-ok' : 'badge-err'"
-                style="padding: 6px 12px; border-radius: 6px; font-size: 0.82rem"
-              >
-                {{ tx(proxyTestResult.message) }}
-              </span>
+                  <button
+                    type="button"
+                    class="btn btn-outline"
+                    :disabled="isTestingProxy"
+                    style="display: inline-flex; align-items: center; gap: 8px"
+                    @click="testProxyConnection"
+                  >
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                    </svg>
+                    <span>{{ tx(isTestingProxy ? 'Test en cours...' : 'Tester le proxy') }}</span>
+                  </button>
+                  <span
+                    v-if="proxyTestResult"
+                    class="status-badge"
+                    :class="proxyTestResult.success ? 'badge-ok' : 'badge-err'"
+                    style="padding: 6px 12px; border-radius: 6px; font-size: 0.82rem"
+                  >
+                    {{ tx(proxyTestResult.message) }}
+                  </span>
+                </div>
+              </div>
             </div>
-          </div>
+          </section>
         </div>
-      </section>
+      </div>
     </div>
 
     <!-- Toast Notification -->
@@ -847,6 +788,7 @@
 
 <script setup lang="ts">
 import DiagnosticsExport from '@/components/DiagnosticsExport.vue'
+import { Download, Film, Globe, HardDrive, Network, Save } from 'lucide-vue-next'
 import { tx } from '@/utils/locale'
 import { themeMode, palette } from '@/stores/appearance'
 import ThemePicker from '@/components/ThemePicker.vue'
@@ -1137,7 +1079,7 @@ onMounted(() => {
 }
 
 .toast-info {
-  border-left: 4px solid #6366f1;
+  border-left: 4px solid var(--accent);
 }
 
 @keyframes slideUp {

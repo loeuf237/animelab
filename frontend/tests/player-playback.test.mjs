@@ -49,6 +49,9 @@ const component = (
         ),
         '@/utils/locale': inline('export const tx=v=>String(v??"");'),
         '@/stores/library': inline('export const useLibraryStore=()=>({markWatched(){}});'),
+        'lucide-vue-next': inline(
+          'const Icon=()=>null; export const HardDrive=Icon, SkipBack=Icon, SkipForward=Icon, Subtitles=Icon, X=Icon;',
+        ),
         'hls.js': inline(`export default class Hls {
  static Events={MANIFEST_PARSED:'manifest',ERROR:'error'};
  static isSupported(){return Boolean(globalThis.__hlsTest);}

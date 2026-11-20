@@ -1,9 +1,12 @@
 from animelab.api_contracts import ContractRoute
-from animelab.services.source_http import VerificationRequired
+from animelab.api_errors import APIProblem, MESSAGES, problem_for
+from animelab.services.source_http import RateLimited, SourceNetworkError, VerificationRequired
+import json
 import logging
 from typing import Dict, Any
+import httpx
 from fastapi import APIRouter, Request, HTTPException, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from animelab.services.source_settings_service import source_settings_service
 from animelab.services.source_catalogue import source_catalogue, CatalogueError
@@ -47,6 +50,70 @@ async def browse_catalogue(source_id: str, mode: str = 'latest', q: str = Query(
         raise HTTPException(400, str(exc)) from exc
     except (ValueError,RecursionError) as exc:
         raise HTTPException(400,'Filtres de source invalides.') from exc
+
+
+@router.get("/{source_id}/catalogue/stream")
+async def stream_catalogue(
+    source_id: str,
+    mode: str = 'latest',
+    q: str = Query('', max_length=250),
+    tags: list[str] = Query(default=[]),
+    order: str = 'source',
+    cursor: str | None = Query(None, max_length=64),
+    nativeFilters: str | None = Query(None, max_length=32768),
+):
+    if len(tags) > 12:
+        raise HTTPException(400, "Sélectionnez au maximum douze genres")
+    try:
+        native_filters = json.loads(nativeFilters) if nativeFilters is not None else None
+        if native_filters is not None and not isinstance(native_filters, list):
+            raise CatalogueError('Format des filtres APK invalide.')
+    except CatalogueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except (ValueError, RecursionError) as exc:
+        raise HTTPException(400, 'Filtres de source invalides.') from exc
+
+    async def event_stream():
+        try:
+            async for event in source_catalogue.browse_stream(
+                source_id, mode, q, tags, order, cursor, native_filters
+            ):
+                yield json.dumps(event, ensure_ascii=False) + "\n"
+        except VerificationRequired as exc:
+            payload = {"type": "error", "status": 409, **exc.to_dict()}
+            payload.setdefault("problem", problem_for(409, payload).model_dump())
+            yield json.dumps(payload, ensure_ascii=False) + "\n"
+        except RateLimited as exc:
+            payload = {"type": "error", "status": 429, "error": MESSAGES['rate_limit'], "code": "rate_limited", "retryAfter": exc.retry_after}
+            payload["problem"] = problem_for(429, payload).model_dump()
+            yield json.dumps(payload, ensure_ascii=False) + "\n"
+        except CatalogueError as exc:
+            payload = {"type": "error", "status": 400, "error": str(exc)}
+            payload["problem"] = problem_for(400, payload).model_dump()
+            yield json.dumps(payload, ensure_ascii=False) + "\n"
+        except APIProblem as exc:
+            payload = {"type": "error", "status": exc.status, "error": str(exc), "code": exc.problem.code, "problem": exc.problem.model_dump()}
+            yield json.dumps(payload, ensure_ascii=False) + "\n"
+        except httpx.RequestError as exc:
+            code = 'network_' + exc.kind if isinstance(exc, SourceNetworkError) else 'network_error'
+            payload = {"type": "error", "status": 502, "error": MESSAGES['network'], "code": code}
+            payload["problem"] = problem_for(502, payload).model_dump()
+            yield json.dumps(payload, ensure_ascii=False) + "\n"
+        except httpx.HTTPStatusError as exc:
+            status = 429 if exc.response.status_code == 429 else 502
+            payload = {"type": "error", "status": status, "error": MESSAGES['network'], "code": "upstream_error"}
+            payload["problem"] = problem_for(status, payload).model_dump()
+            yield json.dumps(payload, ensure_ascii=False) + "\n"
+        except Exception as exc:
+            logger.error("[router.sources] Streaming catalogue failed for %s: %s", source_id, exc)
+            payload = {"type": "error", "status": 500, "error": MESSAGES['internal'], "problem": problem_for(500, {}).model_dump()}
+            yield json.dumps(payload, ensure_ascii=False) + "\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="application/x-ndjson",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/settings")

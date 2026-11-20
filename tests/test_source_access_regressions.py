@@ -91,9 +91,9 @@ def test_voiranime_current_madara_cards_prefer_title_and_lazy_image():
 @pytest.mark.asyncio
 async def test_voiranime_chapter_dropdown_and_current_player_scripts():
     soup = BeautifulSoup('''<select class="single-chapter-select"><option data-redirect="/anime/one/one-02-vostfr/">02</option><option data-redirect="/anime/one/one-01-vostfr/">01</option></select>''', 'html.parser')
-    episodes = await voiranime_service.fetch_episodes('https://voir-anime.to/anime/one/', soup)
+    episodes = await voiranime_service.fetch_episodes('https://voiranime.cx/anime/one/', soup)
     assert [ep.number for ep in episodes] == [1, 2]
-    assert all(ep.playerUrl.startswith('https://voir-anime.to/anime/one/') for ep in episodes)
+    assert all(ep.playerUrl.startswith('https://voiranime.cx/anime/one/') for ep in episodes)
     html = '''<script>const thisChapterSources = {"LECTEUR myTV":"<iframe data-src=\\"https://voembed.net/embed-1.html\\"></iframe>"} ;</script>'''
     assert voiranime_service._parse_episode_sources(html)['myTV'] == 'https://voembed.net/embed-1.html'
 
@@ -123,11 +123,14 @@ def test_manual_retry_keeps_blocked_state_until_transport_accepts(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_imported_voiranime_old_recipe_reads_current_cards(monkeypatch):
-    source = AniyomiContainerSource(SourceRecipe(pkg='imported.voiranime', base_url='https://voir-anime.to',
+    source = AniyomiContainerSource(SourceRecipe(pkg='imported.voiranime', base_url='https://voiranime.cx',
         search_selector='div.c-tabs-item__content, article', popular_selector='div.c-tabs-item__content, article'))
     monkeypatch.setattr(source, '_fetch_html', AsyncMock(return_value='<div class="page-item-detail video"><div class="post-title"><h3 class="h5"><a href="/anime/one/">One</a></h3></div><img src="/one.jpg"></div>'))
     results = await source.get_latest_releases()
     assert results[0].title == 'One' and results[0].source == source.pkg
+    legacy = AniyomiContainerSource(SourceRecipe(pkg='legacy.voiranime', base_url='https://voir-anime.to',
+        search_selector='div.c-tabs-item__content, article', popular_selector='div.c-tabs-item__content, article'))
+    assert '.page-item-detail.video' in legacy.recipe.popular_selector
     custom = AniyomiContainerSource(SourceRecipe(pkg='custom.voiranime', base_url=source.base_url, latest_selector='.custom-card'))
     assert custom.recipe.latest_selector == '.custom-card'
 

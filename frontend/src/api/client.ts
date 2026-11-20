@@ -101,6 +101,27 @@ class ApiError extends Error {
   }
 }
 
+async function parseErrorResponse(response: Response): Promise<never> {
+  if (response.status === 401 && response.headers.get('X-AnimeLab-Shared') === '1') {
+    window.location.replace('/auth/login')
+  }
+  let errorDetail = response.statusText
+  let data: ErrorResponse | null = null
+  try {
+    const raw: unknown = await response.json()
+    data = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as ErrorResponse) : null
+    if (data?.problem) errorDetail = tx(data.problem.messageKey)
+    else if (data && data.detail) {
+      errorDetail = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail)
+    } else if (data && data.error) {
+      errorDetail = typeof data.error === 'string' ? data.error : JSON.stringify(data.error)
+    }
+  } catch {
+    // Body not JSON
+  }
+  throw new ApiError(errorDetail, response.status, data)
+}
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers || {})
   if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
@@ -130,24 +151,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   }
 
   if (!response.ok) {
-    if (response.status === 401 && response.headers.get('X-AnimeLab-Shared') === '1') {
-      window.location.replace('/auth/login')
-    }
-    let errorDetail = response.statusText
-    let data: ErrorResponse | null = null
-    try {
-      const raw: unknown = await response.json()
-      data = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as ErrorResponse) : null
-      if (data?.problem) errorDetail = tx(data.problem.messageKey)
-      else if (data && data.detail) {
-        errorDetail = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail)
-      } else if (data && data.error) {
-        errorDetail = typeof data.error === 'string' ? data.error : JSON.stringify(data.error)
-      }
-    } catch {
-      // Body not JSON
-    }
-    throw new ApiError(errorDetail, response.status, data)
+    return parseErrorResponse(response)
   }
 
   return response.json() as Promise<T>
@@ -198,6 +202,23 @@ export const api = {
   },
   getDiagnostics() {
     return request<Record<string, unknown>>('/api/diagnostics/export')
+  },
+  reportClientError(payload: {
+    kind: 'js_error' | 'unhandled_rejection' | 'vue_error' | 'android_crash' | 'manual'
+    code: string
+    component?: string
+    route?: string
+  }) {
+    if (typeof fetch !== 'function') return Promise.resolve()
+    return fetch('/api/diagnostics/report', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'Accept-Language': language.value,
+      },
+      body: JSON.stringify(payload),
+    }).catch(() => undefined)
   },
 
   getProxyPool() {
@@ -326,13 +347,132 @@ export const api = {
       cursor?: string
       nativeFilters?: import('@/types/extensions').NativeFilter[]
     },
+    signal?: AbortSignal,
   ) {
     const query = new URLSearchParams({ mode: params.mode, q: params.q, order: params.order })
     params.tags.forEach((tag) => query.append('tags', tag))
     if (params.cursor) query.set('cursor', params.cursor)
     if (params.nativeFilters?.length)
       query.set('nativeFilters', JSON.stringify(params.nativeFilters))
-    return request<CataloguePage>(`/api/sources/${encodeURIComponent(source)}/catalogue?${query}`)
+    return request<CataloguePage>(`/api/sources/${encodeURIComponent(source)}/catalogue?${query}`, {
+      signal,
+    })
+  },
+  async browseCatalogueStream(
+    source: string,
+    params: {
+      mode: string
+      q: string
+      tags: string[]
+      order: string
+      cursor?: string
+      nativeFilters?: import('@/types/extensions').NativeFilter[]
+    },
+    options: {
+      onItems: (items: AnimeResult[]) => void
+      onMeta?: (meta: { totalEstimate?: number }) => void
+      signal?: AbortSignal
+    },
+  ): Promise<{ nextCursor: string | null; queryScope: string }> {
+    const query = new URLSearchParams({ mode: params.mode, q: params.q, order: params.order })
+    params.tags.forEach((tag) => query.append('tags', tag))
+    if (params.cursor) query.set('cursor', params.cursor)
+    if (params.nativeFilters?.length)
+      query.set('nativeFilters', JSON.stringify(params.nativeFilters))
+
+    let response: Response
+    try {
+      response = await fetch(
+        `/api/sources/${encodeURIComponent(source)}/catalogue/stream?${query}`,
+        {
+          headers: {
+            Accept: 'application/x-ndjson, application/json',
+            'Accept-Language': language.value,
+          },
+          signal: options.signal,
+        },
+      )
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') throw error
+      throw new ApiError(tx('La connexion au site a échoué. Réessayez.'), 0, {
+        problem: {
+          code: 'client_network_error',
+          category: 'network',
+          messageKey: 'La connexion au site a échoué. Réessayez.',
+          action: 'retry',
+        },
+      })
+    }
+
+    const contentType = (response.headers.get('content-type') || '').toLowerCase()
+    if (
+      response.status === 404 ||
+      response.status === 405 ||
+      (response.ok && !contentType.includes('ndjson'))
+    ) {
+      await response.body?.cancel?.()
+      const page = await this.browseCatalogue(source, params, options.signal)
+      if (page.results?.length) options.onItems(page.results)
+      return { nextCursor: page.nextCursor ?? null, queryScope: page.queryScope || 'catalogue' }
+    }
+
+    if (!response.ok) {
+      return parseErrorResponse(response)
+    }
+
+    const reader = response.body?.getReader?.()
+    if (!reader) {
+      const page = await this.browseCatalogue(source, params, options.signal)
+      if (page.results?.length) options.onItems(page.results)
+      return { nextCursor: page.nextCursor ?? null, queryScope: page.queryScope || 'catalogue' }
+    }
+
+    let nextCursor: string | null = null
+    let queryScope = 'catalogue'
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    const handleLine = (line: string) => {
+      const trimmed = line.trim()
+      if (!trimmed) return
+      const event = JSON.parse(trimmed) as {
+        type?: string
+        totalEstimate?: number
+        items?: AnimeResult[]
+        nextCursor?: string | null
+        queryScope?: string
+        status?: number
+        error?: string
+        problem?: ErrorResponse['problem']
+      }
+      if (event.type === 'meta') {
+        options.onMeta?.({ totalEstimate: event.totalEstimate })
+      } else if (event.type === 'items' && Array.isArray(event.items) && event.items.length) {
+        options.onItems(event.items)
+      } else if (event.type === 'done') {
+        nextCursor = event.nextCursor ?? null
+        queryScope = event.queryScope || 'catalogue'
+      } else if (event.type === 'error') {
+        const message = tx(event.problem?.messageKey || event.error || 'Catalogue indisponible.')
+        throw new ApiError(message, event.status || 502, event as ErrorResponse)
+      }
+    }
+
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''
+      for (const line of lines) {
+        handleLine(line)
+      }
+    }
+    buffer += decoder.decode()
+    if (buffer.trim()) {
+      handleLine(buffer)
+    }
+    return { nextCursor, queryScope }
   },
 
   async getAnimeDetail(url: string, source: string = 'french-manga'): Promise<AnimeDetailResponse> {

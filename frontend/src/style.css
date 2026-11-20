@@ -528,13 +528,14 @@ input::placeholder {
 }
 .btn-primary {
   border-color: transparent;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color: #fff;
-  box-shadow: 0 4px 14px rgba(var(--accent-rgb), 0.32);
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: none;
 }
 .btn-primary:hover {
   background: var(--accent-2);
-  box-shadow: 0 6px 20px rgba(var(--accent-rgb), 0.44);
+  color: var(--on-accent);
+  box-shadow: none;
 }
 .btn-success {
   border-color: rgba(74, 222, 128, 0.28);
@@ -579,10 +580,10 @@ input::placeholder {
 .hero-panel {
   position: relative;
   z-index: 40;
-  padding: 30px;
+  padding: 24px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.18), rgba(14, 165, 233, 0.07));
+  background: var(--panel);
 }
 .search-form {
   margin-top: 22px;
@@ -811,7 +812,7 @@ html[data-theme='light'] .episode-version-badge,
 html[data-theme='light'] .ver-vostfr {
   color: var(--on-accent-container);
   background: var(--accent-container);
-  border: 1px solid rgba(111, 52, 235, 0.18);
+  border: 1px solid rgba(var(--accent-rgb), 0.22);
 }
 html[data-theme='light'] .chip-auto,
 html[data-theme='light'] .badge-ok,
@@ -4099,12 +4100,12 @@ html[data-theme='light'] .palette-preview-backdrop {
   gap: 10px;
   padding: 14px 22px;
   background: var(--accent);
-  color: #ffffff;
+  color: var(--on-accent);
   border-radius: var(--radius-pill);
   border: none;
   font-weight: 700;
   font-size: 0.95rem;
-  box-shadow: 0 8px 24px rgba(var(--accent-rgb), 0.45);
+  box-shadow: var(--elevation-2);
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -4112,7 +4113,7 @@ html[data-theme='light'] .palette-preview-backdrop {
 .tachiyomi-fab:hover {
   background: var(--accent-2);
   transform: translateY(-2px);
-  box-shadow: 0 12px 28px rgba(var(--accent-rgb), 0.6);
+  box-shadow: var(--elevation-2);
 }
 
 .tachiyomi-fab svg {
@@ -4505,7 +4506,7 @@ html[data-theme='light'] .palette-preview-backdrop {
 }
 .dl-task-bottom-fill {
   height: 100%;
-  background: linear-gradient(90deg, #8b5cf6, #38bdf8);
+  background: var(--accent);
   transition: width 0.3s ease;
 }
 .dl-task-bottom-fill.is-error {
@@ -5005,9 +5006,7 @@ html[data-theme='light'] .tg-action-btn-close:hover {
   -webkit-backdrop-filter: blur(18px);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
-  box-shadow:
-    0 16px 40px rgba(0, 0, 0, 0.5),
-    0 0 24px rgba(157, 111, 255, 0.2);
+  box-shadow: var(--shadow);
   max-width: 440px;
   animation: pwaSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -5105,8 +5104,8 @@ html.pwa-standalone body {
 :root {
   --faint: #94a0b8;
   --input-border: #647089;
-  --action-bg: #7135d9;
-  --action-hover: #5c22b8;
+  --action-bg: var(--accent);
+  --action-hover: var(--accent-2);
 }
 html[data-theme='light'] {
   --faint: #626c80;
@@ -5117,10 +5116,12 @@ html[data-theme='light'] {
   outline-offset: 3px;
 }
 .btn-primary {
-  background: var(--action-bg);
+  background: var(--accent);
+  color: var(--on-accent);
 }
 .btn-primary:hover {
-  background: var(--action-hover);
+  background: var(--accent-2);
+  color: var(--on-accent);
 }
 input:not([type='checkbox']):not([type='radio']),
 select,
@@ -5653,6 +5654,9 @@ textarea {
   }
   .notification-region {
     bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px) + 12px);
+  }
+  .tachiyomi-fab {
+    bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px) + 16px);
   }
 }
 @media (max-width: 359px) {

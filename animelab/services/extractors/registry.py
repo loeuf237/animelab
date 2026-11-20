@@ -3,6 +3,7 @@ import logging
 from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
+from animelab.config import settings
 from animelab.services.extractors.base import BaseVideoExtractor, ExtractorResult
 from animelab.services.extractors.vidmoly import VidmolyExtractor
 from animelab.services.extractors.sibnet import SibnetExtractor
@@ -91,9 +92,10 @@ class ExtractorRegistry:
         elif s_lower == "voe":
             headers["Referer"] = "https://voe.sx/"
         elif s_lower == "moon":
+            va_base = settings.VOIR_ANIME_URL.rstrip("/")
             headers["Referer"] = "https://gn1r5n.org/"
-            headers["X-Embed-Origin"] = "voir-anime.to"
-            headers["X-Embed-Referer"] = "https://voir-anime.to/"
+            headers["X-Embed-Origin"] = urlparse(va_base).hostname or "voiranime.cx"
+            headers["X-Embed-Referer"] = va_base + "/"
         elif s_lower == "kwik" or "owocdn" in u_lower:
             headers["Referer"] = "https://kwik.cx/"
         elif "vidzy" in u_lower or s_lower == "vidzy":

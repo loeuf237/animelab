@@ -11,7 +11,8 @@
               class="local-badge"
               :title="tx('Fichier disponible sur le disque dur')"
             >
-              💾 Local
+              <HardDrive :size="13" aria-hidden="true" />
+              <span>Local</span>
             </span>
           </div>
           <span class="episode-title">
@@ -24,7 +25,10 @@
         <div class="header-actions">
           <!-- Subtitle Selector -->
           <div v-if="playerStore.subtitles.length > 0" class="select-group">
-            <label>{{ tx('💬 Sous-titres :') }}</label>
+            <label style="display: inline-flex; align-items: center; gap: 5px">
+              <Subtitles :size="15" aria-hidden="true" />
+              <span>{{ tx('Sous-titres :') }}</span>
+            </label>
             <select
               :value="playerStore.selectedSubtitle || ''"
               class="header-select"
@@ -81,8 +85,13 @@
             </select>
           </div>
 
-          <button class="btn-icon" :title="tx('Fermer (Échap)')" @click="playerStore.closePlayer">
-            ✕
+          <button
+            class="btn-icon"
+            :title="tx('Fermer (Échap)')"
+            :aria-label="tx('Fermer (Échap)')"
+            @click="playerStore.closePlayer"
+          >
+            <X :size="18" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -153,7 +162,8 @@
           :disabled="!playerStore.hasPrev"
           @click="playerStore.playPrev"
         >
-          {{ tx('⏮ Épisode précédent') }}
+          <SkipBack :size="15" aria-hidden="true" />
+          {{ tx('Épisode précédent') }}
         </button>
 
         <span class="source-tag">
@@ -162,7 +172,8 @@
         </span>
 
         <button class="btn-primary" :disabled="!playerStore.hasNext" @click="playerStore.playNext">
-          {{ tx('Épisode suivant ⏭') }}
+          {{ tx('Épisode suivant') }}
+          <SkipForward :size="15" aria-hidden="true" />
         </button>
       </div>
     </div>
@@ -172,6 +183,7 @@
 <script setup lang="ts">
 import { tx } from '@/utils/locale'
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
+import { HardDrive, SkipBack, SkipForward, Subtitles, X } from 'lucide-vue-next'
 import Hls from 'hls.js'
 import { usePlayerStore, playbackTrackKey } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
@@ -606,8 +618,8 @@ onUnmounted(() => {
 .spinner {
   width: 44px;
   height: 44px;
-  border: 3px solid rgba(99, 102, 241, 0.2);
-  border-top-color: var(--accent-primary);
+  border: 3px solid rgba(var(--accent-rgb), 0.22);
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -626,6 +638,12 @@ onUnmounted(() => {
   border-top: 1px solid var(--border-subtle);
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.player-footer button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .source-tag {

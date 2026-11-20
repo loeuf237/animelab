@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { api } from '@/api/client'
 import { palette, setAppearance, themeMode } from './appearance'
 import { readPreference, writePreference } from '@/utils/locale'
+import { applyStartupPlatform } from '@/utils/platform'
 import type { AppPreferences, StartupSnapshot, UpdateCheck } from '@/types/startup'
 
 export const useStartupStore = defineStore('startup', () => {
@@ -34,6 +35,7 @@ export const useStartupStore = defineStore('startup', () => {
       const state = await api.getStartup(controller.signal)
       if (current !== generation) return
       snapshot.value = state
+      applyStartupPlatform(state.runtime, state.os)
       // Shared browsers keep their own appearance; a changing Android origin
       // can restore installation preferences from the engine instead.
       setAppearance(
@@ -59,7 +61,7 @@ export const useStartupStore = defineStore('startup', () => {
   async function checkUpdates(refresh = false) {
     checking.value = true
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 8000)
+    const timer = setTimeout(() => controller.abort(), 14000)
     try {
       update.value = await api.checkApplicationUpdates(controller.signal, refresh)
     } catch {

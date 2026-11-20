@@ -109,7 +109,7 @@ class AniyomiContainerSource:
     def __init__(self, recipe: SourceRecipe):
         # Upgrade the old built-in VoirAnime recipe without replacing custom selectors.
         host = (urlparse(recipe.base_url).hostname or "").lower()
-        if host in ("voir-anime.to", "www.voir-anime.to"):
+        if host in ("voiranime.cx", "www.voiranime.cx", "voir-anime.to", "www.voir-anime.to"):
             current_cards = ".page-item-detail.video, .page-item-detail, .c-tabs-item__content"
             for field in ("search_selector", "popular_selector", "latest_selector"):
                 if getattr(recipe, field) in ("", "div.c-tabs-item__content, article"):

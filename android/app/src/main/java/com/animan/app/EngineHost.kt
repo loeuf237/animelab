@@ -30,6 +30,7 @@ object EngineHost {
         if (started) return
         started = true
         context = applicationContext.applicationContext
+        CrashReporter.install(context)
         if (BuildConfig.EXTENSION_RUNTIME_ENABLED) ExtensionBridge.initialize(context)
         port = ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { it.localPort }
         thread(name = "AnimanPythonEngine", isDaemon = true) {
@@ -39,6 +40,7 @@ object EngineHost {
                     context.filesDir.absolutePath, context.cacheDir.absolutePath, port, token, testMode)
             } catch (failure: Exception) {
                 error = failure.message ?: failure.javaClass.simpleName
+                CrashReporter.recordWebViewError(context, "engine_start_failed", error ?: "unknown")
                 android.util.Log.e("AnimanEngine", "Embedded engine failed", failure)
                 main.post { DownloadService.finishIdle(context) }
             }

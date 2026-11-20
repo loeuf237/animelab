@@ -32,7 +32,7 @@ android {
         targetSdk = 35
         versionCode = 222
         versionName = "0.1.6"
-        buildConfigField("String", "RELEASE_VERSION", "\"${System.getenv("RELEASE_TAG")?.removePrefix("v") ?: versionName}\"")
+        buildConfigField("String", "RELEASE_VERSION", "\"${System.getenv("RELEASE_TAG")?.removePrefix("android-v")?.removePrefix("v") ?: versionName}\"")
         manifestPlaceholders["appLabel"] = "@string/app_name"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

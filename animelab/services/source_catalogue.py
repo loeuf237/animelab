@@ -258,6 +258,97 @@ class SourceCatalogueService:
         if urlparse(target)._replace(fragment='') == urlparse(url)._replace(fragment='') or urlparse(target).hostname != urlparse(url).hostname: return None
         return self.remember_cursor(context, target)
 
+    def _build_recipe_request(self, service, recipe, mode, query, selected, order, url):
+        custom_feed = None
+        if mode.startswith('feed:') and recipe.custom_feeds:
+            fid = mode.split(':', 1)[1]
+            custom_feed = next((f for f in recipe.custom_feeds if f.get('id') == fid), None)
+        elif mode == 'featured' and recipe.custom_feeds:
+            custom_feed = recipe.custom_feeds[0]
+
+        if custom_feed:
+            path = custom_feed.get('path') or '/'
+        else:
+            path = (
+                recipe.search_request_path
+                if mode == 'search'
+                else recipe.latest_request_path
+                if mode == 'latest'
+                else recipe.popular_request_path
+            ) or '/'
+        path = path.replace('{page}', '1').replace('{query}', quote_plus(query))
+        method, data = 'GET', None
+        if mode == 'search' and not selected:
+            method = recipe.search_method.upper()
+            if method == 'POST':
+                data = {k: v.replace('{query}', query) for k, v in recipe.search_post_params.items()}
+                data[recipe.search_query_param or 's'] = query
+            elif '{query}' not in (recipe.search_request_path or ''):
+                path += ('&' if '?' in path else '?') + urlencode({recipe.search_query_param or 's': query})
+        if not url:
+            param_tags = [t for t in selected if t.get('param')]
+            if param_tags:
+                base_filter_path = path
+                if recipe.tag_request_path and '{tag}' in recipe.tag_request_path:
+                    base_filter_path = recipe.tag_request_path.replace('{page}', '1').replace('{tag}', '').replace('{query}', quote_plus(query))
+                extra_params = [(t['param'], t['value']) for t in param_tags]
+                if query and (recipe.search_query_param or 's'):
+                    extra_params.insert(0, (recipe.search_query_param or 's', query))
+                if order not in ('source', 'title', 'title_desc') and recipe.order_param:
+                    extra_params.append((recipe.order_param, order))
+                parsed = urlparse(base_filter_path)
+                defaults = parse_qsl(urlparse(path).query, keep_blank_values=True)
+                template_defaults = parse_qsl(parsed.query, keep_blank_values=True)
+                template_keys = {k for k, _ in template_defaults}
+                defaults = [(k, v) for k, v in defaults if k not in template_keys] + template_defaults
+                replaced = {k for k, _ in extra_params}
+                params = [(k, v) for k, v in defaults if k not in replaced] + extra_params
+                url = urljoin(service.base_url + '/', parsed._replace(query=urlencode(params)).geturl())
+            elif selected and selected[0].get('url'):
+                url = selected[0]['url']
+            else:
+                if order not in ('source', 'title', 'title_desc') and recipe.order_param:
+                    path += ('&' if '?' in path else '?') + urlencode({recipe.order_param: order})
+                url = urljoin(service.base_url + '/', path)
+        if selected:
+            method, data = 'GET', None
+        if custom_feed and custom_feed.get('selector'):
+            selector = custom_feed['selector']
+        else:
+            selector = recipe.search_selector if mode == 'search' else recipe.latest_selector if mode == 'latest' else recipe.popular_selector
+        next_selector = recipe.search_next_selector if mode == 'search' else recipe.latest_next_selector if mode == 'latest' else recipe.popular_next_selector
+        return url, method, data, selector, next_selector
+
+    async def _prepare_browse(self, source_id, mode, query, tags, order, cursor):
+        service = self.provider(source_id).service
+        descriptor = self.descriptor(source_id, service)
+        if mode not in [v['id'] for v in descriptor['views']]:
+            raise CatalogueError('Ce catalogue n’est pas proposé par cette source')
+        query = query.strip()
+        if mode == 'search' and not query and not tags:
+            return None
+        context = self.context(source_id, mode, query, tags, order)
+        url, selected, offset = '', [], 0
+        if tags or order != 'source':
+            filters = await self.filters(source_id)
+            selected = [next((t for t in filters['tags'] if t['id'] == ident), None) for ident in tags]
+            if any(t is None for t in selected):
+                raise CatalogueError('Filtre inconnu ; actualisez les filtres de cette source')
+            if len(selected) > 1 and not descriptor['multiTags']:
+                raise CatalogueError('Cette source accepte un seul filtre à la fois')
+            for group in filters.get('groups', []):
+                if group.get('single') and sum(t['group'] == group['name'] for t in selected) > 1:
+                    raise CatalogueError('Sélectionnez une seule option pour le groupe ' + group['name'])
+            if order not in [o['id'] for o in filters['orders']]:
+                raise CatalogueError('Tri inconnu')
+        if cursor:
+            saved = self._cursors.get(cursor)
+            if not saved or saved['context'] != context or saved['expires'] < time.monotonic():
+                raise CatalogueError('La page a expiré ; rechargez le catalogue')
+            url = saved['url']
+            offset = saved.get('offset', 0)
+        return service, descriptor, context, query, url, selected, offset
+
     async def browse(self, source_id, mode='latest', query='', tags=(), order='source', cursor=None, native_filters=None):
         provider=self.provider(source_id)
         if getattr(provider.service,'runtime','') == 'android-apk':
@@ -277,33 +368,13 @@ class SourceCatalogueService:
         return await provider.observe('browse',self._browse(source_id,mode,query,tags,order,cursor))
 
     async def _browse(self, source_id, mode='latest', query='', tags=(), order='source', cursor=None):
-        service = self.provider(source_id).service
+        prepared = await self._prepare_browse(source_id, mode, query, tags, order, cursor)
+        if prepared is None:
+            return {'source': source_id, 'results': [], 'nextCursor': None, 'queryScope': 'catalogue'}
+        service, _, context, query, url, selected, offset = prepared
         recipe = getattr(service, 'recipe', None)
         api_catalogue = bool(recipe and recipe.runtime.get('catalogue'))
-        descriptor = self.descriptor(source_id, service)
-        if mode not in [v['id'] for v in descriptor['views']]:
-            raise CatalogueError('Ce catalogue n’est pas proposé par cette source')
-        query = query.strip()
-        if mode == 'search' and not query and not tags:
-            return {'source': source_id, 'results': [], 'nextCursor': None, 'queryScope': 'catalogue'}
-        context = self.context(source_id, mode, query, tags, order)
-        html, url, selector, next_selector = '', '', '', ''
-        selected, offset = [], 0
-        if tags or order != 'source':
-            filters = await self.filters(source_id)
-            selected = [next((t for t in filters['tags'] if t['id'] == ident), None) for ident in tags]
-            if any(t is None for t in selected): raise CatalogueError('Filtre inconnu ; actualisez les filtres de cette source')
-            if len(selected) > 1 and not descriptor['multiTags']: raise CatalogueError('Cette source accepte un seul filtre à la fois')
-            for group in filters.get('groups', []):
-                if group.get('single') and sum(t['group'] == group['name'] for t in selected) > 1:
-                    raise CatalogueError('Sélectionnez une seule option pour le groupe ' + group['name'])
-            if order not in [o['id'] for o in filters['orders']]: raise CatalogueError('Tri inconnu')
-        if cursor:
-            saved = self._cursors.get(cursor)
-            if not saved or saved['context'] != context or saved['expires'] < time.monotonic():
-                raise CatalogueError('La page a expiré ; rechargez le catalogue')
-            url = saved['url']
-            offset = saved.get('offset', 0)
+        html, selector, next_selector = '', '', ''
 
         if api_catalogue:
             effective_order = order
@@ -379,64 +450,13 @@ class SourceCatalogueService:
                 html, url = await self.html(service, url or service.base_url + '/anime')
                 items = self.parse_generic(html, url, service)
         else:
-            recipe = service.recipe
-            custom_feed = None
-            if mode.startswith('feed:') and recipe.custom_feeds:
-                fid = mode.split(':', 1)[1]
-                custom_feed = next((f for f in recipe.custom_feeds if f.get('id') == fid), None)
-            elif mode == 'featured' and recipe.custom_feeds:
-                custom_feed = recipe.custom_feeds[0]
-
             if mode == 'search' and recipe.runtime.get('search') and not selected and not url:
                 items = await service.search_anime(query)
             else:
-                if custom_feed:
-                    path = custom_feed.get('path') or '/'
-                else:
-                    path = (recipe.search_request_path if mode == 'search' else
-                            recipe.latest_request_path if mode == 'latest' else recipe.popular_request_path) or '/'
-                path = path.replace('{page}', '1').replace('{query}', quote_plus(query))
-                method, data = 'GET', None
-                if mode == 'search' and not selected:
-                    method = recipe.search_method.upper()
-                    if method == 'POST':
-                        data = {k: v.replace('{query}', query) for k, v in recipe.search_post_params.items()}
-                        data[recipe.search_query_param or 's'] = query
-                    elif '{query}' not in (recipe.search_request_path or ''):
-                        path += ('&' if '?' in path else '?') + urlencode({recipe.search_query_param or 's': query})
-                if not url:
-                    param_tags = [t for t in selected if t.get('param')]
-                    if param_tags:
-                        base_filter_path = path
-                        if recipe.tag_request_path and '{tag}' in recipe.tag_request_path:
-                            base_filter_path = recipe.tag_request_path.replace('{page}', '1').replace('{tag}', '').replace('{query}', quote_plus(query))
-                        extra_params = [(t['param'], t['value']) for t in param_tags]
-                        if query and (recipe.search_query_param or 's'):
-                            extra_params.insert(0, (recipe.search_query_param or 's', query))
-                        if order not in ('source', 'title', 'title_desc') and recipe.order_param:
-                            extra_params.append((recipe.order_param, order))
-                        parsed = urlparse(base_filter_path)
-                        defaults = parse_qsl(urlparse(path).query, keep_blank_values=True)
-                        template_defaults = parse_qsl(parsed.query, keep_blank_values=True)
-                        template_keys = {k for k, _ in template_defaults}
-                        defaults = [(k, v) for k, v in defaults if k not in template_keys] + template_defaults
-                        replaced = {k for k, _ in extra_params}
-                        params = [(k, v) for k, v in defaults if k not in replaced] + extra_params
-                        url = urljoin(service.base_url + '/', parsed._replace(query=urlencode(params)).geturl())
-                    elif selected and selected[0].get('url'):
-                        url = selected[0]['url']
-                    else:
-                        if order not in ('source', 'title', 'title_desc') and recipe.order_param:
-                            path += ('&' if '?' in path else '?') + urlencode({recipe.order_param: order})
-                        url = urljoin(service.base_url + '/', path)
-                if selected:
-                    method, data = 'GET', None
+                url, method, data, selector, next_selector = self._build_recipe_request(
+                    service, recipe, mode, query, selected, order, url,
+                )
                 html, url = await self.html(service, url, method, data)
-                if custom_feed and custom_feed.get('selector'):
-                    selector = custom_feed['selector']
-                else:
-                    selector = recipe.search_selector if mode == 'search' else recipe.latest_selector if mode == 'latest' else recipe.popular_selector
-                next_selector = recipe.search_next_selector if mode == 'search' else recipe.latest_next_selector if mode == 'latest' else recipe.popular_next_selector
                 items = await service.data_runtime.expand_listing(self.parse_generic(html, url, service, selector))
                 if query and selected and not any(t.get('param') for t in selected):
                     items = [i for i in items if query.casefold() in i.title.casefold()]
@@ -454,6 +474,91 @@ class SourceCatalogueService:
         next_page = cursor if api_catalogue or source_id == 'animepahe' and mode == 'latest' else self.next_cursor(html, url, context, next_selector) if html else None
         return {'source': source_id, 'results': results, 'nextCursor': next_page,
                 'queryScope': 'page' if page_query else 'catalogue'}
+
+    async def browse_stream(self, source_id, mode='latest', query='', tags=(), order='source', cursor=None, native_filters=None):
+        provider = self.provider(source_id)
+        service = provider.service
+        recipe = getattr(service, 'recipe', None)
+        is_script_expansion = (
+            getattr(service, 'runtime', '') != 'android-apk'
+            and source_id not in ('voir-anime', 'french-manga', 'animepahe')
+            and bool(recipe and not recipe.runtime.get('catalogue') and recipe.runtime.get('listing_expansion', {}).get('kind') == 'script_sections')
+            and order not in ('title', 'title_desc')
+        )
+        if not is_script_expansion:
+            page = await self.browse(source_id, mode, query, tags, order, cursor, native_filters)
+            items = page['results']
+            yield {'type': 'meta', 'totalEstimate': len(items)}
+            for index in range(0, len(items), 12):
+                chunk = items[index : index + 12]
+                if chunk:
+                    yield {
+                        'type': 'items',
+                        'items': [item.model_dump() if hasattr(item, 'model_dump') else item for item in chunk],
+                    }
+            yield {
+                'type': 'done',
+                'source': source_id,
+                'nextCursor': page['nextCursor'],
+                'queryScope': page['queryScope'],
+            }
+            return
+
+        prepared = await self._prepare_browse(source_id, mode, query, tags, order, cursor)
+        if prepared is None:
+            yield {'type': 'meta', 'totalEstimate': 0}
+            yield {'type': 'done', 'source': source_id, 'nextCursor': None, 'queryScope': 'catalogue'}
+            return
+        _, _, context, query, url, selected, _ = prepared
+        if mode == 'search' and recipe.runtime.get('search') and not selected and not url:
+            page = await self.browse(source_id, mode, query, tags, order, cursor, native_filters)
+            items = page['results']
+            yield {'type': 'meta', 'totalEstimate': len(items)}
+            for index in range(0, len(items), 12):
+                chunk = items[index : index + 12]
+                if chunk:
+                    yield {
+                        'type': 'items',
+                        'items': [item.model_dump() if hasattr(item, 'model_dump') else item for item in chunk],
+                    }
+            yield {
+                'type': 'done',
+                'source': source_id,
+                'nextCursor': page['nextCursor'],
+                'queryScope': page['queryScope'],
+            }
+            return
+
+        url, method, data, selector, next_selector = self._build_recipe_request(
+            service, recipe, mode, query, selected, order, url,
+        )
+        html, url = await self.html(service, url, method, data)
+        raw_items = self.parse_generic(html, url, service, selector)
+        yield {'type': 'meta', 'totalEstimate': len(raw_items)}
+        page_query = bool(
+            query and (selected or mode != 'search') and not any(t.get('param') for t in selected)
+        )
+        next_page = self.next_cursor(html, url, context, next_selector) if html else None
+        seen = set()
+        async for batch in service.data_runtime.expand_listing_stream(raw_items):
+            out = []
+            for item in batch:
+                if page_query and query.casefold() not in item.title.casefold():
+                    continue
+                if query and selected and not any(t.get('param') for t in selected) and query.casefold() not in item.title.casefold():
+                    continue
+                if item.url not in seen:
+                    seen.add(item.url)
+                    item.source = source_id
+                    out.append(item.model_dump())
+            if out:
+                yield {'type': 'items', 'items': out}
+        yield {
+            'type': 'done',
+            'source': source_id,
+            'nextCursor': next_page,
+            'queryScope': 'page' if page_query else 'catalogue',
+        }
 
 
 source_catalogue = SourceCatalogueService()

@@ -68,3 +68,59 @@ async def test_export_is_local_only_and_excludes_raw_download_data(monkeypatch):
         assert 'private' not in response.text and 'fileUrl' not in response.text and 'settings' not in response.text
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app,client=('192.0.2.1',123)),base_url='http://remote') as client:
         assert (await client.get('/api/diagnostics/export')).status_code==403
+
+
+@pytest.mark.asyncio
+async def test_client_error_report_and_android_crash_summary_are_local_and_redacted(tmp_path, monkeypatch):
+    from fastapi import FastAPI
+    from animelab.api_errors import install_error_handlers
+    import animelab.diagnostics as diag_module
+    from animelab.routers.diagnostics import router
+
+    remember_secret('super-secret-token-999')
+    monkeypatch.setenv('ANIMAN_DATA_DIR', str(tmp_path))
+    (tmp_path / 'last_crash.json').write_text(
+        json.dumps({
+            'time': '2026-11-20T14:00:00Z',
+            'kind': 'uncaught_exception',
+            'thread': 'main',
+            'exception': 'IllegalStateException at https://user:super-secret-token-999@private.example/cb?token=abc',
+            'frames': ['com.animan.app.MainActivity.onCreate(MainActivity.kt:120)'],
+        }),
+        encoding='utf-8',
+    )
+    app = FastAPI()
+    install_error_handlers(app)
+    app.include_router(router)
+
+    @app.get('/api/boom')
+    async def boom():
+        raise RuntimeError('boom secret')
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app, client=('192.0.2.5', 1)), base_url='http://remote') as client:
+        denied = await client.post('/api/diagnostics/report', json={'kind': 'js_error', 'code': 'TypeError'})
+        assert denied.status_code == 403
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app, client=('127.0.0.1', 1), raise_app_exceptions=False),
+        base_url='http://local',
+    ) as client:
+        ok = await client.post('/api/diagnostics/report', json={
+            'kind': 'vue_error',
+            'code': 'TypeError',
+            'component': 'SourcesView',
+            'route': '/spa/sources?token=super-secret-token-999',
+        })
+        assert ok.status_code == 200 and ok.json() == {'recorded': True}
+        boom_res = await client.get('/api/boom')
+        assert boom_res.status_code == 500
+        exported = await client.get('/api/diagnostics/export')
+        assert exported.status_code == 200
+        data = exported.json()
+        assert data['recentErrorCount'] >= 2
+        assert data['lastCrash']['kind'] == 'uncaught_exception'
+        assert 'super-secret-token-999' not in exported.text
+        assert 'token=abc' not in exported.text
+        assert any(row.get('event') == 'server_error' and row.get('code') == 'RuntimeError' for row in data['events'])
+        assert any(row.get('event') == 'client_error' and row.get('route') == '/spa/sources' for row in data['events'])
+    assert diag_module.read_android_crash(None) is None

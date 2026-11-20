@@ -29,14 +29,21 @@ class LauncherStyle(QProxyStyle):
             return super().drawPrimitive(element, option, painter, widget)
         enabled = bool(option.state & QStyle.StateFlag.State_Enabled)
         checked = bool(option.state & QStyle.StateFlag.State_On)
+        dark = option.palette.color(QPalette.ColorRole.Window).lightness() < 128
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         rect = QRectF(option.rect).adjusted(1, 1, -1, -1)
-        painter.setPen(QPen(QColor('#4386c9' if checked and enabled else '#a7aaad'), 1))
-        painter.setBrush(QColor('#4b90d3' if checked and enabled else '#ffffff' if enabled else '#e4e5e6'))
-        painter.drawRoundedRect(rect, 2, 2)
+        accent_border = '#80d3dc' if dark else '#006874'
+        accent_fill = '#80d3dc' if dark else '#006874'
+        unchecked_border = '#54696d' if dark else '#8fa0a4'
+        unchecked_fill = '#111e21' if dark else '#ffffff'
+        disabled_fill = '#18272a' if dark else '#e4e8e9'
+        tick_color = '#00363c' if dark else '#ffffff'
+        painter.setPen(QPen(QColor(accent_border if checked and enabled else unchecked_border), 1))
+        painter.setBrush(QColor(accent_fill if checked and enabled else unchecked_fill if enabled else disabled_fill))
+        painter.drawRoundedRect(rect, 3, 3)
         if checked:
-            painter.setPen(QPen(QColor('#ffffff' if enabled else '#92969a'), 1.8,
+            painter.setPen(QPen(QColor(tick_color if enabled else '#829397'), 1.8,
                                 Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
             from PySide6.QtGui import QPainterPath
             path = QPainterPath()
@@ -45,6 +52,16 @@ class LauncherStyle(QProxyStyle):
             path.lineTo(rect.left() + rect.width() * .80, rect.top() + rect.height() * .28)
             painter.drawPath(path)
         painter.restore()
+
+
+def _is_dark_system_theme(app) -> bool:
+    try:
+        hints = app.styleHints()
+        if hasattr(hints, 'colorScheme'):
+            return hints.colorScheme() == Qt.ColorScheme.Dark
+    except Exception:
+        pass
+    return False
 
 
 def application():
@@ -66,16 +83,29 @@ def application():
         app.setFont(font)
         app.setStyle(LauncherStyle('Fusion'))
         palette = app.palette()
-        for role, color in ((QPalette.ColorRole.Window, '#f4f4f4'),
-                            (QPalette.ColorRole.WindowText, '#000000'),
-                            (QPalette.ColorRole.Base, '#ffffff'),
-                            (QPalette.ColorRole.Text, '#000000'),
-                            (QPalette.ColorRole.Button, '#f7f7f7'),
-                            (QPalette.ColorRole.ButtonText, '#000000'),
-                            (QPalette.ColorRole.Highlight, '#4389ce'),
-                            (QPalette.ColorRole.HighlightedText, '#ffffff')):
+        if _is_dark_system_theme(app):
+            colors = ((QPalette.ColorRole.Window, '#0b1517'),
+                      (QPalette.ColorRole.WindowText, '#dce7e9'),
+                      (QPalette.ColorRole.Base, '#111e21'),
+                      (QPalette.ColorRole.Text, '#dce7e9'),
+                      (QPalette.ColorRole.Button, '#18272a'),
+                      (QPalette.ColorRole.ButtonText, '#dce7e9'),
+                      (QPalette.ColorRole.Highlight, '#80d3dc'),
+                      (QPalette.ColorRole.HighlightedText, '#00363c'))
+            disabled = '#829397'
+        else:
+            colors = ((QPalette.ColorRole.Window, '#f5fafb'),
+                      (QPalette.ColorRole.WindowText, '#000000'),
+                      (QPalette.ColorRole.Base, '#ffffff'),
+                      (QPalette.ColorRole.Text, '#000000'),
+                      (QPalette.ColorRole.Button, '#eaf2f3'),
+                      (QPalette.ColorRole.ButtonText, '#000000'),
+                      (QPalette.ColorRole.Highlight, '#006874'),
+                      (QPalette.ColorRole.HighlightedText, '#ffffff'))
+            disabled = '#647c81'
+        for role, color in colors:
             palette.setColor(role, QColor(color))
         for role in (QPalette.ColorRole.WindowText, QPalette.ColorRole.Text, QPalette.ColorRole.ButtonText):
-            palette.setColor(QPalette.ColorGroup.Disabled, role, QColor('#888888'))
+            palette.setColor(QPalette.ColorGroup.Disabled, role, QColor(disabled))
         app.setPalette(palette)
     return app

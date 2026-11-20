@@ -132,7 +132,7 @@ for (const width of [320, 360, 390, 412, 768, 769, 900, 1024, 1440])
         }
         expect(errors).toEqual([])
       })
-      test('sources, catalogues and other main pages fit the viewport', async ({ page }) => {
+      test('sources and catalogues fit the viewport', async ({ page }) => {
         const errors = []
         page.on('pageerror', (error) => errors.push(error.message))
         await mockApp(page, { lang, theme })
@@ -146,20 +146,36 @@ for (const width of [320, 360, 390, 412, 768, 769, 900, 1024, 1440])
         await page.locator('.catalogue-tools > button').first().click()
         await expect(page.locator('.source-filters')).toBeVisible()
         await noOverflow(page)
-        for (const view of ['', 'extensions', 'library', 'history']) {
+        expect(errors).toEqual([])
+      })
+      test('home, library and history fit the viewport', async ({ page }) => {
+        const errors = []
+        page.on('pageerror', (error) => errors.push(error.message))
+        await mockApp(page, { lang, theme })
+        for (const view of ['', 'library', 'history']) {
           await page.goto('/app/' + view)
           await expect(page.locator('#main-content h1')).toBeVisible()
-          if (view === 'extensions') {
-            await expect(page.locator('.ext-card')).toHaveCount(12)
-            await page.locator('.extension-management > summary').click()
-            const input = await page.locator('.extension-repo-input').boundingBox()
-            const container = await page.locator('.extension-repo-card').boundingBox()
-            expect(input.x).toBeGreaterThanOrEqual(container.x)
-            expect(input.x + input.width).toBeLessThanOrEqual(container.x + container.width)
-            await capture(page, 'extensions', width, lang, theme)
-          }
           await noOverflow(page)
         }
+        expect(errors).toEqual([])
+      })
+      test('extensions and more pages fit the viewport', async ({ page }) => {
+        const errors = []
+        page.on('pageerror', (error) => errors.push(error.message))
+        await mockApp(page, { lang, theme })
+        await page.goto('/app/extensions')
+        await expect(page.locator('#main-content h1')).toBeVisible()
+        await expect(page.locator('.ext-card')).toHaveCount(12)
+        await page.locator('.extension-management > summary').click()
+        const input = await page.locator('.extension-repo-input').boundingBox()
+        const container = await page.locator('.extension-repo-card').boundingBox()
+        expect(input.x).toBeGreaterThanOrEqual(container.x)
+        expect(input.x + input.width).toBeLessThanOrEqual(container.x + container.width)
+        await capture(page, 'extensions', width, lang, theme)
+        await noOverflow(page)
+        await page.goto('/app/more')
+        await expect(page.locator('#main-content h1')).toBeVisible()
+        await noOverflow(page)
         expect(errors).toEqual([])
       })
     })

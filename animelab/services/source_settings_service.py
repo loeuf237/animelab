@@ -88,7 +88,7 @@ class SourceSettingsService:
                 "name": "VoirAnime",
                 "type": "native",
                 "lang": "fr",
-                "icon": "https://voir-anime.to/favicon.ico",
+                "icon": f"{settings.VOIR_ANIME_URL.rstrip('/')}/favicon.ico",
                 "badge": "Français (VF / VOSTFR)",
                 "description": "Source francophone avec multiples lecteurs (myTV, VOE, Streamtape, FHD1, MOON).",
                 "has_custom_settings": True,

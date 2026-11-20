@@ -10,6 +10,7 @@ from fastapi import APIRouter, Query, HTTPException
 from animelab.security import is_safe_url
 from animelab.services.library_service import library_service
 from animelab.services.tmdb_service import tmdb_service
+from animelab.services.voiranime_service import normalize_voiranime_url
 
 logger = logging.getLogger("animelab.router.anime")
 router = APIRouter(route_class=ContractRoute)
@@ -84,28 +85,35 @@ async def search_api(
 
 async def fetch_enriched_anime_detail(url: str, source: str = "french-manga") -> Optional[Dict[str, Any]]:
     """Récupère et enrichit la fiche complète d'un animé (TMDB, épisodes, favoris, progression)."""
-    if not url or not is_safe_url(url):
+    fetch_url = normalize_voiranime_url(url)
+    if not fetch_url or not is_safe_url(fetch_url):
         return None
 
-    detected_source = detect_source_from_url(url, fallback=source)
+    detected_source = detect_source_from_url(fetch_url, fallback=source)
     if detected_source != source:
         source = detected_source
 
     provider = source_registry.get(source)
-    detail = await provider.get_anime_detail(url)
+    detail = await provider.get_anime_detail(fetch_url)
 
     if not detail:
         return None
 
     detail.source = source
     detail = await tmdb_service.enrich_anime_detail(detail)
-    downloaded_set = library_service.get_downloaded_episodes_set(url)
-    watched_set = library_service.get_watched_episodes_set(url)
-    progress_by_episode = {
-        (p.episodeNumber, p.version or ""): p
-        for p in library_service.get_progress_for_anime(url)
-    }
-    fav = library_service.get_favorite(url)
+    lookup_urls = [fetch_url] if fetch_url == url else [url, fetch_url]
+    downloaded_set = set()
+    watched_set = set()
+    progress_by_episode = {}
+    fav = None
+    for candidate_url in lookup_urls:
+        downloaded_set.update(library_service.get_downloaded_episodes_set(candidate_url))
+        watched_set.update(library_service.get_watched_episodes_set(candidate_url))
+        for p in library_service.get_progress_for_anime(candidate_url):
+            progress_by_episode[(p.episodeNumber, p.version or "")] = p
+        candidate_fav = library_service.get_favorite(candidate_url)
+        if candidate_fav is not None:
+            fav = candidate_fav
     is_favorite = fav is not None
     auto_download = fav.autoDownload if fav else False
 
@@ -157,7 +165,7 @@ async def api_anime_detail(
     source: str = Query("french-manga", alias="source")
 ):
     """Retourne la fiche anime complète avec épisodes et métadonnées en JSON pur."""
-    if not is_safe_url(url):
+    if not is_safe_url(normalize_voiranime_url(url)):
         raise HTTPException(status_code=400, detail="URL d'animé invalide ou non sécurisée")
     res = await fetch_enriched_anime_detail(url, source)
     if not res:
