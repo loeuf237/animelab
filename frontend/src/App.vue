@@ -12,7 +12,7 @@
     <main :inert="isPaletteOpen" id="main-content" class="main-content" tabindex="-1">
       <NetworkVerificationPanel />
       <router-view v-slot="{ Component }">
-        <transition name="fade">
+        <transition name="fade" mode="out-in">
           <KeepAlive include="HomeView,SourcesView,LibraryView,DownloadsView" :max="4">
             <component :is="Component" @open-palette="openPalette" />
           </KeepAlive>
