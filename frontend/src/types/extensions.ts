@@ -31,6 +31,10 @@ export interface ExtensionOperation {
   action: string
   state: string
   error?: string
+  versionCode?: string
+  createdAt?: number
+  updatedAt?: number
+  canConfirm?: boolean
 }
 
 export interface AndroidExtensionState {

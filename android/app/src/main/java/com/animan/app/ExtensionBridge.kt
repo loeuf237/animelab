@@ -30,6 +30,7 @@ object ExtensionBridge {
         if (::context.isInitialized) return
         context = value.applicationContext
         client = ExtensionHostClient(context,gateway)
+        try { ExtensionPackages.reconcile(context) } catch (_: Exception) { }
     }
     @JvmStatic fun discover(): String = client.discover()
     @JvmStatic fun invoke(payload: String): String = client.invoke(payload)
@@ -39,5 +40,6 @@ object ExtensionBridge {
     @JvmStatic fun uninstall(pkg: String): String = ExtensionPackages.uninstall(context, pkg).toString()
     @JvmStatic fun operations(): String = ExtensionPackages.operations(context).toString()
     @JvmStatic fun cancelInstallation(id: String): String = ExtensionPackages.cancel(context,id).toString()
+    @JvmStatic fun confirmOperation(id: String): String = ExtensionPackages.openConfirmation(context, id).toString()
     @JvmStatic fun resumePendingInstalls() { if (::context.isInitialized) ExtensionPackages.resume(context) }
 }

@@ -228,3 +228,79 @@ async def test_bulk_update_reports_partial_failure(host,monkeypatch):
     result=await service.update_all_extensions()
     assert result['pending_ids']==[2] and result['failed']==[{'id':1,'code':'extension_update_failed'}]
     assert result['success'] is False
+
+
+@pytest.mark.asyncio
+async def test_update_all_reports_android_pending_message(host, monkeypatch):
+    service, _ = host
+    monkeypatch.setattr(service, 'get_visible_extensions', lambda: [{'id': 1, 'has_update': True}])
+    monkeypatch.setattr(service, 'update_extension', AsyncMock(return_value={'success': True, 'pending': True}))
+    result = await service.update_all_extensions()
+    assert result['success'] is True
+    assert result['pending_ids'] == [1]
+    assert '1 mise(s) à jour envoyée(s) à Android' in result['message']
+
+
+@pytest.mark.asyncio
+async def test_confirm_operation_delegates_to_bridge(monkeypatch):
+    calls = []
+
+    class Bridge:
+        def confirmOperation(self, op_id):
+            calls.append(op_id)
+            return json.dumps({'id': op_id, 'state': 'waiting_user', 'canConfirm': True})
+
+    monkeypatch.setattr(native, '_bridge', Bridge())
+    result = await native.confirm_operation('op-42')
+    assert calls == ['op-42']
+    assert result['state'] == 'waiting_user'
+
+
+@pytest.mark.asyncio
+async def test_retrying_install_upserts_existing_operation_id(host, monkeypatch, tmp_path):
+    import hashlib
+    import io
+    import zipfile
+    from animelab.services import extension_service as ext_mod
+    from animelab.services.source_http import source_http
+
+    service, _ = host
+    monkeypatch.setattr(ext_mod, 'APKS_DIR', tmp_path / 'apks')
+    (tmp_path / 'apks').mkdir()
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w') as zf:
+        zf.writestr('classes.dex', b'dex\n035\x00' + b'\x00' * 120)
+    apk_bytes = buf.getvalue()
+    sha256 = hashlib.sha256(apk_bytes).hexdigest()
+
+    class Response:
+        status_code = 200
+        content = apk_bytes
+
+    class Client:
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *args):
+            return False
+        async def get(self, url, **kwargs):
+            return Response()
+
+    monkeypatch.setattr(source_http, 'async_client', lambda **kwargs: Client())
+    monkeypatch.setattr(ext_mod, 'is_safe_url', lambda url: True)
+    monkeypatch.setattr(native, 'inspect', AsyncMock(return_value={
+        'pkg': 'fixture.one', 'versionCode': '2', 'version': '1.2', 'signer': 'b' * 64, 'sha256': sha256,
+    }))
+    monkeypatch.setattr(native, 'install', AsyncMock(return_value={
+        'id': 'op-same', 'pkg': 'fixture.one', 'action': 'install', 'state': 'waiting_user', 'canConfirm': True,
+    }))
+    with service._get_conn() as conn:
+        conn.execute("INSERT INTO extension_repos(url,name,is_active) VALUES ('https://repo.example','Repo',1)")
+        conn.execute("INSERT INTO imported_extensions(repo_id,pkg,name,lang,apk_url,version) VALUES (1,'fixture.one','Fixture','fr','https://repo.example/a.apk','1.2')")
+
+    first = await service.install_android_extension(1)
+    second = await service.install_android_extension(1)
+    assert first['pending'] is True and second['pending'] is True
+    assert first['operation']['id'] == second['operation']['id'] == 'op-same'
+    with service._get_conn() as conn:
+        rows = conn.execute('SELECT id, state FROM extension_operations').fetchall()
+        assert [(r['id'], r['state']) for r in rows] == [('op-same', 'waiting_user')]

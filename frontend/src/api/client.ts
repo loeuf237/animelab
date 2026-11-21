@@ -1029,6 +1029,11 @@ export const api = {
       method: 'POST',
     })
   },
+  async confirmAndroidOperation(id: string): Promise<{ operation: ExtensionOperation }> {
+    return request(`/api/extensions/android/operations/${encodeURIComponent(id)}/confirm`, {
+      method: 'POST',
+    })
+  },
   async importAndroidAPK(file: File): Promise<{ operation: ExtensionOperation }> {
     return request('/api/extensions/android/install-apk', {
       method: 'POST',
@@ -1081,7 +1086,7 @@ export const api = {
   async toggleExtension(
     extId: number | string,
     enabled: boolean,
-  ): Promise<{ success: boolean; is_enabled?: boolean; pending?: boolean }> {
+  ): Promise<{ success: boolean; is_enabled?: boolean; pending?: boolean; message?: string }> {
     const numId = typeof extId === 'number' ? extId : parseInt(String(extId), 10)
     return request(`/api/extensions/${isNaN(numId) ? extId : numId}/toggle`, {
       method: 'POST',

@@ -72,7 +72,19 @@ async def trust_android_extension(pkg: str, payload: dict = Body(...)):
 @router.post('/api/extensions/android/operations/{operation_id}/cancel')
 async def cancel_android_installation(operation_id: str):
     from animelab.services import android_extensions
-    return {'operation':await android_extensions.cancel_installation(operation_id)}
+    try:
+        return {'operation': await android_extensions.cancel_installation(operation_id)}
+    except Exception as error:
+        raise HTTPException(400, str(error)) from error
+
+
+@router.post('/api/extensions/android/operations/{operation_id}/confirm')
+async def confirm_android_installation(operation_id: str):
+    from animelab.services import android_extensions
+    try:
+        return {'operation': await android_extensions.confirm_operation(operation_id)}
+    except Exception as error:
+        raise HTTPException(400, str(error)) from error
 
 
 @router.post('/api/extensions/android/{pkg}/revoke')

@@ -1241,5 +1241,19 @@
   "Signaler un bug": "Report a bug",
   "Diagnostics enregistrés dans {0}.": "Diagnostics saved to {0}.",
   "Résumé copié dans le presse-papiers.": "Summary copied to clipboard.",
-  "Impossible de copier le résumé.": "Could not copy summary."
+  "Impossible de copier le résumé.": "Could not copy summary.",
+  "Tout mettre à jour": "Update all",
+  "Importer un APK": "Import APK",
+  "Autorisez AnimeLab à installer des applications inconnues dans les paramètres Android, puis revenez ici : l’installation reprendra automatiquement.": "Allow AnimeLab to install unknown apps in Android settings, then come back here: installation will resume automatically.",
+  "Autoriser dans Android": "Allow in Android",
+  "extension(s) en attente d’approbation": "extension(s) awaiting approval",
+  "Nouvel APK installé : vérifiez sa signature et approuvez-le pour activer ses sources.": "New APK installed: verify its signature and approve it to enable its sources.",
+  "Validez la fenêtre système Android pour terminer.": "Confirm the Android system prompt to finish.",
+  "La signature diffère de la version installée (ex. changement de dépôt). Désinstallez l’ancienne version puis réinstallez.": "The signature differs from the installed version (e.g. switched repository). Uninstall the old version, then reinstall.",
+  "Ouvrir la confirmation": "Open confirmation",
+  "Désinstaller l’ancienne version": "Uninstall old version",
+  "La confirmation Android a expiré ou a été fermée.": "Android confirmation expired or was closed.",
+  "Préparation de l’installation": "Preparing installation",
+  "Téléchargement…": "Downloading…",
+  "En attente…": "Pending…"
 }

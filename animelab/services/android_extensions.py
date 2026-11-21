@@ -99,6 +99,12 @@ async def cancel_installation(operation):
     return json.loads(str(await asyncio.to_thread(_bridge.cancelInstallation,operation)))
 
 
+async def confirm_operation(operation):
+    if not available():
+        raise ValueError('Installation APK réservée à Android.')
+    return json.loads(str(await asyncio.to_thread(_bridge.confirmOperation, operation)))
+
+
 class AndroidAPKSource:
     """A real source instance enumerated by the original APK's factory."""
     runtime = 'android-apk'

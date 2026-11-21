@@ -84,11 +84,15 @@
       ref="androidPanel"
       :query="searchQuery"
       :catalogue="extensions"
-      @changed="fetchExtensions"
+      :filter-mode="filterLang"
+      @changed="fetchExtensions({ silent: true, skipAndroidReload: true })"
     />
     <details class="extension-management">
       <summary>{{ tx('Dépôts, importation et mises à jour') }}</summary>
-      <ExtensionRepositoriesPanel ref="repositoryPanel" @changed="fetchExtensions" />
+      <ExtensionRepositoriesPanel
+        ref="repositoryPanel"
+        @changed="fetchExtensions({ silent: true })"
+      />
 
       <!-- Carte d'importation d'un magasin -->
       <section class="settings-card-pro extension-repo-card">
@@ -553,7 +557,46 @@
                 {{ tx('Configurer') }}
               </button>
             </details>
-            <label class="toggle-switch">
+            <template v-if="androidAvailable">
+              <button
+                v-if="busyExtensions.has(ext.id)"
+                type="button"
+                class="btn btn-sm btn-secondary ext-install-btn"
+                disabled
+              >
+                <span class="spinner-sm" aria-hidden="true"></span>
+                <span>{{ tx('Téléchargement…') }}</span>
+              </button>
+              <div v-else-if="activeAndroidOp(ext.pkg)" class="ext-android-pending">
+                <span class="ext-pending-chip">
+                  <span class="spinner-sm" aria-hidden="true"></span>
+                  {{
+                    tx(
+                      activeAndroidOp(ext.pkg)!.state === 'permission_required'
+                        ? 'Autorisation requise'
+                        : 'En attente…',
+                    )
+                  }}
+                </span>
+                <button
+                  type="button"
+                  class="btn btn-sm btn-secondary"
+                  @click="androidPanel?.cancelOperation(activeAndroidOp(ext.pkg)!.id)"
+                >
+                  {{ tx('Annuler') }}
+                </button>
+              </div>
+              <button
+                v-else
+                type="button"
+                class="btn btn-sm btn-primary ext-install-btn"
+                @click="handleToggleExtension(ext, true)"
+              >
+                <Download :size="15" aria-hidden="true" />
+                <span>{{ tx('Installer') }}</span>
+              </button>
+            </template>
+            <label v-else class="toggle-switch">
               <input
                 type="checkbox"
                 :aria-label="
@@ -574,7 +617,9 @@
 
     <!-- Empty State -->
     <div
-      v-else
+      v-else-if="
+        extensions.length === 0 || !androidAvailable || (androidPanel?.visibleCount ?? 0) === 0
+      "
       class="empty-state"
       style="
         padding: 60px 20px;
@@ -652,7 +697,7 @@
 </template>
 
 <script setup lang="ts">
-import { Flame, Settings2, Tag, Zap } from 'lucide-vue-next'
+import { Download, Flame, Settings2, Tag, Zap } from 'lucide-vue-next'
 import RecipeHistory from '@/components/RecipeHistory.vue'
 import ExplorerNavigation from '@/components/ExplorerNavigation.vue'
 import ExtensionAvatar from '@/components/ExtensionAvatar.vue'
@@ -668,6 +713,8 @@ import AndroidExtensionsPanel from '@/components/AndroidExtensionsPanel.vue'
 import ExtensionRepositoriesPanel from '@/components/ExtensionRepositoriesPanel.vue'
 const repositoryPanel = ref<InstanceType<typeof ExtensionRepositoriesPanel> | null>(null)
 const androidPanel = ref<InstanceType<typeof AndroidExtensionsPanel> | null>(null)
+const androidAvailable = computed(() => Boolean(androidPanel.value?.available))
+const activeAndroidOp = (pkg: string) => androidPanel.value?.activeOperationsByPkg?.[pkg] || null
 import { useAnimeStore } from '@/stores/anime'
 const animeStore = useAnimeStore()
 import type { ExtensionSource } from '@/types'
@@ -696,7 +743,7 @@ function editRecipe(ext: ExtensionSource) {
 }
 async function recipeRestored() {
   animeStore.homeFeed = null
-  await fetchExtensions()
+  await fetchExtensions({ silent: true })
   const updated = extensions.value.find((ext) => ext.id === editingExtension.value?.id)
   if (updated) editRecipe(updated)
 }
@@ -707,7 +754,7 @@ async function saveRecipe() {
   try {
     await api.configureExtension(ext.id, JSON.parse(recipeText.value))
     animeStore.homeFeed = null
-    await fetchExtensions()
+    await fetchExtensions({ silent: true })
     editingExtension.value = null
     showToast('Recette enregistrée.', 'success')
   } catch (e: any) {
@@ -749,7 +796,7 @@ async function diagnose(ext: ExtensionSource) {
       showToast(e.message, 'error')
     }
   } finally {
-    await fetchExtensions()
+    await fetchExtensions({ silent: true })
     busyExtensions.value.delete(ext.id)
   }
 }
@@ -758,7 +805,7 @@ async function refreshRepo() {
   try {
     await api.refreshExtensions()
     animeStore.homeFeed = null
-    await fetchExtensions()
+    await fetchExtensions({ silent: true })
     showToast('Dépôt actualisé.', 'success')
   } catch (e: any) {
     showToast(e.message, 'error')
@@ -770,7 +817,7 @@ async function checkUpdates() {
   isCheckingUpdates.value = true
   try {
     const res = await api.checkExtensionUpdates()
-    await fetchExtensions()
+    await fetchExtensions({ silent: true })
     showToast(
       res.message ||
         (res.count
@@ -792,7 +839,7 @@ async function handleUpdateExtension(ext: ExtensionSource) {
   try {
     const res = await api.updateExtension(ext.id)
     animeStore.homeFeed = null
-    await fetchExtensions()
+    await fetchExtensions({ silent: true })
     showToast(res.message || `${ext.name} mis à jour.`, 'success')
   } catch (e: any) {
     showToast(e.message || 'Erreur lors de la mise à jour.', 'error')
@@ -805,7 +852,7 @@ async function handleUpdateAll() {
   try {
     const res = await api.updateAllExtensions()
     animeStore.homeFeed = null
-    await fetchExtensions()
+    await fetchExtensions({ silent: true })
     const failed = res.failed?.length || 0
     const pending = res.pending_ids?.length || 0
     showToast(
@@ -824,7 +871,7 @@ async function handleRecompileExtension(ext: ExtensionSource) {
   try {
     const res = await api.recompileExtension(ext.id)
     animeStore.homeFeed = null
-    await fetchExtensions()
+    await fetchExtensions({ silent: true })
     showToast(res.message || `Recette recompilée pour ${ext.name}.`, 'success')
   } catch (e: any) {
     showToast(e.message || 'Erreur lors de la recompilation.', 'error')
@@ -915,17 +962,25 @@ const extensionGroups = computed(() => {
     }))
 })
 
-async function fetchExtensions() {
-  isLoading.value = true
+async function fetchExtensions(options: { silent?: boolean; skipAndroidReload?: boolean } = {}) {
+  const { silent = false, skipAndroidReload = false } = options
+  if (!silent && extensions.value.length === 0) {
+    isLoading.value = true
+  }
   try {
     const res = await api.getExtensions()
     if (res) {
       activeRepo.value = res.active_repo || null
       extensions.value = res.extensions || res.installed || []
-      await Promise.all([repositoryPanel.value?.reload(), androidPanel.value?.reload()])
+      await Promise.all([
+        repositoryPanel.value?.reload(),
+        skipAndroidReload ? Promise.resolve() : androidPanel.value?.reload(),
+      ])
     }
   } catch (e: any) {
-    showToast(e.message || 'Erreur lors du chargement des extensions.', 'error')
+    if (!silent) {
+      showToast(e.message || 'Erreur lors du chargement des extensions.', 'error')
+    }
   } finally {
     isLoading.value = false
   }
@@ -952,7 +1007,7 @@ async function handleImportRepo() {
       `Dépôt "${res.repo_name || 'Aniyomi'}" importé avec succès (${res.count || 0} extensions) !`,
       'success',
     )
-    await fetchExtensions()
+    await fetchExtensions({ silent: true })
   } catch (e: any) {
     showToast(e.message || "Échec de l'importation du dépôt.", 'error')
   } finally {
@@ -965,16 +1020,17 @@ async function handleToggleExtension(ext: ExtensionSource, enabled: boolean) {
   try {
     const result = await api.toggleExtension(ext.id, enabled)
     animeStore.homeFeed = null
-    await fetchExtensions()
+    await fetchExtensions({ silent: true })
     showToast(
       result.pending
-        ? 'Confirmez l’installation dans Android, puis approuvez le paquet installé.'
+        ? result.message ||
+            'Confirmez l’installation dans Android, puis approuvez le paquet installé.'
         : `${ext.name} ${enabled ? 'activée' : 'désactivée'}.`,
       'success',
     )
   } catch (e: any) {
     showToast(e.message || "Erreur lors de l'activation/désactivation de l'extension.", 'error')
-    await fetchExtensions()
+    await fetchExtensions({ silent: true })
   } finally {
     busyExtensions.value.delete(ext.id)
   }
@@ -1216,5 +1272,27 @@ onMounted(() => {
 }
 .extension-row-tools[open] > button {
   margin: 0.25rem;
+}
+.ext-install-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.ext-android-pending {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.ext-pending-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--muted);
 }
 </style>

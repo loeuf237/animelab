@@ -566,7 +566,11 @@ class ExtensionService:
             "message": (
                 f"{len(updated_ids)} extension(s) mise(s) à jour."
                 if updated_ids
-                else "Aucune mise à jour en attente."
+                else (
+                    f"{len(pending)} mise(s) à jour envoyée(s) à Android."
+                    if pending
+                    else "Aucune mise à jour en attente."
+                )
             ),
         }
 
@@ -1005,9 +1009,14 @@ class ExtensionService:
         with self._get_conn() as conn:
             conn.execute('INSERT OR IGNORE INTO extension_artifacts(sha256,pkg,version_code,signer,path,authentication) VALUES (?,?,?,?,?,?)',
                          (digest,target['pkg'],version_code(inspected['versionCode']),inspected['signer'],str(path),'android-archive-metadata'))
-            conn.execute('INSERT INTO extension_operations(id,ext_id,action,state) VALUES (?,?,?,?)',
+            conn.execute('INSERT INTO extension_operations(id,ext_id,action,state) VALUES (?,?,?,?) ON CONFLICT(id) DO UPDATE SET state=excluded.state, updated_at=CURRENT_TIMESTAMP',
                          (operation['id'],ext_id,'android-install',operation['state']))
-        return {'success':True,'operation':operation,'is_installed':False,'pending':True}
+        message = (
+            'Autorisez AnimeLab à installer des APK dans Android, puis revenez ici.'
+            if operation.get('state') == 'permission_required'
+            else 'Confirmez l’installation dans Android, puis approuvez le paquet installé.'
+        )
+        return {'success':True,'operation':operation,'is_installed':False,'pending':True,'message':message}
 
     async def toggle_android_extension(self, ext_id, enabled):
         from animelab.services import android_extensions
