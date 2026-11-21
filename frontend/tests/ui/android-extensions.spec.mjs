@@ -449,7 +449,10 @@ test('Android storage settings expose all permissions and clean up reclaimable p
   await expect(page.getByText('Téléchargements en arrière-plan')).toBeVisible()
   await expect(page.getByText('12.0 Mo récupérables')).toBeVisible()
 
-  await page.locator('.android-storage').getByRole('button', { name: 'Autoriser' }).click()
+  await page
+    .locator('.android-storage')
+    .getByRole('button', { name: 'Autoriser', exact: true })
+    .click()
   await expect.poll(() => actions).toEqual([{ action: 'install_apps' }])
 
   const cleanupBtn = page.getByRole('button', { name: 'Libérer le stockage privé' })
