@@ -204,7 +204,12 @@ class EmbeddedEngineTest {
                     automation.executeShellCommand("dumpsys activity activities")).bufferedReader().use { it.readText() }
                 if (activities.lineSequence().any { it.contains("ResumedActivity") && it.contains("documentsui") }) {
                     ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand("input keyevent KEYCODE_BACK")).use { it.readBytes() }
-                    Thread.sleep(1000)
+                    val settleDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3)
+                    while (pending && System.nanoTime() < settleDeadline) {
+                        Thread.sleep(250)
+                        pending = JSONObject(request("/api/system/android/storage").second).getBoolean("selectionPending")
+                    }
+                    continue
                 }
                 pending = JSONObject(request("/api/system/android/storage").second).getBoolean("selectionPending")
                 if (pending) Thread.sleep(250)

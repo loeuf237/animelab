@@ -97,7 +97,6 @@ watch(
     var(--surface-4) 50%,
     var(--surface-3) 80%
   );
-  background-size: 240% 100%;
   animation: posterImgShimmer 1.35s ease-in-out infinite;
 }
 
@@ -126,11 +125,12 @@ watch(
 }
 
 @keyframes posterImgShimmer {
-  0% {
-    background-position: 120% 0;
-  }
+  0%,
   100% {
-    background-position: -120% 0;
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
   }
 }
 

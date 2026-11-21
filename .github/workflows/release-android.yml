@@ -249,7 +249,7 @@ jobs:
           ram-size: 4096M
           heap-size: 512M
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          emulator-options: -no-window -gpu ${{ matrix.api == 35 && 'guest' || 'swiftshader_indirect' }} -no-snapshot -noaudio -no-boot-anim
           # Emulator-only ADB access for collecting test evidence on API 30;
           # this does not grant extra storage privileges to the application.
           script: |

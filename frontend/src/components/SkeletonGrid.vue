@@ -89,7 +89,6 @@ withDefaults(defineProps<{ count?: number; label?: string; inline?: boolean }>()
     var(--surface-4) 55%,
     var(--surface-3) 80%
   );
-  background-size: 240% 100%;
   animation: skeletonShimmer 1.4s ease-in-out infinite;
   animation-delay: var(--skel-delay, 0ms);
 }
@@ -104,7 +103,6 @@ withDefaults(defineProps<{ count?: number; label?: string; inline?: boolean }>()
     var(--surface-4) 50%,
     var(--surface-3) 80%
   );
-  background-size: 240% 100%;
   animation: skeletonShimmer 1.4s ease-in-out infinite;
   animation-delay: var(--skel-delay, 0ms);
 }
@@ -115,11 +113,12 @@ withDefaults(defineProps<{ count?: number; label?: string; inline?: boolean }>()
 }
 
 @keyframes skeletonShimmer {
-  0% {
-    background-position: 120% 0;
-  }
+  0%,
   100% {
-    background-position: -120% 0;
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
   }
 }
 
