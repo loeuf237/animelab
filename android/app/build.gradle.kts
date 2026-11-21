@@ -30,8 +30,8 @@ android {
         applicationId = "com.animan.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 222
-        versionName = "0.1.6"
+        versionCode = 223
+        versionName = "0.1.7"
         buildConfigField("String", "RELEASE_VERSION", "\"${System.getenv("RELEASE_TAG")?.removePrefix("android-v")?.removePrefix("v") ?: versionName}\"")
         manifestPlaceholders["appLabel"] = "@string/app_name"
 
