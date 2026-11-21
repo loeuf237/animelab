@@ -958,6 +958,65 @@ class ExtensionService:
         self.sync_android_extensions()
         return {'success':True,'alias':alias,'source_key':source_key,'libraryRowsDeleted':0}
 
+    @staticmethod
+    def _active_staged_hashes(operations=None) -> Set[str]:
+        active = {'preparing', 'permission_required', 'waiting_user', 'installing'}
+        return {
+            op['sha256'] for op in (operations or [])
+            if isinstance(op, dict) and op.get('state') in active and op.get('sha256')
+        }
+
+    def staged_apk_storage_summary(self, active_hashes: Optional[Set[str]] = None) -> tuple[int, int]:
+        if not APKS_DIR.is_dir():
+            return (0, 0)
+        count = 0
+        total = 0
+        for apk_path in APKS_DIR.glob('*.apk'):
+            if active_hashes and apk_path.stem in active_hashes:
+                continue
+            try:
+                if apk_path.is_file() and not apk_path.is_symlink():
+                    total += apk_path.stat().st_size
+                    count += 1
+            except OSError:
+                pass
+        return (count, total)
+
+    def prune_staged_apks(self, operations=None, *, min_age_seconds: float = 0.0) -> tuple[int, int]:
+        from animelab.services import android_extensions
+        if not android_extensions.available() or not APKS_DIR.is_dir():
+            return (0, 0)
+        import time
+        active_hashes = self._active_staged_hashes(operations)
+        terminal_hashes = {
+            op['sha256'] for op in (operations or [])
+            if isinstance(op, dict) and op.get('state') in ('installed', 'uninstalled', 'failed', 'cancelled') and op.get('sha256')
+        } - active_hashes
+        now = time.time()
+        removed = 0
+        freed = 0
+        for apk_path in list(APKS_DIR.glob('*.apk')):
+            if apk_path.stem in active_hashes:
+                continue
+            try:
+                if apk_path.is_symlink() or not apk_path.is_file():
+                    continue
+                stat = apk_path.stat()
+                age = max(0.0, now - stat.st_mtime)
+                should_delete = (
+                    apk_path.stem in terminal_hashes
+                    if operations is not None and min_age_seconds <= 0.0
+                    else age >= min_age_seconds
+                )
+                if should_delete:
+                    size = stat.st_size
+                    apk_path.unlink(missing_ok=True)
+                    removed += 1
+                    freed += size
+            except OSError:
+                pass
+        return (removed, freed)
+
     async def android_operation_states(self):
         from animelab.services import android_extensions
         operations=await android_extensions.operations()
@@ -968,6 +1027,7 @@ class ExtensionService:
                 if operation['state']=='installed' and operation.get('sha256'):
                     conn.execute("UPDATE extension_artifacts SET authentication='android-package-installer-verified' WHERE sha256=? AND pkg=? AND signer=? AND version_code=?",
                                  (operation['sha256'],operation['pkg'],operation.get('signer'),version_code(operation.get('versionCode'))))
+        await asyncio.to_thread(self.prune_staged_apks, operations)
         return operations
 
     async def install_android_extension(self, ext_id):

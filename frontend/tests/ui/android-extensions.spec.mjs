@@ -399,3 +399,67 @@ test('Mihon-style Android catalogue offers Installer, confirm retry, conflict un
     true,
   )
 })
+
+test('Android storage settings expose all permissions and clean up reclaimable private files at 360px', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 780 })
+  await mockApp(page)
+  const actions = []
+  let cleaned = false
+  const storagePayload = () => ({
+    android: true,
+    apiLevel: 29,
+    mode: 'downloads',
+    destination: 'Downloads/AnimeLab',
+    authorized: true,
+    selectionPending: false,
+    notificationsGranted: true,
+    installAppsGranted: false,
+    batteryUnrestricted: false,
+    privateStorageBytes: cleaned ? 0 : 12 * 1024 * 1024,
+    reclaimableBytes: cleaned ? 0 : 12 * 1024 * 1024,
+    exportedPrivateCount: cleaned ? 0 : 3,
+    orphanedPrivateCount: 0,
+    stagedApkCount: 0,
+    stagedApkBytes: 0,
+    error: null,
+    exportError: null,
+  })
+  await page.route('**/api/system/android/storage', (route) => {
+    if (route.request().method() === 'POST') {
+      actions.push(route.request().postDataJSON())
+    }
+    return route.fulfill({ json: storagePayload() })
+  })
+  await page.route('**/api/system/android/storage/cleanup', (route) => {
+    cleaned = true
+    return route.fulfill({
+      json: {
+        success: true,
+        removedFiles: 3,
+        freedBytes: 12 * 1024 * 1024,
+        storage: storagePayload(),
+      },
+    })
+  })
+
+  await page.goto('/app/settings?tab=storage')
+  await expect(page.getByText('Installation d’extensions APK')).toBeVisible()
+  await expect(page.getByText('Téléchargements en arrière-plan')).toBeVisible()
+  await expect(page.getByText('12.0 Mo récupérables')).toBeVisible()
+
+  await page.locator('.android-storage').getByRole('button', { name: 'Autoriser' }).click()
+  await expect.poll(() => actions).toEqual([{ action: 'install_apps' }])
+
+  const cleanupBtn = page.getByRole('button', { name: 'Libérer le stockage privé' })
+  await expect(cleanupBtn).toBeEnabled()
+  await cleanupBtn.click()
+  await expect(page.getByText('12.0 Mo libérés dans le stockage privé.')).toBeVisible()
+  await expect(page.getByText('Aucun fichier temporaire à nettoyer')).toBeVisible()
+  await expect(cleanupBtn).toBeDisabled()
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
+    true,
+  )
+})

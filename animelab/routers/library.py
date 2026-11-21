@@ -131,8 +131,20 @@ async def clear_history(
     status: Optional[str] = Query(None),
     animeName: Optional[str] = Query(None)
 ):
+    clearable = (
+        library_service.get_clearable_history(status=status, anime_name=animeName)
+        if platform_events.completed_handler is not None
+        else []
+    )
     library_service.clear_history(status=status, anime_name=animeName)
     download_manager.clear_history_tasks(status=status, anime_name=animeName)
+    for entity in clearable:
+        task = entity.to_task()
+        try:
+            download_manager.media_pipeline.output_processor.cleanup(task)
+        except OSError:
+            pass
+        download_manager.purge_private_task_artifacts(task)
     return {"success": True, "message": "Historique nettoyé"}
 
 # -------------------------------------------------------------------------
@@ -198,7 +210,20 @@ async def get_system_storage():
 
 @router.get("/api/system/android/storage")
 async def android_storage_status():
-    return await asyncio.to_thread(platform_events.storage_status)
+    status = await asyncio.to_thread(platform_events.storage_status)
+    if isinstance(status, dict) and status.get("android"):
+        summary = await asyncio.to_thread(download_manager.android_private_storage_summary)
+        return {**status, **summary}
+    return status
+
+
+@router.post("/api/system/android/storage/cleanup")
+async def android_storage_cleanup():
+    if platform_events.completed_handler is None:
+        raise HTTPException(404, "Android storage cleanup is unavailable")
+    result = await asyncio.to_thread(download_manager.cleanup_android_private_storage)
+    storage = await android_storage_status()
+    return {"success": True, **result, "storage": storage}
 
 
 @router.post("/api/system/android/storage")

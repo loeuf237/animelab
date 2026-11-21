@@ -4,7 +4,7 @@
     <p>
       {{
         tx(
-          'Les fichiers terminés sont copiés dans le stockage partagé. Les téléchargements en cours restent privés.',
+          'Les vidéos terminées sont exportées vers le stockage partagé, puis la copie temporaire privée est libérée automatiquement. Sur Android 10+, AnimeLab utilise l’accès ciblé par dossier (SAF/MediaStore) sans demander l’autorisation globale « Stockage ».',
         )
       }}
     </p>
@@ -34,6 +34,7 @@
     </p>
     <div class="storage-access-actions">
       <button
+        type="button"
         class="btn btn-primary"
         :disabled="busy || state.selectionPending"
         @click="act('choose_directory')"
@@ -41,13 +42,19 @@
         {{ tx('Choisir et autoriser un dossier') }}
       </button>
       <button
+        type="button"
         class="btn btn-secondary"
         :disabled="busy || state.selectionPending"
         @click="act('use_downloads')"
       >
         {{ tx('Utiliser Downloads/AnimeLab') }}
       </button>
-      <button class="btn btn-secondary" :disabled="busy" @click="act('open_downloads')">
+      <button
+        type="button"
+        class="btn btn-secondary"
+        :disabled="busy"
+        @click="act('open_downloads')"
+      >
         {{ tx('Ouvrir le dossier') }}
       </button>
     </div>
@@ -64,6 +71,7 @@
       </div>
       <button
         v-if="!state.notificationsGranted"
+        type="button"
         class="btn btn-secondary"
         :disabled="busy"
         @click="act('notifications')"
@@ -71,11 +79,63 @@
         {{ tx('Autoriser les notifications') }}
       </button>
     </div>
+    <div class="storage-access-row">
+      <div>
+        <strong>{{ tx('Installation d’extensions APK') }}</strong>
+        <p>{{ tx(state.installAppsGranted ? 'Accès autorisé' : 'Autorisation requise') }}</p>
+      </div>
+      <button
+        v-if="!state.installAppsGranted"
+        type="button"
+        class="btn btn-secondary"
+        :disabled="busy"
+        @click="act('install_apps')"
+      >
+        {{ tx('Autoriser') }}
+      </button>
+    </div>
+    <div class="storage-access-row">
+      <div>
+        <strong>{{ tx('Téléchargements en arrière-plan') }}</strong>
+        <p>{{ tx(state.batteryUnrestricted ? 'Sans restriction' : 'Optimisée par Android') }}</p>
+      </div>
+      <button
+        v-if="!state.batteryUnrestricted"
+        type="button"
+        class="btn btn-secondary"
+        :disabled="busy"
+        @click="act('battery')"
+      >
+        {{ tx('Configurer la batterie') }}
+      </button>
+    </div>
+    <div class="storage-access-row storage-private-box">
+      <div class="storage-private-meta">
+        <strong>{{ tx('Stockage privé de l’application') }}</strong>
+        <p>{{ reclaimableSummary }}</p>
+        <p class="storage-reassurance">
+          {{
+            tx(
+              'Vos vidéos déjà exportées dans Downloads/AnimeLab, votre bibliothèque et vos réglages sont conservés.',
+            )
+          }}
+        </p>
+      </div>
+      <button
+        type="button"
+        class="btn btn-secondary"
+        :disabled="busy || cleaning || (state.reclaimableBytes ?? 0) === 0"
+        @click="cleanupPrivateStorage"
+      >
+        {{ tx(cleaning ? 'Nettoyage…' : 'Libérer le stockage privé') }}
+      </button>
+    </div>
+    <p v-if="cleanupNotice" class="storage-cleanup-notice" role="status">{{ cleanupNotice }}</p>
     <div class="storage-access-actions">
-      <button class="btn btn-secondary" :disabled="busy" @click="act('app_settings')">
+      <button type="button" class="btn btn-secondary" :disabled="busy" @click="act('app_settings')">
         {{ tx('Permissions dans les paramètres Android') }}
       </button>
-      <button class="btn btn-secondary" :disabled="busy" @click="refresh">
+      <button type="button" class="btn btn-secondary" :disabled="busy" @click="refresh">
         {{ tx('Actualiser les accès') }}
       </button>
     </div>
@@ -83,14 +143,28 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { api, type AndroidStorageState } from '@/api/client'
 import { tx } from '@/utils/locale'
+
 const state = ref<AndroidStorageState | null>(null)
 const busy = ref(false)
+const cleaning = ref(false)
 const error = ref('')
+const cleanupNotice = ref('')
 let timer: ReturnType<typeof setInterval> | undefined
 let refreshing = false
+
+function formatMb(bytes: number): string {
+  return (bytes / (1024 * 1024)).toFixed(1)
+}
+
+const reclaimableSummary = computed(() => {
+  const reclaimable = state.value?.reclaimableBytes ?? 0
+  if (reclaimable <= 0) return tx('Aucun fichier temporaire à nettoyer')
+  return `${formatMb(reclaimable)} ${tx('Mo récupérables')}`
+})
+
 async function refresh() {
   if (refreshing) return
   refreshing = true
@@ -102,6 +176,7 @@ async function refresh() {
     refreshing = false
   }
 }
+
 async function act(action: string) {
   busy.value = true
   error.value = ''
@@ -113,16 +188,46 @@ async function act(action: string) {
     busy.value = false
   }
 }
+
+async function cleanupPrivateStorage() {
+  if (busy.value || cleaning.value) return
+  cleaning.value = true
+  error.value = ''
+  cleanupNotice.value = ''
+  try {
+    const res = await api.androidCleanupPrivateStorage()
+    if (res.storage) state.value = res.storage
+    else await refresh()
+    cleanupNotice.value = tx('{0} Mo libérés dans le stockage privé.').replace(
+      '{0}',
+      formatMb(res.freedBytes || 0),
+    )
+  } catch (failure) {
+    error.value = failure instanceof Error ? failure.message : String(failure)
+  } finally {
+    cleaning.value = false
+  }
+}
+
+function handleVisibility() {
+  if (!document.hidden) void refresh()
+}
+
 onMounted(async () => {
   await refresh()
   if (state.value?.android) {
     window.addEventListener('focus', refresh)
-    timer = setInterval(refresh, 4000)
+    document.addEventListener('visibilitychange', handleVisibility)
+    timer = setInterval(() => {
+      if (!document.hidden) void refresh()
+    }, 4000)
   }
 })
+
 onUnmounted(() => {
   if (timer) clearInterval(timer)
   window.removeEventListener('focus', refresh)
+  document.removeEventListener('visibilitychange', handleVisibility)
 })
 </script>
 
@@ -149,6 +254,23 @@ onUnmounted(() => {
 }
 .storage-access-row p {
   margin: 6px 0;
+}
+.storage-private-box {
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.storage-private-meta {
+  flex: 1;
+  min-width: min(240px, 100%);
+}
+.storage-reassurance {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.storage-cleanup-notice {
+  color: #34d399 !important;
+  font-size: 0.88rem;
+  font-weight: 500;
 }
 .storage-access-actions {
   display: flex;

@@ -1255,5 +1255,18 @@
   "La confirmation Android a expiré ou a été fermée.": "Android confirmation expired or was closed.",
   "Préparation de l’installation": "Preparing installation",
   "Téléchargement…": "Downloading…",
-  "En attente…": "Pending…"
+  "En attente…": "Pending…",
+  "Les vidéos terminées sont exportées vers le stockage partagé, puis la copie temporaire privée est libérée automatiquement. Sur Android 10+, AnimeLab utilise l’accès ciblé par dossier (SAF/MediaStore) sans demander l’autorisation globale « Stockage ».": "Completed videos are exported to shared storage and the temporary private copy is released automatically. On Android 10+, AnimeLab uses folder-scoped access (SAF/MediaStore) instead of requesting broad Storage permission.",
+  "Installation d’extensions APK": "APK extension installation",
+  "Téléchargements en arrière-plan": "Background downloads",
+  "Sans restriction": "Unrestricted",
+  "Optimisée par Android": "Optimized by Android",
+  "Configurer la batterie": "Configure battery",
+  "Stockage privé de l’application": "App private storage",
+  "Aucun fichier temporaire à nettoyer": "No temporary files to clean",
+  "Mo récupérables": "MB reclaimable",
+  "Vos vidéos déjà exportées dans Downloads/AnimeLab, votre bibliothèque et vos réglages sont conservés.": "Videos already exported to Downloads/AnimeLab, your library and your settings are kept.",
+  "Nettoyage…": "Cleaning…",
+  "Libérer le stockage privé": "Free private storage",
+  "{0} Mo libérés dans le stockage privé.": "{0} MB freed from private storage."
 }

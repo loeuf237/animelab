@@ -43,6 +43,12 @@ export interface AndroidStorageState {
   installAppsGranted?: boolean
   batteryUnrestricted?: boolean
   subtitleDestination?: string | null
+  privateStorageBytes?: number
+  reclaimableBytes?: number
+  exportedPrivateCount?: number
+  orphanedPrivateCount?: number
+  stagedApkBytes?: number
+  stagedApkCount?: number
   error: string | null
   exportError: string | null
 }
@@ -923,6 +929,14 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ action }),
     })
+  },
+  androidCleanupPrivateStorage() {
+    return request<{
+      success: boolean
+      freedBytes: number
+      removedFiles: number
+      storage?: AndroidStorageState | null
+    }>('/api/system/android/storage/cleanup', { method: 'POST' })
   },
   exportAndroidDownload(taskId: string) {
     return request<{ success: boolean; destination: string; task: DownloadTask }>(

@@ -323,18 +323,30 @@ class LibraryService:
                 return True
             return False
 
+    @staticmethod
+    def _clear_history_query(db, status: Optional[str] = None, anime_name: Optional[str] = None):
+        q = db.query(DownloadTaskEntity).filter(
+            DownloadTaskEntity.exportStatus != ExportStatus.EXPORTING.value,
+            ~and_(DownloadTaskEntity.status == DownloadStatus.COMPLETED.value,
+                DownloadTaskEntity.exportStatus.in_([ExportStatus.PENDING.value, ExportStatus.EXPORT_FAILED.value])))
+        if anime_name:
+            q = q.filter(DownloadTaskEntity.animeName == anime_name)
+        if status:
+            statuses = [s.strip().upper() for s in status.split(",") if s.strip()]
+            q = q.filter(DownloadTaskEntity.status.in_(statuses))
+        return q
+
+    def get_clearable_history(self, status: Optional[str] = None, anime_name: Optional[str] = None) -> List[DownloadTaskEntity]:
+        with transaction(SessionLocal) as db:
+            return self._clear_history_query(db, status=status, anime_name=anime_name).all()
+
+    def get_all_tasks_snapshot(self) -> List[DownloadTaskEntity]:
+        with transaction(SessionLocal) as db:
+            return db.query(DownloadTaskEntity).all()
+
     def clear_history(self, status: Optional[str] = None, anime_name: Optional[str] = None):
         with transaction(SessionLocal) as db:
-            q = db.query(DownloadTaskEntity).filter(
-                DownloadTaskEntity.exportStatus != ExportStatus.EXPORTING.value,
-                ~and_(DownloadTaskEntity.status == DownloadStatus.COMPLETED.value,
-                    DownloadTaskEntity.exportStatus.in_([ExportStatus.PENDING.value, ExportStatus.EXPORT_FAILED.value])))
-            if anime_name:
-                q = q.filter(DownloadTaskEntity.animeName == anime_name)
-            if status:
-                statuses = [s.strip().upper() for s in status.split(",") if s.strip()]
-                q = q.filter(DownloadTaskEntity.status.in_(statuses))
-            q.delete(synchronize_session=False)
+            self._clear_history_query(db, status=status, anime_name=anime_name).delete(synchronize_session=False)
             db.flush()
 
     def get_completed_tasks(self) -> List[DownloadTaskEntity]:

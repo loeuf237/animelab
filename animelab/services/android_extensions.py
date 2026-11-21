@@ -89,6 +89,10 @@ async def inspect(path):
     return json.loads(str(await asyncio.to_thread(_bridge.inspect, str(path))))
 
 
+def staged_operations_sync():
+    return json.loads(str(_bridge.operations())) if available() else []
+
+
 async def operations():
     return json.loads(str(await asyncio.to_thread(_bridge.operations))) if available() else []
 

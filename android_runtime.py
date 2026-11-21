@@ -178,17 +178,31 @@ def start(data_dir, cache_dir, port, token, test_mode=False):
 
     platform_events.progress_handler = notify
     def export_completed(task):
-        from animelab.services.subtitle_service import normalize_subtitles
         if not task.savePath or not Path(task.savePath).is_file():
             raise FileNotFoundError("The private download is missing")
-        paths = platform_events.completed_paths(task)
-        uris = [str(hooks.exportFile(path, task.id)) for path in dict.fromkeys(paths) if path and Path(path).is_file()]
-        if not uris:
+        paths = [path for path in dict.fromkeys(platform_events.completed_paths(task)) if path and Path(path).is_file()]
+        if not paths:
             raise FileNotFoundError("The private download is missing")
-        return {"uris": uris, "destination": json.loads(str(storage.status()))["destination"]}
+        uris = [str(hooks.exportFile(path, task.id)) for path in paths]
+        destination = json.loads(str(storage.status()))["destination"]
+        # Release private staging copies once every file is verified & published in shared storage.
+        download_manager._release_private_paths(paths)
+        return {"uris": uris, "destination": destination}
 
     platform_events.completed_handler = export_completed
     original_lifespan = run.app.router.lifespan_context
+
+    async def startup_cleanup():
+        try:
+            await asyncio.to_thread(
+                download_manager.startup_android_storage_cleanup,
+                lambda uri: bool(hooks.exportedCopyExists(uri)),
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as failure:
+            import logging
+            logging.getLogger('animelab.download_manager').warning('Nettoyage stockage ignoré (%s)', type(failure).__name__)
 
     @asynccontextmanager
     async def lifespan(app):
@@ -203,13 +217,17 @@ def start(data_dir, cache_dir, port, token, test_mode=False):
                 except Exception as failure:
                     import logging
                     logging.getLogger('animelab.extensions').warning('Découverte APK indisponible (%s)',type(failure).__name__)
-            discovery=asyncio.create_task(discover_apks())
+            discovery = asyncio.create_task(discover_apks())
+            cleanup_task = asyncio.create_task(startup_cleanup())
             try:
                 yield
             finally:
                 discovery.cancel()
+                cleanup_task.cancel()
                 with suppress(asyncio.CancelledError):
                     await discovery
+                with suppress(asyncio.CancelledError):
+                    await cleanup_task
         _loop = None
 
     run.app.router.lifespan_context = lifespan

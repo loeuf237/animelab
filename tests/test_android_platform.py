@@ -224,3 +224,187 @@ async def test_storage_failure_never_invents_available_capacity(monkeypatch, tmp
     result = await get_system_storage()
     assert result['totalBytes'] is None and result['freeBytes'] is None
     assert result['error'] == 'Storage unavailable'
+
+
+@pytest.mark.asyncio
+async def test_remove_task_and_history_purge_private_files_only_on_android(monkeypatch, tmp_path):
+    from fastapi import FastAPI
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from animelab.database import Base
+    from animelab import platform_events
+    from animelab.models.download_task import DownloadTask, DownloadStatus, ExportStatus
+    from animelab.routers.library import router
+    from animelab.services import library_service as lib_mod
+    from animelab.services.download_manager import DownloadManagerService
+    from animelab.services import download_manager as dm_mod
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'storage.sqlite'}", connect_args={'check_same_thread': False})
+    Base.metadata.create_all(engine)
+    sessions = sessionmaker(bind=engine)
+    monkeypatch.setattr(lib_mod, 'SessionLocal', sessions)
+
+    dl_dir = tmp_path / 'downloads'
+    dl_dir.mkdir()
+    manager = DownloadManagerService()
+    manager.download_dir = str(dl_dir)
+    monkeypatch.setattr(manager, '_trigger_process_queue', lambda: None)
+    monkeypatch.setattr(dm_mod, 'download_manager', manager)
+
+    # Desktop keeps completed media untouched on remove_task.
+    monkeypatch.setattr(platform_events, 'completed_handler', None)
+    desktop_video = dl_dir / 'Anime' / 'ep1.mp4'
+    desktop_video.parent.mkdir()
+    desktop_video.write_bytes(b'keep-desktop')
+    t_desktop = DownloadTask(animeName='Anime', fileName='ep1.mp4', savePath=str(desktop_video), status=DownloadStatus.COMPLETED)
+    manager.tasks[t_desktop.id] = t_desktop
+    manager.task_order.append(t_desktop.id)
+    assert manager.remove_task(t_desktop.id)
+    assert desktop_video.is_file()
+
+    # Android deletes private video copy and prunes empty parent directory on remove_task.
+    monkeypatch.setattr(platform_events, 'completed_handler', lambda task: {'uris': ['content://downloads/1']})
+    android_video = dl_dir / 'Show' / 'ep1.mp4'
+    android_video.parent.mkdir()
+    android_video.write_bytes(b'private-android-copy')
+    t_android = DownloadTask(animeName='Show', fileName='ep1.mp4', savePath=str(android_video),
+                             status=DownloadStatus.COMPLETED, exportStatus=ExportStatus.EXPORTED)
+    manager.tasks[t_android.id] = t_android
+    manager.task_order.append(t_android.id)
+    assert manager.remove_task(t_android.id)
+    assert not android_video.exists()
+    assert not android_video.parent.exists()
+
+    # DELETE /api/history cleans private files of exported tasks while keeping PENDING-export tasks.
+    exported_file = dl_dir / 'Series' / 'exported.mp4'
+    pending_file = dl_dir / 'Series' / 'pending.mp4'
+    exported_file.parent.mkdir()
+    exported_file.write_bytes(b'exported-data')
+    pending_file.write_bytes(b'pending-data')
+    t_exp = DownloadTask(animeName='Series', fileName='exported.mp4', savePath=str(exported_file),
+                         status=DownloadStatus.COMPLETED, exportStatus=ExportStatus.EXPORTED)
+    t_pend = DownloadTask(animeName='Series', fileName='pending.mp4', savePath=str(pending_file),
+                          status=DownloadStatus.COMPLETED, exportStatus=ExportStatus.PENDING)
+    lib_mod.library_service.save_task(t_exp)
+    lib_mod.library_service.save_task(t_pend)
+    monkeypatch.setattr(dm_mod, 'download_manager', manager)
+
+    from animelab.routers import library as lib_router
+    monkeypatch.setattr(lib_router, 'download_manager', manager)
+    app = FastAPI()
+    app.include_router(router)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url='http://127.0.0.1') as client:
+        resp = await client.delete('/api/history')
+        assert resp.status_code == 200
+    assert not exported_file.exists()
+    assert pending_file.is_file()
+    engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_android_storage_cleanup_and_startup_gc(monkeypatch, tmp_path):
+    import os
+    import time
+    from fastapi import FastAPI
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from animelab.database import Base
+    from animelab import platform_events
+    from animelab.models.download_task import DownloadTask, DownloadStatus, ExportStatus
+    from animelab.routers.library import router
+    from animelab.routers import library as lib_router
+    from animelab.services import android_extensions, extension_service as ext_mod, library_service as lib_mod
+    from animelab.services.download_manager import DownloadManagerService
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'gc.sqlite'}", connect_args={'check_same_thread': False})
+    Base.metadata.create_all(engine)
+    sessions = sessionmaker(bind=engine)
+    monkeypatch.setattr(lib_mod, 'SessionLocal', sessions)
+
+    dl_dir = tmp_path / 'downloads'
+    apks_dir = tmp_path / 'apks'
+    dl_dir.mkdir()
+    apks_dir.mkdir()
+    manager = DownloadManagerService()
+    manager.download_dir = str(dl_dir)
+    monkeypatch.setattr(manager, '_trigger_process_queue', lambda: None)
+    monkeypatch.setattr(ext_mod, 'APKS_DIR', apks_dir)
+
+    class Bridge:
+        @staticmethod
+        def operations():
+            return json.dumps([{'id': 'op-active', 'state': 'waiting_user', 'sha256': 'keephash'}])
+
+    monkeypatch.setattr(android_extensions, '_bridge', Bridge())
+    monkeypatch.setattr(platform_events, 'completed_handler', lambda task: {'uris': ['content://downloads/1']})
+    monkeypatch.setattr(platform_events, 'storage_status_handler', lambda: {
+        'android': True, 'apiLevel': 29, 'mode': 'downloads', 'destination': 'Downloads/AnimeLab',
+        'authorized': True, 'selectionPending': False, 'notificationsGranted': True,
+        'installAppsGranted': False, 'batteryUnrestricted': False,
+    })
+
+    kept_exported = dl_dir / 'exported_kept.mp4'
+    ghost_exported = dl_dir / 'exported_ghost.mp4'
+    protected_pending = dl_dir / 'pending_export.mp4'
+    orphan_file = dl_dir / 'native-probe' / 'old_probe.mp4'
+    orphan_file.parent.mkdir()
+    for p, content in [
+        (kept_exported, b'k' * 100),
+        (ghost_exported, b'g' * 200),
+        (protected_pending, b'p' * 300),
+        (orphan_file, b'o' * 400),
+    ]:
+        p.write_bytes(content)
+    old_ts = time.time() - 600
+    os.utime(orphan_file, (old_ts, old_ts))
+
+    old_apk = apks_dir / 'stalehash.apk'
+    active_apk = apks_dir / 'keephash.apk'
+    old_apk.write_bytes(b'a' * 500)
+    active_apk.write_bytes(b'b' * 600)
+    os.utime(old_apk, (old_ts, old_ts))
+    os.utime(active_apk, (old_ts, old_ts))
+
+    lib_mod.library_service.save_task(DownloadTask(
+        id='t-kept', fileName='exported_kept.mp4', savePath=str(kept_exported),
+        status=DownloadStatus.COMPLETED, exportStatus=ExportStatus.EXPORTED,
+        exportUrisJson='["content://downloads/keep"]',
+    ))
+    lib_mod.library_service.save_task(DownloadTask(
+        id='t-ghost', fileName='exported_ghost.mp4', savePath=str(ghost_exported),
+        status=DownloadStatus.COMPLETED, exportStatus=ExportStatus.EXPORTED,
+        exportUrisJson='["content://downloads/deleted"]',
+    ))
+    lib_mod.library_service.save_task(DownloadTask(
+        id='t-pend', fileName='pending_export.mp4', savePath=str(protected_pending),
+        status=DownloadStatus.COMPLETED, exportStatus=ExportStatus.PENDING,
+    ))
+
+    # Startup GC removes ghost exported video, old orphans and old non-active staged APKs, keeping valid exported & pending copies.
+    startup_res = manager.startup_android_storage_cleanup(lambda uri: uri.endswith('keep'))
+    assert startup_res['removedFiles'] == 3
+    assert startup_res['freedBytes'] == 200 + 400 + 500
+    assert not ghost_exported.exists()
+    assert not orphan_file.exists()
+    assert not old_apk.exists()
+    assert kept_exported.is_file()
+    assert protected_pending.is_file()
+    assert active_apk.is_file()
+
+    # Manual cleanup API reports reclaimableBytes and frees remaining exported duplicates cleanly.
+    monkeypatch.setattr(lib_router, 'download_manager', manager)
+    app = FastAPI()
+    app.include_router(router)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url='http://127.0.0.1') as client:
+        status_res = (await client.get('/api/system/android/storage')).json()
+        assert status_res['reclaimableBytes'] == 100
+        assert status_res['exportedPrivateCount'] == 1
+        clean_res = (await client.post('/api/system/android/storage/cleanup')).json()
+        assert clean_res['success'] is True
+        assert clean_res['removedFiles'] == 1
+        assert clean_res['freedBytes'] == 100
+        assert clean_res['storage']['reclaimableBytes'] == 0
+    assert not kept_exported.exists()
+    assert protected_pending.is_file()
+    assert active_apk.is_file()
+    engine.dispose()

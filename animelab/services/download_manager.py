@@ -1324,12 +1324,251 @@ class DownloadManagerService:
                     self.media_pipeline.output_processor.cleanup(t)
                 except OSError:
                     logger.warning('Unable to clean private media workspace for %s', task_id)
+                self.purge_private_task_artifacts(t)
             if worker and not worker.done():
                 worker.add_done_callback(cleanup_media)
             else:
                 cleanup_media()
         self._trigger_process_queue()
         return (t is not None) or deleted_from_db
+
+    def _prune_empty_download_parents(self, file_path: Path) -> None:
+        try:
+            root = Path(self.download_dir).resolve()
+            parent = file_path.resolve().parent
+            while parent != root and is_safe_path(parent, [root]):
+                if any(parent.iterdir()):
+                    break
+                parent.rmdir()
+                parent = parent.parent
+        except OSError:
+            pass
+
+    def _release_private_paths(self, raw_paths) -> tuple[int, int]:
+        removed = 0
+        freed = 0
+        for raw in dict.fromkeys(str(p) for p in raw_paths if p):
+            path = Path(raw)
+            if not is_safe_path(path, [self.download_dir]):
+                continue
+            try:
+                if path.is_file() or path.is_symlink():
+                    size = path.stat().st_size if not path.is_symlink() else 0
+                    path.unlink(missing_ok=True)
+                    self._prune_empty_download_parents(path)
+                    removed += 1
+                    freed += size
+            except OSError:
+                pass
+        return (removed, freed)
+
+    def _task_private_media_paths(self, task: DownloadTask) -> List[Path]:
+        candidates: List[str] = []
+        try:
+            candidates.extend(platform_events.completed_paths(task))
+        except Exception:
+            pass
+        if task.savePath:
+            candidates.append(task.savePath)
+            candidates.append(task.savePath + ".part")
+            candidates.append(task.savePath + ".part.resume.json")
+            candidates.append(str(Path(task.savePath).with_suffix(".tmp.mp4")))
+        if task.savePathSubtitle:
+            try:
+                parsed = json.loads(task.savePathSubtitle)
+                candidates.extend(parsed if isinstance(parsed, list) else [str(parsed)])
+            except (ValueError, TypeError):
+                candidates.append(task.savePathSubtitle)
+        if task.subtitlesJson:
+            try:
+                for track in json.loads(task.subtitlesJson):
+                    if isinstance(track, dict) and track.get("path"):
+                        candidates.append(str(track["path"]))
+            except (ValueError, TypeError):
+                pass
+        paths: List[Path] = []
+        for raw in dict.fromkeys(candidates):
+            p = Path(raw)
+            if is_safe_path(p, [self.download_dir]):
+                paths.append(p)
+        return paths
+
+    def purge_private_task_artifacts(self, task: DownloadTask) -> tuple[int, int]:
+        if platform_events.completed_handler is None:
+            return (0, 0)
+        return self._release_private_paths(self._task_private_media_paths(task))
+
+    def _task_workspace_dirs(self, task: DownloadTask) -> List[Path]:
+        import hashlib
+        dirs: List[Path] = []
+        if task.savePath:
+            out_p = Path(task.savePath)
+            seg_d = out_p.parent / f".{out_p.stem}_segments"
+            if is_safe_path(seg_d, [self.download_dir]):
+                dirs.append(seg_d)
+        try:
+            out_state = self.media_pipeline.output_processor.state(task)
+            src = out_state.get("source") or task.savePath
+            if src:
+                key = hashlib.sha256(task.id.encode()).hexdigest()[:20]
+                ws = Path(src).parent / (".animelab-media-" + key)
+                if is_safe_path(ws, [self.download_dir]):
+                    dirs.append(ws)
+        except Exception:
+            pass
+        return dirs
+
+    def _classify_android_private_storage(self):
+        root = Path(self.download_dir)
+        protected_files: set[Path] = set()
+        protected_dirs: set[Path] = set()
+        exported_tasks: list[tuple[DownloadTask, list[Path]]] = []
+        seen_ids: set[str] = set()
+        all_tasks: list[DownloadTask] = []
+        for tid in list(self.task_order):
+            t = self.tasks.get(tid)
+            if t is not None:
+                seen_ids.add(t.id)
+                all_tasks.append(t)
+        for entity in library_service.get_all_tasks_snapshot():
+            if entity.id not in seen_ids:
+                seen_ids.add(entity.id)
+                all_tasks.append(entity.to_task())
+        active_statuses = {
+            DownloadStatus.PENDING, DownloadStatus.SCHEDULED, DownloadStatus.DOWNLOADING,
+            DownloadStatus.RETRYING, DownloadStatus.PAUSED, DownloadStatus.VERIFICATION_REQUIRED,
+            DownloadStatus.MUXING,
+        }
+        pending_export_statuses = {ExportStatus.PENDING, ExportStatus.EXPORTING, ExportStatus.EXPORT_FAILED}
+        for task in all_tasks:
+            task_paths = self._task_private_media_paths(task)
+            is_protected = (
+                task.status in active_statuses
+                or (task.status == DownloadStatus.COMPLETED and task.exportStatus in pending_export_statuses)
+            )
+            if is_protected:
+                for p in task_paths:
+                    try:
+                        protected_files.add(p.resolve())
+                    except OSError:
+                        pass
+                for d in self._task_workspace_dirs(task):
+                    try:
+                        protected_dirs.add(d.resolve())
+                    except OSError:
+                        pass
+            elif task.status == DownloadStatus.COMPLETED and task.exportStatus == ExportStatus.EXPORTED:
+                exported_tasks.append((task, task_paths))
+        exported_path_set: set[Path] = set()
+        for _, paths in exported_tasks:
+            for p in paths:
+                try:
+                    resolved = p.resolve()
+                    if resolved not in protected_files:
+                        exported_path_set.add(resolved)
+                except OSError:
+                    pass
+        download_bytes = 0
+        exported_bytes = 0
+        exported_count = 0
+        orphan_files: list[Path] = []
+        orphan_bytes = 0
+        if root.is_dir():
+            for entry in root.rglob("*"):
+                try:
+                    if entry.is_symlink() or not entry.is_file():
+                        continue
+                    size = entry.stat().st_size
+                    download_bytes += size
+                    resolved = entry.resolve()
+                    if resolved in protected_files or any(d == resolved or d in resolved.parents for d in protected_dirs):
+                        continue
+                    if resolved in exported_path_set:
+                        exported_count += 1
+                        exported_bytes += size
+                    else:
+                        orphan_files.append(entry)
+                        orphan_bytes += size
+                except OSError:
+                    pass
+        return {
+            "download_bytes": download_bytes,
+            "exported_bytes": exported_bytes,
+            "exported_count": exported_count,
+            "orphan_files": orphan_files,
+            "orphan_bytes": orphan_bytes,
+            "exported_tasks": exported_tasks,
+            "protected_files": protected_files,
+            "protected_dirs": protected_dirs,
+        }
+
+    def android_private_storage_summary(self) -> Dict[str, int]:
+        from animelab.services import android_extensions
+        from animelab.services.extension_service import extension_service
+        info = self._classify_android_private_storage()
+        active_hashes = extension_service._active_staged_hashes(android_extensions.staged_operations_sync())
+        apk_count, apk_bytes = extension_service.staged_apk_storage_summary(active_hashes)
+        reclaimable = info["exported_bytes"] + info["orphan_bytes"] + apk_bytes
+        return {
+            "privateStorageBytes": info["download_bytes"] + apk_bytes,
+            "reclaimableBytes": reclaimable,
+            "exportedPrivateCount": info["exported_count"],
+            "orphanedPrivateCount": len(info["orphan_files"]),
+            "stagedApkCount": apk_count,
+            "stagedApkBytes": apk_bytes,
+        }
+
+    def cleanup_android_private_storage(
+        self,
+        *,
+        exported_only_if_missing_uri_fn=None,
+        min_orphan_age_seconds: float = 0.0,
+    ) -> Dict[str, int]:
+        if platform_events.completed_handler is None:
+            return {"removedFiles": 0, "freedBytes": 0}
+        from animelab.services import android_extensions
+        from animelab.services.extension_service import extension_service
+        info = self._classify_android_private_storage()
+        protected_files = info["protected_files"]
+        protected_dirs = info["protected_dirs"]
+        to_delete: list[Path] = []
+        for task, paths in info["exported_tasks"]:
+            should_clean = True
+            if exported_only_if_missing_uri_fn is not None:
+                try:
+                    uris = [u for u in json.loads(task.exportUrisJson or "[]") if isinstance(u, str) and u]
+                except (ValueError, TypeError):
+                    uris = []
+                # Clean automatically on startup only if none of the shared copies exist anymore.
+                should_clean = bool(uris) and all(not exported_only_if_missing_uri_fn(u) for u in uris)
+            if should_clean:
+                for p in paths:
+                    try:
+                        resolved = p.resolve()
+                        if resolved not in protected_files and not any(d in resolved.parents for d in protected_dirs):
+                            to_delete.append(p)
+                    except OSError:
+                        pass
+        now = time.time()
+        for entry in info["orphan_files"]:
+            try:
+                if min_orphan_age_seconds > 0.0:
+                    age = max(0.0, now - entry.stat().st_mtime)
+                    if age < min_orphan_age_seconds:
+                        continue
+                to_delete.append(entry)
+            except OSError:
+                pass
+        removed, freed = self._release_private_paths(to_delete)
+        ops = android_extensions.staged_operations_sync()
+        apk_removed, apk_freed = extension_service.prune_staged_apks(ops, min_age_seconds=60.0)
+        return {"removedFiles": removed + apk_removed, "freedBytes": freed + apk_freed}
+
+    def startup_android_storage_cleanup(self, uri_exists_fn=None) -> Dict[str, int]:
+        return self.cleanup_android_private_storage(
+            exported_only_if_missing_uri_fn=uri_exists_fn,
+            min_orphan_age_seconds=300.0,
+        )
 
     def pause_all_downloads(self):
         for exporting in list(self.tasks.values()):

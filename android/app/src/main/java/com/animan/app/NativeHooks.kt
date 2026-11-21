@@ -38,6 +38,15 @@ object NativeHooks {
         }
     }
 
+    @JvmStatic fun exportedCopyExists(uriString: String): Boolean = try {
+        if (uriString.isBlank()) false
+        else EngineHost.context.contentResolver.openFileDescriptor(android.net.Uri.parse(uriString), "r")?.use {
+            it.statSize != 0L
+        } == true
+    } catch (_: Exception) {
+        false
+    }
+
     private fun exportCompletedFile(path: String, taskId: String): String {
         val context = EngineHost.context
         val root = File(context.filesDir, "downloads").canonicalFile
