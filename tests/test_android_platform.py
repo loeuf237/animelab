@@ -228,6 +228,7 @@ async def test_storage_failure_never_invents_available_capacity(monkeypatch, tmp
 
 @pytest.mark.asyncio
 async def test_remove_task_and_history_purge_private_files_only_on_android(monkeypatch, tmp_path):
+    import importlib
     from fastapi import FastAPI
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
@@ -235,9 +236,9 @@ async def test_remove_task_and_history_purge_private_files_only_on_android(monke
     from animelab import platform_events
     from animelab.models.download_task import DownloadTask, DownloadStatus, ExportStatus
     from animelab.routers.library import router
-    from animelab.services import library_service as lib_mod
     from animelab.services.download_manager import DownloadManagerService
-    from animelab.services import download_manager as dm_mod
+    lib_mod = importlib.import_module('animelab.services.library_service')
+    dm_mod = importlib.import_module('animelab.services.download_manager')
 
     engine = create_engine(f"sqlite:///{tmp_path / 'storage.sqlite'}", connect_args={'check_same_thread': False})
     Base.metadata.create_all(engine)
@@ -303,6 +304,7 @@ async def test_remove_task_and_history_purge_private_files_only_on_android(monke
 
 @pytest.mark.asyncio
 async def test_android_storage_cleanup_and_startup_gc(monkeypatch, tmp_path):
+    import importlib
     import os
     import time
     from fastapi import FastAPI
@@ -313,8 +315,10 @@ async def test_android_storage_cleanup_and_startup_gc(monkeypatch, tmp_path):
     from animelab.models.download_task import DownloadTask, DownloadStatus, ExportStatus
     from animelab.routers.library import router
     from animelab.routers import library as lib_router
-    from animelab.services import android_extensions, extension_service as ext_mod, library_service as lib_mod
+    from animelab.services import android_extensions
     from animelab.services.download_manager import DownloadManagerService
+    ext_mod = importlib.import_module('animelab.services.extension_service')
+    lib_mod = importlib.import_module('animelab.services.library_service')
 
     engine = create_engine(f"sqlite:///{tmp_path / 'gc.sqlite'}", connect_args={'check_same_thread': False})
     Base.metadata.create_all(engine)
