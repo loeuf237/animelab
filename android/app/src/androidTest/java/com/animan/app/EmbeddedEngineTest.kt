@@ -37,8 +37,11 @@ class EmbeddedEngineTest {
                         const setup = document.querySelector('.startup-page');
                         if (!setup) {
                             if (!document.querySelector('#main-content')) return false;
-                            const home = document.querySelector('a[href="/spa/"]');
-                            if (home) home.click();
+                            if (window.location.pathname !== '/spa/') {
+                                const home = document.querySelector('a[href="/spa/"]');
+                                if (home) home.click();
+                                return false;
+                            }
                             return true;
                         }
                         const buttons = [...setup.querySelectorAll('button')];
@@ -72,6 +75,7 @@ class EmbeddedEngineTest {
 
     private fun waitForHome(scenario: ActivityScenario<MainActivity>, message: String) {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60)
+        var lastState = "init"
         while (System.nanoTime() < deadline) {
             val checked = CountDownLatch(1)
             val rendered = AtomicBoolean(false)
@@ -80,11 +84,20 @@ class EmbeddedEngineTest {
                 // screen behavior without changing the user's timeout settings.
                 activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 val webView = activity.findViewById<WebView>(R.id.webView)
-                if (webView.url?.startsWith(EngineHost.baseUrl + "/spa/") != true ||
-                    !activity.hasWindowFocus() ||
-                    activity.findViewById<android.view.View>(R.id.loadingLayout).visibility != android.view.View.GONE) checked.countDown()
-                else webView.evaluateJavascript("Boolean(document.querySelector('#main-content .home-container .home-top-header, #main-content .home-container .hero-panel'))") {
-                    rendered.set(it == "true"); checked.countDown()
+                val url = webView.url
+                val focus = activity.hasWindowFocus()
+                val loadingVis = activity.findViewById<android.view.View>(R.id.loadingLayout).visibility
+                if (url?.startsWith(EngineHost.baseUrl + "/spa/") != true ||
+                    !focus ||
+                    loadingVis != android.view.View.GONE) {
+                    lastState = "url=$url focus=$focus loadingVis=$loadingVis"
+                    checked.countDown()
+                } else webView.evaluateJavascript(
+                    "(() => (document.querySelector('#main-content .home-container .home-top-header, #main-content .home-container .hero-panel') ? 'OK' : 'WAIT') + '|' + window.location.pathname + '|main=' + Boolean(document.querySelector('#main-content')) + '|setup=' + Boolean(document.querySelector('.startup-page')))()"
+                ) { result ->
+                    lastState = "url=$url focus=$focus dom=$result"
+                    rendered.set(result?.startsWith("\"OK|") == true)
+                    checked.countDown()
                 }
             }
             // A renderer can start slowly after recreation. A missed callback
@@ -93,7 +106,7 @@ class EmbeddedEngineTest {
             if (rendered.get()) return
             Thread.sleep(250)
         }
-        fail(message)
+        fail("$message [$lastState]")
     }
     private fun request(path: String, authenticated: Boolean = true, body: String? = null): Pair<Int, String> {
         val connection = URL(EngineHost.baseUrl + path).openConnection(Proxy.NO_PROXY) as HttpURLConnection

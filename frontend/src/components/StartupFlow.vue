@@ -433,10 +433,16 @@ function back() {
   flow.screen = steps.value[stepIndex.value - 1] as 'theme' | 'storage'
 }
 async function next() {
+  if (busy.value || flow.saving) return
   if (isLastStep.value) {
-    if (await flow.finish()) {
-      await router.replace('/library')
-      flow.screen = 'app'
+    busy.value = true
+    try {
+      if (await flow.finish()) {
+        await router.replace('/library')
+        flow.screen = 'app'
+      }
+    } finally {
+      busy.value = false
     }
   } else flow.screen = steps.value[stepIndex.value + 1] as 'storage' | 'permissions'
 }
