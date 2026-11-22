@@ -147,6 +147,10 @@ async def test_setup_preferences_persist_and_reject_arbitrary_configuration(inst
         assert response.status_code == 200
         assert app_preferences.load()['onboardingCompleted'] is True
         assert app_preferences.load()['checkUpdates'] is True
+        for valid_palette in ('classic', 'amoled'):
+            palette_resp = await client.patch('/api/app/preferences', json={'palette': valid_palette})
+            assert palette_resp.status_code == 200
+            assert app_preferences.load()['palette'] == valid_palette
         for changes in ({'palette': 'unknown'}, {'updateFeed': 'http://127.0.0.1'}, {'downloadDirectory': '/private'}):
             assert (await client.patch('/api/app/preferences', json=changes)).status_code == 422
         assert 'downloadDirectory' not in response.json()

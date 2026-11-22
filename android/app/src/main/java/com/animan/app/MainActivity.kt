@@ -109,6 +109,7 @@ class MainActivity : AppCompatActivity() {
         NativeUiBridge.applySavedChrome(
             this,
             binding.root,
+            binding.webView,
             binding.loadingLayout,
             binding.loadingTitle,
             binding.loadingStatus,

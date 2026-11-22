@@ -20,10 +20,7 @@
         :aria-pressed="palette === variant.id"
         @click="choose(themeMode, variant.id)"
       >
-        <span
-          class="theme-mini"
-          :style="{ '--mini-bg': variant.background, '--mini-accent': variant.accent }"
-        >
+        <span class="theme-mini" :style="previewStyle(variant)">
           <span class="mini-heading"></span><span class="mini-card"><i></i><i></i></span>
           <span class="mini-nav"><i></i><i></i><i></i></span>
           <Check v-if="palette === variant.id" class="mini-check" aria-hidden="true" />
@@ -35,7 +32,7 @@
 </template>
 <script setup lang="ts">
 import { Check } from 'lucide-vue-next'
-import { themeMode, palette, setAppearance } from '@/stores/appearance'
+import { effectiveTheme, themeMode, palette, setAppearance } from '@/stores/appearance'
 import type { Palette, ThemeMode } from '@/types/startup'
 import { tx } from '@/utils/locale'
 const emit = defineEmits<{ change: [] }>()
@@ -44,12 +41,91 @@ const modes: { id: ThemeMode; label: string }[] = [
   { id: 'light', label: 'Clair' },
   { id: 'dark', label: 'Sombre' },
 ]
-const variants: { id: Palette; label: string; background: string; accent: string }[] = [
-  { id: 'teal', label: 'Turquoise', background: '#0b1517', accent: '#80d3dc' },
-  { id: 'lavender', label: 'Violet', background: '#15121d', accent: '#c6b5ff' },
-  { id: 'ember', label: 'Ambre', background: '#1c1510', accent: '#ffbc87' },
-  { id: 'amoled', label: 'AMOLED', background: '#000000', accent: '#a8dfcf' },
+interface PreviewSwatches {
+  bg: string
+  card: string
+  nav: string
+  heading: string
+  accent: string
+}
+interface PaletteVariant {
+  id: Palette
+  label: string
+  dark: PreviewSwatches
+  light: PreviewSwatches
+}
+const variants: PaletteVariant[] = [
+  {
+    id: 'classic',
+    label: 'Classique',
+    dark: { bg: '#1b1b1f', card: '#292730', nav: '#211f26', heading: '#e3e2e6', accent: '#b0c6ff' },
+    light: {
+      bg: '#fefbff',
+      card: '#e8e5ef',
+      nav: '#f3edf7',
+      heading: '#1b1b1f',
+      accent: '#0058ca',
+    },
+  },
+  {
+    id: 'teal',
+    label: 'Turquoise',
+    dark: { bg: '#0b1517', card: '#18272a', nav: '#0f1b1e', heading: '#dce7e9', accent: '#80d3dc' },
+    light: {
+      bg: '#f5fafb',
+      card: '#e1edef',
+      nav: '#eaf2f3',
+      heading: '#15282b',
+      accent: '#006874',
+    },
+  },
+  {
+    id: 'lavender',
+    label: 'Violet',
+    dark: { bg: '#15121d', card: '#252131', nav: '#191622', heading: '#dce7e9', accent: '#c6b5ff' },
+    light: {
+      bg: '#f8f6fc',
+      card: '#e8e0f5',
+      nav: '#eee8f6',
+      heading: '#1c1826',
+      accent: '#6844a0',
+    },
+  },
+  {
+    id: 'ember',
+    label: 'Ambre',
+    dark: { bg: '#1c1510', card: '#2d241d', nav: '#211913', heading: '#dce7e9', accent: '#ffbc87' },
+    light: {
+      bg: '#fcf7f4',
+      card: '#ece0d7',
+      nav: '#f2e7df',
+      heading: '#241912',
+      accent: '#8a4b0d',
+    },
+  },
+  {
+    id: 'amoled',
+    label: 'AMOLED',
+    dark: { bg: '#000000', card: '#141414', nav: '#000000', heading: '#ffffff', accent: '#ffffff' },
+    light: {
+      bg: '#ffffff',
+      card: '#ebebeb',
+      nav: '#f5f5f5',
+      heading: '#000000',
+      accent: '#141414',
+    },
+  },
 ]
+function previewStyle(variant: PaletteVariant) {
+  const s = effectiveTheme.value === 'light' ? variant.light : variant.dark
+  return {
+    '--mini-bg': s.bg,
+    '--mini-card': s.card,
+    '--mini-nav': s.nav,
+    '--mini-heading': s.heading,
+    '--mini-accent': s.accent,
+  }
+}
 function choose(mode: ThemeMode, variant: Palette) {
   setAppearance(mode, variant)
   emit('change')
@@ -91,8 +167,8 @@ function choose(mode: ThemeMode, variant: Palette) {
 }
 .theme-variants {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
   margin-top: 28px;
 }
 .theme-variant {
@@ -114,17 +190,19 @@ function choose(mode: ThemeMode, variant: Palette) {
   height: 150px;
   background: var(--mini-bg);
   border: 3px solid transparent;
+  box-shadow: inset 0 0 0 1px var(--line);
   border-radius: 18px;
   margin-bottom: 10px;
   overflow: hidden;
 }
 .theme-variant[aria-pressed='true'] .theme-mini {
   border-color: var(--accent);
+  box-shadow: none;
 }
 .mini-heading {
   width: 70%;
   height: 10px;
-  background: #dce6e7;
+  background: var(--mini-heading);
   border-radius: 9px;
   margin-bottom: 12px;
 }
@@ -132,7 +210,7 @@ function choose(mode: ThemeMode, variant: Palette) {
   display: flex;
   align-items: start;
   gap: 3px;
-  background: #ffffff25;
+  background: var(--mini-card);
   width: 75%;
   height: 54px;
   padding: 5px;
@@ -153,7 +231,7 @@ function choose(mode: ThemeMode, variant: Palette) {
   align-items: center;
   margin: auto -7px 0;
   padding: 10px 7px;
-  background: #ffffff13;
+  background: var(--mini-nav);
 }
 .mini-nav i {
   width: 10px;
@@ -172,18 +250,24 @@ function choose(mode: ThemeMode, variant: Palette) {
   height: 18px;
   padding: 2px;
   background: var(--accent);
-  color: var(--bg);
+  color: var(--on-accent);
   border-radius: 99px;
+}
+@media (max-width: 520px) {
+  .theme-variants {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
 }
 @media (max-width: 380px) {
   .theme-variants {
-    gap: 6px;
+    gap: 8px;
   }
   .theme-variant {
-    font-size: 10px;
+    font-size: 11px;
   }
   .theme-mini {
-    height: 128px;
+    height: 120px;
     padding-inline: 5px;
   }
 }

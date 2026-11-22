@@ -700,7 +700,7 @@
               <div
                 class="setting-row-pro"
                 style="
-                  background: rgba(124, 58, 237, 0.05);
+                  background: var(--panel-subtle);
                   border: 1px dashed var(--line);
                   border-radius: 8px;
                   padding: 12px 16px;

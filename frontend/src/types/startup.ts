@@ -1,6 +1,6 @@
 import type { AndroidStorageState } from '@/api/client'
 export type ThemeMode = 'system' | 'dark' | 'light'
-export type Palette = 'teal' | 'lavender' | 'ember' | 'amoled'
+export type Palette = 'classic' | 'teal' | 'lavender' | 'ember' | 'amoled'
 export interface AppPreferences {
   onboardingCompleted: boolean
   theme: ThemeMode | null

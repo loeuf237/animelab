@@ -4,6 +4,8 @@ import { test } from 'node:test'
 import vm from 'node:vm'
 
 const source = await readFile(new URL('../../animelab/static/sw.js', import.meta.url), 'utf8')
+const currentCache = source.match(/const CACHE_NAME = ["']([^"']+)["']/)?.[1]
+assert.ok(currentCache, 'sw.js must define CACHE_NAME')
 
 function worker(fetchImpl, cached) {
   const handlers = new Map()
@@ -26,7 +28,11 @@ function worker(fetchImpl, cached) {
     caches: {
       open: async () => cache,
       match: async () => cached,
-      keys: async () => ['animelab-cache-v0.1.0-brand2', 'animelab-cache-v0.1.0-spa-only-1'],
+      keys: async () => [
+        'animelab-cache-v0.1.0-brand2',
+        'animelab-cache-v0.1.0-spa-only-1',
+        currentCache,
+      ],
       delete: async (key) => deleted.push(key),
     },
   })
@@ -99,5 +105,5 @@ test('private API data and account pages never use a cached response', () => {
 test('upgrading removes cached legacy pages while keeping the current cache', async () => {
   const sw = worker(() => {})
   await sw.activate()
-  assert.deepEqual(sw.deleted, ['animelab-cache-v0.1.0-brand2'])
+  assert.deepEqual(sw.deleted, ['animelab-cache-v0.1.0-brand2', 'animelab-cache-v0.1.0-spa-only-1'])
 })

@@ -4,30 +4,44 @@ import { mockApp } from './fixtures.mjs'
 
 const PALETTE_CHROME = {
   dark: {
-    teal: '#0b1517',
-    lavender: '#15121d',
-    ember: '#1c1510',
-    amoled: '#000000',
+    classic: { bg: '#1b1b1f', nav: '#211f26' },
+    teal: { bg: '#0b1517', nav: '#0f1b1e' },
+    lavender: { bg: '#15121d', nav: '#191622' },
+    ember: { bg: '#1c1510', nav: '#211913' },
+    amoled: { bg: '#000000', nav: '#000000' },
   },
   light: {
-    teal: '#f5fafb',
-    lavender: '#f8f6fc',
-    ember: '#fcf7f4',
-    amoled: '#f4faf7',
+    classic: { bg: '#fefbff', nav: '#f3edf7' },
+    teal: { bg: '#f5fafb', nav: '#eaf2f3' },
+    lavender: { bg: '#f8f6fc', nav: '#eee8f6' },
+    ember: { bg: '#fcf7f4', nav: '#f2e7df' },
+    amoled: { bg: '#ffffff', nav: '#f5f5f5' },
   },
 }
 
 const PALETTE_LABELS = {
+  classic: 'Classique',
   teal: 'Turquoise',
   lavender: 'Violet',
   ember: 'Ambre',
   amoled: 'AMOLED',
 }
 
-test('design tokens override purple button defaults across all 4 palettes x dark/light', async ({
+test('design tokens override purple button defaults across all 5 palettes x dark/light', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
+  await page.addInitScript(() => {
+    window.__syncedSystemBars = []
+    window.AnimeLabAndroid = {
+      syncSystemBars(statusHex, navHex, lightIcons) {
+        window.__syncedSystemBars.push({ statusHex, navHex, lightIcons })
+      },
+      getPlatformInfo() {
+        return JSON.stringify({ os: 'android', runtime: 'android', sdk: 29, edgeToEdge: true })
+      },
+    }
+  })
   await mockApp(page)
   await page.goto('/app/settings')
   await expect(page.locator('.settings-header-pro .btn-primary')).toBeVisible()
@@ -38,7 +52,7 @@ test('design tokens override purple button defaults across all 4 palettes x dark
       .locator('.theme-modes')
       .getByRole('button', { name: theme === 'light' ? 'Clair' : 'Sombre' })
       .click()
-    for (const palette of ['teal', 'lavender', 'ember', 'amoled']) {
+    for (const palette of ['classic', 'teal', 'lavender', 'ember', 'amoled']) {
       await page
         .locator('.theme-variants')
         .getByRole('button', { name: PALETTE_LABELS[palette] })
@@ -69,18 +83,48 @@ test('design tokens override purple button defaults across all 4 palettes x dark
         const actual = btn ? getComputedStyle(btn).backgroundColor : ''
         probe.remove()
         const meta = document.querySelector('meta[name="theme-color"]')?.getAttribute('content')
-        return { actual, expected, meta }
+        const topbar = document.querySelector('.app-topbar')
+        const sidebar = document.querySelector('.app-sidebar')
+        return {
+          actual,
+          expected,
+          meta,
+          bodyBg: getComputedStyle(document.body).backgroundColor,
+          bodyColor: getComputedStyle(document.body).color,
+          topbarBg: topbar ? getComputedStyle(topbar).backgroundColor : '',
+          sidebarBg: sidebar ? getComputedStyle(sidebar).backgroundColor : '',
+          lastBarSync: window.__syncedSystemBars.at(-1) || null,
+        }
       })
 
       expect(result.actual).toBe(result.expected)
       if (palette !== 'lavender') {
         expect(result.actual).not.toBe('rgb(113, 53, 217)')
       }
-      expect(result.meta).toBe(PALETTE_CHROME[theme][palette])
+      expect(result.meta).toBe(PALETTE_CHROME[theme][palette].bg)
+      expect(result.lastBarSync).toEqual({
+        statusHex: PALETTE_CHROME[theme][palette].bg,
+        navHex: PALETTE_CHROME[theme][palette].nav,
+        lightIcons: theme === 'light',
+      })
+      if (theme === 'dark' && palette === 'amoled') {
+        expect(result.bodyBg).toBe('rgb(0, 0, 0)')
+        expect(result.topbarBg).toBe('rgb(0, 0, 0)')
+        expect(result.sidebarBg).toBe('rgb(0, 0, 0)')
+        expect(result.bodyColor).toBe('rgb(255, 255, 255)')
+      }
+      if (theme === 'dark' && palette === 'classic') {
+        expect(result.bodyBg).toBe('rgb(27, 27, 31)')
+        expect(result.actual).toBe('rgb(176, 198, 255)')
+      }
+      if (theme === 'light' && palette === 'classic') {
+        expect(result.bodyBg).toBe('rgb(254, 251, 255)')
+        expect(result.actual).toBe('rgb(0, 88, 202)')
+      }
       seenAccents.add(`${theme}:${palette}:${result.actual}`)
     }
   }
-  expect(seenAccents.size).toBe(8)
+  expect(seenAccents.size).toBe(10)
 })
 
 test('platform attributes, desktop 2-col settings, collapsible rail, and back handler work', async ({

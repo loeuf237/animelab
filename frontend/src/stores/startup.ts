@@ -52,6 +52,9 @@ export const useStartupStore = defineStore('startup', () => {
       }
       continueStartup()
     } catch {
+      if (snapshot.value === null) {
+        setAppearance(themeMode.value, palette.value)
+      }
       if (current === generation)
         error.value = 'Impossible de joindre le serveur. Vous pouvez réessayer ou continuer.'
     } finally {

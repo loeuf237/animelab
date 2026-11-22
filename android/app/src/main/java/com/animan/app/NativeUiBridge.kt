@@ -45,6 +45,7 @@ class NativeUiBridge(
         fun applySavedChrome(
             activity: Activity,
             rootView: View,
+            webView: WebView? = null,
             loadingLayout: View? = null,
             loadingTitle: android.widget.TextView? = null,
             loadingStatus: android.widget.TextView? = null,
@@ -53,7 +54,17 @@ class NativeUiBridge(
             val statusHex = prefs.getString(KEY_STATUS_COLOR, "#0b1517") ?: "#0b1517"
             val navHex = prefs.getString(KEY_NAV_COLOR, "#0f1b1e") ?: "#0f1b1e"
             val lightIcons = prefs.getBoolean(KEY_LIGHT_ICONS, false)
-            applyColors(activity, rootView, statusHex, navHex, lightIcons, loadingLayout, loadingTitle, loadingStatus)
+            applyColors(
+                activity,
+                rootView,
+                statusHex,
+                navHex,
+                lightIcons,
+                webView,
+                loadingLayout,
+                loadingTitle,
+                loadingStatus,
+            )
         }
 
         private fun applyColors(
@@ -62,6 +73,7 @@ class NativeUiBridge(
             statusHex: String,
             navHex: String,
             lightIcons: Boolean,
+            webView: WebView? = null,
             loadingLayout: View? = null,
             loadingTitle: android.widget.TextView? = null,
             loadingStatus: android.widget.TextView? = null,
@@ -74,18 +86,35 @@ class NativeUiBridge(
                 window.statusBarColor = statusColor
                 window.navigationBarColor = navColor
             }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                window.isNavigationBarContrastEnforced = false
+                window.isStatusBarContrastEnforced = false
+            }
+            window.decorView.setBackgroundColor(statusColor)
             rootView.setBackgroundColor(statusColor)
+            webView?.setBackgroundColor(statusColor)
             WindowInsetsControllerCompat(window, window.decorView).apply {
                 isAppearanceLightStatusBars = lightIcons
                 isAppearanceLightNavigationBars = lightIcons
             }
             loadingLayout?.setBackgroundColor(statusColor)
-            if (lightIcons) {
-                loadingTitle?.setTextColor(Color.parseColor("#15282b"))
-                loadingStatus?.setTextColor(Color.parseColor("#465f64"))
-            } else {
-                loadingTitle?.setTextColor(Color.parseColor("#dce7e9"))
-                loadingStatus?.setTextColor(Color.parseColor("#afbec1"))
+            when {
+                lightIcons -> {
+                    loadingTitle?.setTextColor(Color.parseColor("#15282b"))
+                    loadingStatus?.setTextColor(Color.parseColor("#465f64"))
+                }
+                statusHex.equals("#000000", ignoreCase = true) -> {
+                    loadingTitle?.setTextColor(Color.parseColor("#ffffff"))
+                    loadingStatus?.setTextColor(Color.parseColor("#b0b0b0"))
+                }
+                statusHex.equals("#1b1b1f", ignoreCase = true) -> {
+                    loadingTitle?.setTextColor(Color.parseColor("#e3e2e6"))
+                    loadingStatus?.setTextColor(Color.parseColor("#c5c6d0"))
+                }
+                else -> {
+                    loadingTitle?.setTextColor(Color.parseColor("#dce7e9"))
+                    loadingStatus?.setTextColor(Color.parseColor("#afbec1"))
+                }
             }
         }
     }
@@ -98,7 +127,7 @@ class NativeUiBridge(
             if (activity.isDestroyed || activity.isFinishing) return@runOnUiThread
             if (!isLocalOrigin(webView.url)) return@runOnUiThread
             try {
-                applyColors(activity, rootView, statusHex, navHex, lightIcons)
+                applyColors(activity, rootView, statusHex, navHex, lightIcons, webView)
                 activity.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
                     .putString(KEY_STATUS_COLOR, statusHex)
                     .putString(KEY_NAV_COLOR, navHex)

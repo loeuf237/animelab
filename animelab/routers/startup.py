@@ -22,7 +22,7 @@ class Preferences(BaseModel):
     model_config = ConfigDict(extra='forbid')
     onboardingCompleted: bool | None = None
     theme: Literal['system', 'dark', 'light'] | None = None
-    palette: Literal['teal', 'lavender', 'ember', 'amoled'] | None = None
+    palette: Literal['classic', 'teal', 'lavender', 'ember', 'amoled'] | None = None
     checkUpdates: bool | None = None
     updateChannel: Literal['stable', 'beta'] | None = None
     lastSeenVersion: str | None = Field(default=None, max_length=64)
