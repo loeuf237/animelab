@@ -20,6 +20,7 @@ datas = [(str(project / 'animelab' / 'static'), 'animelab/static'),
          (str(project / 'animelab/desktop/panel.html'), 'animelab/desktop'),
          (str(project / 'animelab/desktop/panel.js'), 'animelab/desktop'),
          (str(project / 'animelab/desktop/panel.css'), 'animelab/desktop'),
+         (str(project / 'animelab/desktop/linux_gtk_window.py'), 'animelab/desktop'),
          (str(project / 'animelab/shared/web'), 'animelab/shared/web'),
          (str(project / 'animelab/services/seanime_shim.js'), 'animelab/services'),
          (str(project / 'docs' / 'desktop-distribution.md'), '.')]

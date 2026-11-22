@@ -312,3 +312,48 @@ def test_engine_does_not_survive_a_killed_supervisor(tmp_path):
         if process.poll() is None:
             process.kill()
             process.wait(timeout=5)
+
+
+def test_linux_gtk_window_helpers_validate_origin_and_title():
+    from animelab.desktop import linux_gtk_window
+
+    assert linux_gtk_window.get_local_origin('http://127.0.0.1:8080/spa/') == ('http', '127.0.0.1', 8080)
+    assert linux_gtk_window.get_local_origin('http://localhost:8080/') == ('http', 'localhost', 8080)
+    assert linux_gtk_window.get_local_origin('https://example.com/') is None
+    assert linux_gtk_window.get_local_origin('javascript:alert(1)') is None
+
+    normalized = linux_gtk_window.sanitize_title('  AnimeLab  \n\t  Demo  ')
+    assert normalized == 'AnimeLab Demo'
+    assert len(linux_gtk_window.sanitize_title('x' * 200)) == 120
+
+
+def test_linux_open_window_delegates_to_system_gtk_subprocess_when_inprocess_unavailable(monkeypatch):
+    monkeypatch.setattr(sys, 'platform', 'linux')
+    monkeypatch.setattr(window, '_has_inprocess_gtk_webview', lambda: False)
+    monkeypatch.setattr(window, '_has_inprocess_qt_webview', lambda: False)
+
+    calls = []
+    monkeypatch.setattr(
+        window,
+        '_open_linux_gtk_subprocess',
+        lambda **kwargs: calls.append(kwargs),
+    )
+
+    window.open_window(url='http://127.0.0.1:8080/spa/', control_url='http://127.0.0.1:9999/#tok', probe=True)
+    assert calls == [{
+        'url': 'http://127.0.0.1:8080/spa/',
+        'control_url': 'http://127.0.0.1:9999/#tok',
+        'workdir': None,
+        'probe': True,
+    }]
+
+    monkeypatch.setattr(window, '_has_inprocess_gtk_webview', lambda: False)
+    monkeypatch.setattr(window, '_has_inprocess_qt_webview', lambda: False)
+    monkeypatch.undo()
+    monkeypatch.setattr(sys, 'platform', 'linux')
+    monkeypatch.setattr(window, '_has_inprocess_gtk_webview', lambda: False)
+    monkeypatch.setattr(window, '_has_inprocess_qt_webview', lambda: False)
+    monkeypatch.setattr(window, '_find_system_gtk_python', lambda: None)
+
+    with pytest.raises(RuntimeError, match='GTK3/WebKit2GTK'):
+        window.open_window(url='http://127.0.0.1:8080/spa/')

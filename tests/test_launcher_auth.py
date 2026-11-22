@@ -153,7 +153,8 @@ def test_real_auth_controls_are_masked_and_nonpersisted(model, monkeypatch):
         assert ui.auth_configured and not field.isEnabled() and field.text() == ''
         assert ui.collect_config()['launcher']['authMode'] == 'accounts'
         assert PASSWORD not in json.dumps(ui.collect_config())
-        assert ui.palette().color(QPalette.ColorRole.WindowText).name() == '#000000'
+        expected_text = '#dce7e9' if ui.palette().color(QPalette.ColorRole.Window).lightness() < 128 else '#000000'
+        assert ui.palette().color(QPalette.ColorRole.WindowText).name() == expected_text
         assert ui.font().hintingPreference() == QFont.HintingPreference.PreferFullHinting
     finally:
         ui.closed = True

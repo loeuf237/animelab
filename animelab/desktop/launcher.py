@@ -219,6 +219,8 @@ class NativeLauncher(QWidget):
                     self.status_text.set(self.t('ready' if value.get('ready') else 'starting' if value.get('running') else 'offline'))
                     if value.get('portFallback'): self.status_text.set(self.status_text.get() + ' · ' + self.t('port_fallback'))
                     if value.get('pendingRestart'): self.status_text.set(self.status_text.get() + ' · ' + self.t('pending'))
+                    if value.get('nativeError') and not self.busy:
+                        self.notice_text.set(self.t('native_fallback'))
                     continue
                 self.busy = False
                 for item in self.action_buttons: item.setEnabled(True)
@@ -277,12 +279,12 @@ class NativeLauncher(QWidget):
             return
         if self.address.get() != '—' and not self.confirm('restart', 'restart_confirm'):
             return
-        def success(_):
+        def success(state):
             self.config = self.model.config()
             self.variables['browser'].set(self.config['browser'])
             self.variables['openUi'].set(self.config['launcher']['openUi'])
             self.rebuild()
-            self.note('started')
+            self.note('native_fallback' if isinstance(state, dict) and state.get('nativeError') else 'started')
         self.task(lambda: self.model.launch(values, native=native), success)
 
     def restart(self):
