@@ -564,6 +564,12 @@ async def test_image_proxy_coalesces_concurrent_requests_and_prunes_disk_cache(m
             calls.append((url, (headers or {}).get("Referer", "")))
             return SlowStreamResp()
 
+    monkeypatch.setattr(media, "validate_media_url", lambda u: u)
+
+    async def _always_safe(_url):
+        return True
+
+    monkeypatch.setattr(media, "is_safe_url_async", _always_safe)
     monkeypatch.setattr(media, "IMAGE_CACHE", OrderedDict())
     monkeypatch.setattr(media, "IMAGE_CACHE_CURRENT_BYTES", 0)
     monkeypatch.setattr(media, "IMAGE_DISK_CACHE_DIR", tmp_path)

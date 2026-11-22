@@ -16,6 +16,8 @@ async function moduleUrl(path, replacements = {}, transform = (s) => s) {
   code = code
     .replaceAll("'@/utils/locale'", JSON.stringify(localeUrl))
     .replaceAll("'@/stores/sourcePreferences'", JSON.stringify(sourcePreferencesUrl))
+    .replaceAll("'@/utils/media'", JSON.stringify(mediaUtilsUrl))
+    .replaceAll('"@/utils/media"', JSON.stringify(mediaUtilsUrl))
   return inline(code)
 }
 const localeSource = await readFile(new URL('../src/utils/locale.ts', import.meta.url), 'utf8')
@@ -31,10 +33,12 @@ const localeCode = ts
 const localeUrl = `data:text/javascript;base64,${Buffer.from(localeCode).toString('base64')}`
 // The preference module needs only the already initialized locale.
 let sourcePreferencesUrl = ''
+let mediaUtilsUrl = ''
 sourcePreferencesUrl = await moduleUrl('../src/stores/sourcePreferences.ts', {
   vue: import.meta.resolve('vue'),
   pinia: import.meta.resolve('pinia'),
 })
+mediaUtilsUrl = await moduleUrl('../src/utils/media.ts')
 
 const apiUrl = await moduleUrl('../src/api/client.ts')
 const { api, ApiError } = await import(apiUrl)

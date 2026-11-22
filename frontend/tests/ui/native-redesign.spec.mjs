@@ -356,6 +356,7 @@ test('VoirAnime posters route through image-proxy and direct cover errors fall b
         sourceName: 'VoirAnime',
         isFavorite: false,
         autoDownload: false,
+        watchedEpisodes: [],
         anime: {
           title: 'Sousou no Frieren',
           imageUrl: vaPoster,
