@@ -1,5 +1,5 @@
 // Vue SPA only. Changing the namespace also removes cached Jinja pages on upgrade.
-const CACHE_NAME = "animelab-cache-v0.1.0-spa-only-1";
+const CACHE_NAME = "animelab-cache-v0.1.7-seanime-1";
 const PRECACHE_ASSETS = [
   "/offline.html",
   "/manifest.json",
@@ -70,7 +70,7 @@ self.addEventListener("fetch", (event) => {
   }
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request).catch(
+      fetch(request, { cache: "no-store" }).catch(
         async () =>
           (await caches.match("/offline.html")) ||
           new Response("AnimeLab - Offline", { status: 503 }),

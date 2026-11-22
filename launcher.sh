@@ -31,7 +31,7 @@ if [[ -z "$UV_BIN" ]]; then
     exit 1
 fi
 
-if [[ ! -f frontend/dist/index.html ]]; then
+if [[ ! -f frontend/dist/index.html ]] || [[ -n "$(find frontend/src frontend/index.html frontend/package.json frontend/vite.config.ts -newer frontend/dist/index.html 2>/dev/null | head -n 1)" ]]; then
     if ! command -v npm >/dev/null 2>&1; then
         echo "Erreur : l'interface doit être compilée. Installer Node.js 22 (22.13+) et npm, puis relancer ce script." >&2
         exit 1

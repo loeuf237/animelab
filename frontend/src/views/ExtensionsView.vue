@@ -1351,8 +1351,27 @@ onMounted(() => {
 }
 .ecosystem-tabs {
   display: inline-flex;
+  align-items: center;
   gap: 8px;
-  margin-bottom: 18px;
+  margin: 4px 0 20px;
+  padding: 6px;
+  border-radius: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
   flex-wrap: wrap;
+}
+.ecosystem-tabs .tab-btn {
+  min-height: 38px;
+  padding: 8px 18px;
+  border-radius: 10px;
+  border-bottom: 2px solid transparent;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ecosystem-tabs .tab-btn.active {
+  background: rgba(20, 184, 166, 0.14);
+  color: var(--accent);
+  border-bottom-color: var(--accent);
 }
 </style>

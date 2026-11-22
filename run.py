@@ -273,7 +273,10 @@ if (frontend_dist / "assets").exists():
 async def serve_spa_page():
     index_file = frontend_dist / "index.html"
     if index_file.exists():
-        return FileResponse(index_file)
+        return FileResponse(
+            index_file,
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        )
     return JSONResponse(
         status_code=404,
         content={"error": "Build SPA non trouvé. Exécutez 'npm run build' dans frontend/."}
