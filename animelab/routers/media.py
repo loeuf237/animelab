@@ -396,6 +396,7 @@ async def resolve_stream(
     server_type = server or "auto"
     selected_quality = quality or "auto"
     qualities_dict: Dict[str, str] = {}
+    available_servers: List[str] = []
     tracks: List[Dict[str, Any]] = []
     native_media = None
 
@@ -437,7 +438,14 @@ async def resolve_stream(
 
     if container_source:
         try:
-            container_sources = await container_source.get_episode_sources(episodeUrl)
+            if getattr(container_source, 'runtime', '') == 'seanime':
+                pref_srv = server if (server and server != "auto") else None
+                container_sources = await container_source.get_episode_sources(
+                    episodeUrl,
+                    preferred_server=pref_srv,
+                )
+            else:
+                container_sources = await container_source.get_episode_sources(episodeUrl)
         except (VerificationRequired, APIProblem):
             raise
         except Exception as e:
@@ -448,10 +456,16 @@ async def resolve_stream(
             for idx, vs in enumerate(container_sources):
                 srv_name = vs.get("server") if isinstance(vs, dict) else getattr(vs, "server", None)
                 q_name = vs.get("quality") if isinstance(vs, dict) else getattr(vs, "quality", None)
+                if srv_name and str(srv_name) not in available_servers:
+                    available_servers.append(str(srv_name))
                 label = srv_name or q_name or f"Serveur {idx + 1}"
                 v_url = vs.get("url") if isinstance(vs, dict) else getattr(vs, "url", "")
                 if label not in qualities_dict:
                     qualities_dict[label] = v_url
+            if getattr(container_source, 'runtime', '') == 'seanime':
+                for srv_name in getattr(container_source, 'episode_servers', []) or []:
+                    if srv_name and str(srv_name) not in available_servers:
+                        available_servers.append(str(srv_name))
 
             # Priorité au serveur demandé s'il est spécifié
             candidates = list(container_sources)
@@ -645,7 +659,7 @@ async def resolve_stream(
         # et garantir le fonctionnement fluide des Range requests (seeking) sans blocage CORS / 403
         video_url = f"/api/media/stream-proxy?url={urllib.parse.quote(video_url)}&server={urllib.parse.quote(server_type or 'imported')}"
 
-    return {
+    payload: Dict[str, Any] = {
         "success": True,
         "isDownloaded": False,
         "sourceType": "remote",
@@ -656,6 +670,9 @@ async def resolve_stream(
         "title": f"{animeName} - Épisode {episodeNumber}",
         "subtitles": tracks,
     }
+    if available_servers:
+        payload["availableServers"] = available_servers
+    return payload
 
 @router.api_route("/api/media/stream/{task_id}", methods=["GET", "HEAD"])
 async def stream_video(task_id: str, request: Request, range: Optional[str] = Header(None)):

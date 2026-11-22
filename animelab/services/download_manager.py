@@ -640,7 +640,13 @@ class DownloadManagerService:
                     target = None
                     if matched_container and (not is_known_embed or parsed_u.fragment or getattr(matched_container, 'runtime', '') in ('android-apk', 'seanime')):
                         try:
-                            video_sources = await matched_container.get_episode_sources(download_page_url)
+                            if getattr(matched_container, 'runtime', '') == 'seanime':
+                                video_sources = await matched_container.get_episode_sources(
+                                    download_page_url,
+                                    preferred_server=preferred_server,
+                                )
+                            else:
+                                video_sources = await matched_container.get_episode_sources(download_page_url)
                         except VerificationRequired:
                             raise
                         except Exception as e:

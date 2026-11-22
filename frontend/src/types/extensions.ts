@@ -181,5 +181,6 @@ export interface SeanimeDiagnoseResult {
   stream_count: number
   ok?: boolean
   error?: string | null
+  logs?: string[]
   duration_ms: number
 }

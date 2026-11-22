@@ -1111,8 +1111,7 @@
           var rest = html.slice(i);
           var m = closeRe.exec(rest);
           var rawText = m ? rest.slice(0, m.index) : rest;
-          if (rawText) pushChild({ type: 'text', data: rawText, parent: elem });
-          elem.children.forEach(function (ch) { ch.parent = elem; });
+          if (rawText) elem.children.push({ type: 'text', data: rawText, parent: elem });
           i = m ? i + m.index + m[0].length : n;
         }
       } else if (!selfClosing && !VOID_TAGS[tag]) {
@@ -1568,7 +1567,9 @@
       },
       each: function (fn) {
         if (typeof fn === 'function') {
-          for (var i = 0; i < list.length; i++) fn(i, wrapSelection([list[i]], sel));
+          for (var i = 0; i < list.length; i++) {
+            if (fn(i, wrapSelection([list[i]], sel)) === false) break;
+          }
         }
         return undefined;
       },
@@ -1760,9 +1761,135 @@
   };
 
   // --- Network fetch ---
+  if (typeof global.Headers === 'undefined') {
+    global.Headers = function Headers(init) {
+      this._map = Object.create(null);
+      if (init) {
+        if (Array.isArray(init)) {
+          for (var i = 0; i < init.length; i++) {
+            if (Array.isArray(init[i]) && init[i].length >= 2) {
+              this.append(init[i][0], init[i][1]);
+            }
+          }
+        } else if (typeof init.forEach === 'function') {
+          var self = this;
+          init.forEach(function (v, k) { self.append(k, v); });
+        } else if (typeof init === 'object') {
+          var keys = Object.keys(init);
+          for (var j = 0; j < keys.length; j++) {
+            if (init[keys[j]] !== undefined) this.set(keys[j], init[keys[j]]);
+          }
+        }
+      }
+    };
+    global.Headers.prototype.get = function (name) {
+      var lk = String(name || '').toLowerCase();
+      return Object.prototype.hasOwnProperty.call(this._map, lk) ? this._map[lk][1] : null;
+    };
+    global.Headers.prototype.set = function (name, value) {
+      var k = String(name || '');
+      this._map[k.toLowerCase()] = [k, String(value == null ? '' : value)];
+    };
+    global.Headers.prototype.append = function (name, value) {
+      var k = String(name || '');
+      var lk = k.toLowerCase();
+      var v = String(value == null ? '' : value);
+      if (Object.prototype.hasOwnProperty.call(this._map, lk)) {
+        this._map[lk][1] = this._map[lk][1] + ', ' + v;
+      } else {
+        this._map[lk] = [k, v];
+      }
+    };
+    global.Headers.prototype.has = function (name) {
+      return Object.prototype.hasOwnProperty.call(this._map, String(name || '').toLowerCase());
+    };
+    global.Headers.prototype.delete = function (name) {
+      delete this._map[String(name || '').toLowerCase()];
+    };
+    global.Headers.prototype.forEach = function (cb, thisArg) {
+      var keys = Object.keys(this._map);
+      for (var i = 0; i < keys.length; i++) {
+        var pair = this._map[keys[i]];
+        cb.call(thisArg, pair[1], pair[0], this);
+      }
+    };
+    global.Headers.prototype.entries = function () {
+      var out = [];
+      this.forEach(function (v, k) { out.push([k, v]); });
+      return out[Symbol.iterator]();
+    };
+    global.Headers.prototype[Symbol.iterator] = global.Headers.prototype.entries;
+  }
+
+  if (typeof global.AbortSignal === 'undefined') {
+    global.AbortSignal = function AbortSignal() {
+      this.aborted = false;
+      this.reason = undefined;
+      this.onabort = null;
+      this._listeners = [];
+    };
+    global.AbortSignal.prototype.addEventListener = function (type, listener) {
+      if (type === 'abort' && typeof listener === 'function' && this._listeners.indexOf(listener) === -1) {
+        this._listeners.push(listener);
+      }
+    };
+    global.AbortSignal.prototype.removeEventListener = function (type, listener) {
+      if (type === 'abort') {
+        this._listeners = this._listeners.filter(function (fn) { return fn !== listener; });
+      }
+    };
+    global.AbortSignal.prototype.throwIfAborted = function () {
+      if (this.aborted) {
+        throw this.reason !== undefined ? this.reason : new Error('AbortError: The operation was aborted.');
+      }
+    };
+    global.AbortSignal.prototype._abort = function (reason) {
+      if (this.aborted) return;
+      this.aborted = true;
+      this.reason = reason !== undefined ? reason : new Error('AbortError: The operation was aborted.');
+      var ev = { type: 'abort', target: this };
+      if (typeof this.onabort === 'function') {
+        try { this.onabort(ev); } catch (_e) {}
+      }
+      var list = this._listeners.slice();
+      for (var i = 0; i < list.length; i++) {
+        try { list[i].call(this, ev); } catch (_e) {}
+      }
+    };
+    global.AbortSignal.abort = function (reason) {
+      var s = new global.AbortSignal();
+      s._abort(reason);
+      return s;
+    };
+    global.AbortSignal.timeout = function (ms) {
+      var s = new global.AbortSignal();
+      if (typeof global.setTimeout === 'function') {
+        global.setTimeout(function () {
+          s._abort(new Error('TimeoutError: The operation timed out.'));
+        }, Math.max(0, Number(ms) || 0));
+      }
+      return s;
+    };
+  }
+
+  if (typeof global.AbortController === 'undefined') {
+    global.AbortController = function AbortController() {
+      this.signal = new global.AbortSignal();
+    };
+    global.AbortController.prototype.abort = function (reason) {
+      this.signal._abort(reason);
+    };
+  }
+
   function normalizeHeadersInput(rawHeaders) {
     var out = {};
     if (!rawHeaders || typeof rawHeaders !== 'object') return out;
+    if (typeof rawHeaders.forEach === 'function') {
+      rawHeaders.forEach(function (value, key) {
+        if (key != null && value != null) out[String(key)] = String(value);
+      });
+      return out;
+    }
     var keys = Object.keys(rawHeaders);
     for (var i = 0; i < keys.length; i++) {
       var k = keys[i];
@@ -1811,11 +1938,14 @@
       throw new Error('Seanime network host bridge is not initialized');
     }
     init = init || {};
+    if (init.signal && init.signal.aborted) {
+      throw new Error('AbortError: The operation was aborted.');
+    }
     var req = {
       url: String(url),
       method: String(init.method || 'GET').toUpperCase(),
       headers: normalizeHeadersInput(init.headers),
-      timeout: Number(init.timeout) > 0 ? Number(init.timeout) : 35,
+      timeout: Number(init.timeout) > 0 ? Number(init.timeout) : 20,
       redirect: String(init.redirect || 'follow'),
       noCloudflareBypass: Boolean(init.noCloudflareBypass),
     };

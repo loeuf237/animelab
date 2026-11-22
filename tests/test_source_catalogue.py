@@ -16,6 +16,7 @@ from animelab.services.source_http import VerificationRequired
 from animelab.services.aniyomi_container import AniyomiContainerSource
 from animelab.services.aniyomi_dex_parser import SourceRecipe
 from animelab.services.extension_service import extension_service
+from animelab.services.seanime_service import seanime_service
 
 
 @pytest.mark.parametrize('endpoint', ['catalogue?mode=search&q=bleach', 'filters'])
@@ -53,6 +54,8 @@ def providers(monkeypatch):
         monkeypatch.setattr(service, 'search_anime', AsyncMock(return_value=[]))
     monkeypatch.setattr(extension_service, 'get_enabled_container_sources', lambda: [])
     monkeypatch.setattr(extension_service, 'get_container_source_by_id', lambda sid: None)
+    monkeypatch.setattr(seanime_service, 'get_enabled_sources', lambda: [])
+    monkeypatch.setattr(seanime_service, 'get_source_by_id', lambda sid: None)
     return TestClient(app)
 
 
@@ -115,6 +118,8 @@ def catalogue(monkeypatch):
     service = SourceCatalogueService()
     monkeypatch.setattr(extension_service, 'get_visible_extensions', lambda: [])
     monkeypatch.setattr(extension_service, 'get_enabled_container_sources', lambda: [])
+    monkeypatch.setattr(seanime_service, 'get_enabled_sources', lambda: [])
+    monkeypatch.setattr(seanime_service, 'get_source_by_id', lambda sid: None)
     return service
 
 

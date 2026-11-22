@@ -75,6 +75,7 @@ def problem_for(status, payload, path='', *, category=None):
 
 
 def install_error_handlers(app):
+    from animelab.services.seanime_runtime import SeanimeRuntimeError
     from animelab.services.source_http import VerificationRequired, RateLimited, SourceNetworkError
 
     @app.exception_handler(APIProblem)
@@ -100,6 +101,10 @@ def install_error_handlers(app):
     async def rate_limit(request, exc):
         return JSONResponse(status_code=429, content={'error': MESSAGES['rate_limit'], 'code': 'rate_limited',
                             'retryAfter': exc.retry_after}, headers={'Retry-After': str(max(1, int(exc.retry_after)))})
+
+    @app.exception_handler(SeanimeRuntimeError)
+    async def seanime_runtime_error(request, exc):
+        return JSONResponse(status_code=502, content={'error': str(exc), 'code': 'upstream_error'})
 
     @app.exception_handler(httpx.RequestError)
     async def network_error(request, exc):

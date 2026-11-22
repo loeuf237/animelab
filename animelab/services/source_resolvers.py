@@ -63,7 +63,13 @@ async def resolve_imported(ctx, task, direct_url, skip_local):
     # Recipes can attach all alternate players to a known embed in its fragment.
     # Let the selected recipe expand that reference before choosing an extractor.
     if matched_container and (native or not is_known_embed or urlparse(target_url).fragment):
-        video_sources = await matched_container.get_episode_sources(target_url)
+        if getattr(matched_container, 'runtime', '') == 'seanime':
+            video_sources = await matched_container.get_episode_sources(
+                target_url,
+                preferred_server=task.selectedServer,
+            )
+        else:
+            video_sources = await matched_container.get_episode_sources(target_url)
     from animelab.services.extension_media import prioritize_candidates
     candidates = prioritize_candidates(video_sources, task.selectedServer, task.selectedQuality)
     if not candidates and not native:
@@ -88,7 +94,8 @@ async def resolve_imported(ctx, task, direct_url, skip_local):
         if native:
             if failures:
                 raise failures[0]
-            raise ValueError('Cette extension APK n’a renvoyé aucun flux vidéo pour cet épisode.')
+            kind = 'Seanime' if getattr(matched_container, 'runtime', '') == 'seanime' else 'APK'
+            raise ValueError(f'Cette extension {kind} n’a renvoyé aucun flux vidéo pour cet épisode.')
         clean_t = target_url.split('#')[0].strip()
         if re.search(r'\.(mp4|m3u8|webm|mkv)(\?.*)?$', clean_t, re.IGNORECASE):
             resolved = {'videoUrl': clean_t, 'serverType': 'direct', 'selectedQuality': task.selectedQuality or 'HD'}

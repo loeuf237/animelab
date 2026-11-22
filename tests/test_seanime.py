@@ -618,3 +618,388 @@ async def test_swallowed_verification_required_bubbles_on_empty_result():
             method="search",
             args=[{"query": "naruto"}],
         )
+
+
+@pytest.mark.asyncio
+async def test_shim_script_style_each_headers_abort_and_placeholders():
+    from animelab.services.seanime_runtime import apply_user_config_placeholders
+
+    captured_headers: list[dict[str, str]] = []
+
+    class CaptureClient:
+        def __init__(self, **kwargs):
+            captured_headers.append(dict(kwargs.get("headers") or {}))
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return False
+
+        async def request(self, method: str, url: str, **_kwargs):
+            return httpx.Response(200, json={"ok": True}, request=httpx.Request(method, url))
+
+    provider_js = """
+    class Provider {
+      async checkAll() {
+        const html = '<html><head><style>.a { color: red; }</style></head><body>' +
+          '<script>var eps1 = ["lien:1"];</script>' +
+          '<ul><li>One</li><li>Two</li><li>Three</li></ul>' +
+          '</body></html>';
+        const $ = LoadDoc(html);
+        const scriptText = $('script').first().text().trim();
+        const styleText = $('style').first().text().trim();
+
+        const visited = [];
+        $('li').each((_, el) => {
+          visited.push(el.text());
+          if (el.text() === 'Two') return false;
+        });
+
+        const hdrs = new Headers({ 'X-First': '1' });
+        hdrs.append('X-First', '2');
+        hdrs.set('X-Token', '{{apiKey}}');
+        const res = await fetch('{{domain}}/ping', { headers: hdrs });
+        const pingData = res.json();
+
+        const ctrl = new AbortController();
+        ctrl.abort();
+        let abortedErr = '';
+        try {
+          await fetch('{{domain}}/aborted', { signal: ctrl.signal });
+        } catch (err) {
+          abortedErr = err.message;
+        }
+
+        const literalUnrelated = '{{") || url.includes("}}';
+        return { scriptText, styleText, visited, pingOk: pingData.ok, abortedErr, literalUnrelated };
+      }
+    }
+    """
+    rendered = apply_user_config_placeholders(
+        provider_js,
+        {"apiKey": "secret-123"},
+        {"domain": "https://mirror.example.org", "apiKey": ""},
+    )
+    assert "{{domain}}" not in rendered
+    assert "{{apiKey}}" not in rendered
+    assert '{{") || url.includes("}}' in rendered
+
+    rt = MiniRacerSeanimeRuntime(client_factory=CaptureClient)
+    result, _, _logs = await rt.invoke(
+        extension_id="shim-fixes",
+        source=provider_js,
+        language="javascript",
+        method="checkAll",
+        user_config={"apiKey": "secret-123"},
+        defaults={"domain": "https://mirror.example.org", "apiKey": ""},
+    )
+    assert result["scriptText"] == 'var eps1 = ["lien:1"];'
+    assert result["styleText"] == ".a { color: red; }"
+    assert result["visited"] == ["One", "Two"]
+    assert result["pingOk"] is True
+    assert "Abort" in result["abortedErr"]
+    assert result["literalUnrelated"] == '{{") || url.includes("}}'
+    assert captured_headers[0]["X-First"] == "1, 2"
+    assert captured_headers[0]["X-Token"] == "secret-123"
+
+
+@pytest.mark.asyncio
+async def test_source_no_results_fast_server_return_canonical_pref_and_diagnose(tmp_path):
+    import time as time_mod
+    from animelab.services.seanime_source import SeanimeSource
+
+    class SlowServerClient:
+        def __init__(self, **_kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return False
+
+        async def request(self, method: str, url: str, **_kwargs):
+            if "hang" in url:
+                await asyncio.sleep(10.0)
+            return httpx.Response(200, json={"url": "https://cdn.example.org/fast.m3u8"}, request=httpx.Request(method, url))
+
+    rt = MiniRacerSeanimeRuntime(client_factory=SlowServerClient)
+    db_file = str(tmp_path / "source_unit.db")
+    init_db(db_file)
+
+    provider_code = """
+    class Provider {
+      getSettings() {
+        return { episodeServers: ['VidCloud', 'HangingServer'], supportsDub: false };
+      }
+      async search(opts) {
+        console.log('search query=' + opts.query);
+        if (opts.query === 'empty') {
+          throw new Error('No results found');
+        }
+        return [{ id: opts.query, title: 'Hit', url: '', subOrDub: 'sub' }];
+      }
+      async findEpisodes(id) {
+        if (id === 'no-eps') return [];
+        return [{ id: 'ep-1', number: 1, url: '', title: 'Ep 1' }];
+      }
+      async findEpisodeServer(ep, server) {
+        console.log('server=' + server);
+        if (server === 'HangingServer') {
+          await fetch('https://hang.example.org/embed');
+          return { server, headers: {}, videoSources: [] };
+        }
+        if (ep.id === 'ep-1' && server === 'VidCloud') {
+          if (ep.url === 'no-streams') return { server, headers: {}, videoSources: [] };
+          return {
+            server,
+            headers: {},
+            videoSources: [{ url: 'https://cdn.example.org/video.m3u8', type: 'hls', quality: '1080p', subtitles: [] }],
+          };
+        }
+        return { server, headers: {}, videoSources: [] };
+      }
+    }
+    """
+    src = SeanimeSource(
+        db_path=db_file,
+        extension_id="fast-test",
+        name="Fast Test",
+        runtime_backend=rt,
+        state_loader=lambda _eid: {
+            "payload": provider_code,
+            "language": "javascript",
+            "saved_config": {},
+            "defaults": {},
+            "store": {},
+        },
+        store_saver=lambda _eid, _s: None,
+    )
+
+    # 1. "No results found" maps to [] instead of bubbling 500
+    assert await src.search_anime("empty") == []
+
+    # 2. Fast-return cancels hanging sibling server within ~3s grace window
+    t0 = time_mod.monotonic()
+    cands = await src.get_episode_sources("https://seanime.local/fast-test/episode/ep-1")
+    elapsed = time_mod.monotonic() - t0
+    assert len(cands) == 1
+    assert cands[0]["server"] == "VidCloud"
+    assert elapsed < 5.5
+
+    # 3. Canonical casing match for preferred_server returns immediately without touching HangingServer
+    t1 = time_mod.monotonic()
+    pref_cands = await src.get_episode_sources(
+        "https://seanime.local/fast-test/episode/ep-1",
+        preferred_server="vidcloud",
+    )
+    assert len(pref_cands) == 1
+    assert pref_cands[0]["server"] == "VidCloud"
+    assert (time_mod.monotonic() - t1) < 1.5
+
+    # 4. diagnose() reports ok=False + clear error when episode_count == 0
+    diag_no_eps = await src.diagnose("no-eps")
+    assert diag_no_eps["ok"] is False
+    assert diag_no_eps["search_count"] == 1
+    assert diag_no_eps["episode_count"] == 0
+    assert diag_no_eps["error"]
+    assert any("search query=no-eps" in line for line in diag_no_eps["logs"])
+
+
+@pytest.mark.asyncio
+async def test_anilist_enrichment_and_502_on_runtime_error(tmp_path, monkeypatch):
+    import animelab.routers.anime as anime_router
+    import animelab.services.seanime_service as seanime_mod
+    import animelab.services.seanime_source as source_mod
+    import animelab.services.source_catalogue as cat_mod
+    from animelab.config import settings
+    from animelab.services.source_registry import SourceRegistry
+
+    db_file = tmp_path / "err_502.db"
+    init_db(db_file)
+    monkeypatch.setattr(settings, "DATABASE_PATH", str(db_file))
+
+    captured_media: list[dict] = []
+    manifest_failing = _make_manifest(
+        ext_id="broken-src",
+        language="javascript",
+        payload="""
+        class Provider {
+          getSettings() { return { episodeServers: ['default'], supportsDub: false }; }
+          async search(opts) {
+            if (opts.media && opts.media.id === 9999) {
+              return [{ id: '9999', title: 'AniList Hit', url: '', subOrDub: 'sub' }];
+            }
+            throw new Error('Upstream provider crashed');
+          }
+          async findEpisodes() { return []; }
+          async findEpisodeServer() { return { server: 'default', headers: {}, videoSources: [] }; }
+        }
+        """,
+    )
+
+    runtime = MiniRacerSeanimeRuntime()
+    service = SeanimeExtensionService(db_path=str(db_file), runtime=runtime)
+
+    async def fake_fetch_bytes(_url: str, _max_bytes: int) -> bytes:
+        return json.dumps(manifest_failing).encode()
+
+    monkeypatch.setattr(service, "_fetch_bytes", fake_fetch_bytes)
+    monkeypatch.setattr(seanime_mod, "seanime_service", service)
+    test_registry = SourceRegistry(
+        natives={},
+        extensions=SimpleNamespace(
+            get_enabled_container_sources=lambda: [],
+            get_container_source_by_id=lambda _sid: None,
+        ),
+        seanime=service,
+    )
+    monkeypatch.setattr(anime_router, "source_registry", test_registry)
+    monkeypatch.setattr(cat_mod, "source_registry", test_registry)
+
+    await service.import_repository("https://repo.example.org/broken.json")
+    await service.install_extension("broken-src", enable=True)
+
+    # First verify AniList helper hook populates opts.media.id when provider references media.id
+    async def fake_anilist(query: str):
+        captured_media.append({"q": query})
+        return {
+            "id": 9999,
+            "idMal": 8888,
+            "status": "FINISHED",
+            "format": "TV",
+            "englishTitle": "Test Title",
+            "romajiTitle": "Test Romaji",
+            "synonyms": ["Alias"],
+            "isAdult": False,
+            "episodeCount": 12,
+            "startDate": {"year": 2020, "month": 4, "day": 1},
+        }
+
+    monkeypatch.setattr(source_mod, "_lookup_anilist_media", fake_anilist)
+    src = service.get_source_by_id("seanime:broken-src")
+    hits = await src.search_anime("naruto")
+    assert len(hits) == 1
+    assert hits[0].id == "9999"
+    assert captured_media == [{"q": "naruto"}]
+
+    # Now make AniList return None so provider throws Error -> router returns 502 (not 500)
+    async def no_anilist(_query: str):
+        return None
+
+    monkeypatch.setattr(source_mod, "_lookup_anilist_media", no_anilist)
+    with TestClient(app) as client:
+        r_cat = client.get("/api/sources/seanime:broken-src/catalogue", params={"mode": "search", "q": "boom"})
+        assert r_cat.status_code == 502, r_cat.text
+
+        r_stream = client.get("/api/sources/seanime:broken-src/catalogue/stream", params={"mode": "search", "q": "boom"})
+        assert r_stream.status_code == 200
+        events = [json.loads(line) for line in r_stream.text.splitlines() if line.strip()]
+        assert any(ev.get("type") == "error" and ev.get("status") == 502 for ev in events)
+
+
+@pytest.mark.asyncio
+async def test_detail_returns_502_on_seanime_error_and_non_seanime_stream_resolves(tmp_path, monkeypatch):
+    import animelab.routers.anime as anime_router
+    import animelab.routers.media as media_router
+    import animelab.services.seanime_service as seanime_mod
+    from animelab.config import settings
+    from animelab.services.library_service import library_service
+    from animelab.services.source_registry import SourceRegistry
+
+    db_file = tmp_path / "detail_502_and_apk.db"
+    init_db(db_file)
+    monkeypatch.setattr(settings, "DATABASE_PATH", str(db_file))
+    monkeypatch.setattr(library_service, "find_downloaded_episode", lambda **_kw: None)
+
+    manifest = _make_manifest(
+        ext_id="detail-boom",
+        language="javascript",
+        payload="""
+        class Provider {
+          getSettings() { return { episodeServers: ['default'], supportsDub: false }; }
+          async search() { return []; }
+          async findEpisodes() { throw new Error('Detail upstream failed'); }
+          async findEpisodeServer() { return { server: 'default', headers: {}, videoSources: [] }; }
+        }
+        """,
+    )
+    runtime = MiniRacerSeanimeRuntime()
+    service = SeanimeExtensionService(db_path=str(db_file), runtime=runtime)
+
+    async def fake_fetch_bytes(_url: str, _max_bytes: int) -> bytes:
+        return json.dumps(manifest).encode()
+
+    monkeypatch.setattr(service, "_fetch_bytes", fake_fetch_bytes)
+    monkeypatch.setattr(seanime_mod, "seanime_service", service)
+    test_registry = SourceRegistry(
+        natives={},
+        extensions=SimpleNamespace(
+            get_enabled_container_sources=lambda: [],
+            get_container_source_by_id=lambda _sid: None,
+        ),
+        seanime=service,
+    )
+    monkeypatch.setattr(anime_router, "source_registry", test_registry)
+
+    await service.import_repository("https://repo.example.org/detail_boom.json")
+    await service.install_extension("detail-boom", enable=True)
+
+    # Non-Seanime container source (e.g., android-apk) must still resolve candidates in media.py
+    class FakeApkContainer:
+        runtime = "android-apk"
+        name = "Fake APK"
+        base_url = "https://apk.example.org"
+
+        async def get_episode_sources(self, _episode_url: str):
+            return [
+                {
+                    "url": "https://cdn.example.org/ep1.m3u8",
+                    "server": "ApkServer",
+                    "quality": "1080p",
+                }
+            ]
+
+        async def resolve_candidate(self, cand: dict):
+            return {
+                "videoUrl": cand["url"],
+                "headers": {"Referer": "https://apk.example.org/"},
+                "subtitles": [],
+                "serverType": cand["server"],
+                "selectedQuality": cand["quality"],
+                "unsupportedArguments": False,
+                "audioTracks": [],
+            }
+
+    monkeypatch.setattr(
+        media_router.extension_service,
+        "get_container_source_by_id",
+        lambda sid: FakeApkContainer() if sid == "ext:fake-apk" else None,
+    )
+
+    with TestClient(app) as client:
+        r_detail = client.get(
+            "/api/anime/detail",
+            params={"url": "https://seanime.local/detail-boom/anime/123", "source": "seanime:detail-boom"},
+        )
+        assert r_detail.status_code == 502, r_detail.text
+        detail_err = r_detail.json()
+        assert detail_err["code"] == "upstream_error"
+        assert detail_err["problem"]["category"] == "network"
+
+        r_apk = client.get(
+            "/api/media/stream/resolve",
+            params={
+                "animeName": "Test",
+                "episodeNumber": 1,
+                "episodeUrl": "https://apk.example.org/watch/1",
+                "source": "ext:fake-apk",
+            },
+        )
+        assert r_apk.status_code == 200, r_apk.text
+        apk_json = r_apk.json()
+        assert apk_json["success"] is True
+        assert "/api/media/extension-resource/" in apk_json["streamUrl"]
+        assert apk_json["serverType"] == "ApkServer"
+

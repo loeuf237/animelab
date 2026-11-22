@@ -598,10 +598,17 @@ class SeanimeExtensionService:
                 f"Type Seanime '{full['ext_type']}' non pris en charge (onlinestream-provider uniquement)."
             )
 
+        saved_config = _safe_json_loads(row["saved_config_json"], {})
+        defaults = _build_defaults(full["user_config"])
+        for k, v in defaults.items():
+            saved_config.setdefault(k, v)
+
         ok, syntax_err = self.runtime.validate_syntax(
             full["payload"],
             language=full["language"],
             extension_id=full["ext_id"],
+            user_config=saved_config,
+            defaults=defaults,
         )
         if not ok:
             with sqlite_connection(self.db_path) as conn:
@@ -610,11 +617,6 @@ class SeanimeExtensionService:
                     (syntax_err, row["id"]),
                 )
             raise ValueError(f"Validation JS/TS échouée pour {ext_id} : {syntax_err}")
-
-        saved_config = _safe_json_loads(row["saved_config_json"], {})
-        defaults = _build_defaults(full["user_config"])
-        for k, v in defaults.items():
-            saved_config.setdefault(k, v)
 
         with sqlite_connection(self.db_path) as conn:
             conn.execute(
@@ -819,9 +821,10 @@ class SeanimeExtensionService:
                 elif v is not None:
                     clean_values[key] = str(v)[:4096]
             conn.execute(
-                "UPDATE seanime_extensions SET saved_config_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                "UPDATE seanime_extensions SET saved_config_json = ?, last_error = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 (json.dumps(clean_values, ensure_ascii=False), row["id"]),
             )
+        self.runtime.clear_store(ext_id)
         return self.get_user_config(ext_id)
 
     def _load_source_state(self, ext_id: str) -> dict[str, Any]:

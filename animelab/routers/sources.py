@@ -8,6 +8,7 @@ import httpx
 from fastapi import APIRouter, Request, HTTPException, Query
 from fastapi.responses import JSONResponse, StreamingResponse
 
+from animelab.services.seanime_runtime import SeanimeRuntimeError
 from animelab.services.source_settings_service import source_settings_service
 from animelab.services.source_catalogue import source_catalogue, CatalogueError
 
@@ -46,6 +47,8 @@ async def browse_catalogue(source_id: str, mode: str = 'latest', q: str = Query(
         if native_filters is not None and not isinstance(native_filters,list):
             raise CatalogueError('Format des filtres APK invalide.')
         return await source_catalogue.browse(source_id, mode, q, tags, order, cursor,native_filters)
+    except SeanimeRuntimeError as exc:
+        raise HTTPException(502, str(exc)) from exc
     except CatalogueError as exc:
         raise HTTPException(400, str(exc)) from exc
     except (ValueError,RecursionError) as exc:
@@ -93,6 +96,10 @@ async def stream_catalogue(
             yield json.dumps(payload, ensure_ascii=False) + "\n"
         except APIProblem as exc:
             payload = {"type": "error", "status": exc.status, "error": str(exc), "code": exc.problem.code, "problem": exc.problem.model_dump()}
+            yield json.dumps(payload, ensure_ascii=False) + "\n"
+        except SeanimeRuntimeError as exc:
+            payload = {"type": "error", "status": 502, "error": str(exc), "code": "upstream_error"}
+            payload["problem"] = problem_for(502, payload).model_dump()
             yield json.dumps(payload, ensure_ascii=False) + "\n"
         except httpx.RequestError as exc:
             code = 'network_' + exc.kind if isinstance(exc, SourceNetworkError) else 'network_error'

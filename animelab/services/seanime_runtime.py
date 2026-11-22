@@ -10,10 +10,12 @@ from __future__ import annotations
 
 import asyncio
 import base64
+from collections import OrderedDict
 import json
 import logging
 import sys
 import threading
+import time
 import uuid
 from functools import lru_cache
 from pathlib import Path
@@ -203,11 +205,39 @@ def _ssrf_guard_sync(url: str) -> None:
         raise ValueError(f"URL bloquée par la protection SSRF : {url}")
 
 
+def apply_user_config_placeholders(
+    source: str,
+    user_config: dict[str, Any] | None = None,
+    defaults: dict[str, Any] | None = None,
+) -> str:
+    """Substitute declared ``{{fieldName}}`` placeholders using saved config or defaults."""
+    if not source or "{{" not in source:
+        return source
+    merged: dict[str, str] = {}
+    if defaults:
+        for k, v in defaults.items():
+            if k:
+                merged[str(k)] = "" if v is None else str(v)
+    if user_config:
+        for k, v in user_config.items():
+            if k and v is not None and str(v) != "":
+                merged[str(k)] = str(v)
+    if not merged:
+        return source
+    out = source
+    for key, val in merged.items():
+        token = f"{{{{{key}}}}}"
+        if token in out:
+            out = out.replace(token, val)
+    return out
+
+
 async def host_fetch_json(
     req_json_str: str,
     *,
     client_factory: Callable[..., Any] | None = None,
     on_verification: Callable[[VerificationRequired], None] | None = None,
+    max_timeout: float | None = None,
 ) -> str:
     """Execute one JS ``fetch()`` call via AnimeLab's SSRF-protected transport."""
     try:
@@ -215,6 +245,8 @@ async def host_fetch_json(
         if not isinstance(req, dict):
             raise ValueError("Requête fetch invalide")
         url, method, headers, timeout, follow_redirects, redirect_mode, content = _prepare_request_args(req)
+        if max_timeout is not None:
+            timeout = max(1.0, min(timeout, float(max_timeout)))
         if not await is_safe_url_async(url, allow_private=False):
             return json.dumps({"error": f"URL bloquée par la protection SSRF : {url}"})
 
@@ -285,6 +317,11 @@ class MiniRacerSeanimeRuntime:
         self._client_factory = client_factory
         self._stores: dict[str, dict[str, Any]] = {}
         self._lock = threading.RLock()
+        self._get_cache: OrderedDict[tuple[Any, ...], tuple[float, str]] = OrderedDict()
+        self._inflight_gets: dict[tuple[int, tuple[Any, ...]], asyncio.Task[str]] = {}
+        self._get_cache_ttl = 45.0
+        self._get_cache_max_entries = 64
+        self._get_cache_max_bytes = 2 * 1024 * 1024
 
     def is_available(self) -> bool:
         try:
@@ -296,9 +333,18 @@ class MiniRacerSeanimeRuntime:
     def engine_name(self) -> str:
         return "mini-racer" if self.is_available() else "unavailable"
 
+    def clear_http_cache(self, extension_id: str | None = None) -> None:
+        with self._lock:
+            if extension_id is None:
+                self._get_cache.clear()
+                return
+            for key in [k for k in self._get_cache if k and k[0] == extension_id]:
+                self._get_cache.pop(key, None)
+
     def clear_store(self, extension_id: str) -> None:
         with self._lock:
             self._stores.pop(extension_id, None)
+        self.clear_http_cache(extension_id)
 
     def get_store(self, extension_id: str) -> dict[str, Any]:
         with self._lock:
@@ -314,10 +360,13 @@ class MiniRacerSeanimeRuntime:
         *,
         language: str = "javascript",
         extension_id: str = "validate",
+        user_config: dict[str, Any] | None = None,
+        defaults: dict[str, Any] | None = None,
     ) -> tuple[bool, str | None]:
         """Transpile (if TypeScript) and compile ``Provider`` inside V8."""
         try:
-            prepared = prepare_extension_source(source, language)
+            rendered = apply_user_config_placeholders(source, user_config, defaults)
+            prepared = prepare_extension_source(rendered, language)
         except Exception as exc:
             return False, f"Erreur de transpilation TypeScript : {exc}"
 
@@ -337,6 +386,36 @@ class MiniRacerSeanimeRuntime:
             logger.debug("Seanime syntax validation failed for %s: %s", extension_id, exc)
             return False, str(exc)
 
+    def _get_cached_response(self, cache_key: tuple[Any, ...]) -> str | None:
+        now = time.monotonic()
+        with self._lock:
+            entry = self._get_cache.get(cache_key)
+            if entry is None:
+                return None
+            ts, payload = entry
+            if (now - ts) >= self._get_cache_ttl:
+                self._get_cache.pop(cache_key, None)
+                return None
+            self._get_cache.move_to_end(cache_key)
+            return payload
+
+    def _put_cached_response(self, cache_key: tuple[Any, ...], raw_json: str) -> None:
+        try:
+            parsed = json.loads(raw_json)
+        except Exception:
+            return
+        if not isinstance(parsed, dict) or parsed.get("error"):
+            return
+        if int(parsed.get("status") or 0) != 200:
+            return
+        if int(parsed.get("contentLength") or 0) > self._get_cache_max_bytes:
+            return
+        with self._lock:
+            self._get_cache[cache_key] = (time.monotonic(), raw_json)
+            self._get_cache.move_to_end(cache_key)
+            while len(self._get_cache) > self._get_cache_max_entries:
+                self._get_cache.popitem(last=False)
+
     async def invoke(
         self,
         *,
@@ -351,7 +430,8 @@ class MiniRacerSeanimeRuntime:
         timeout: float = 30.0,
     ) -> tuple[Any, dict[str, Any], list[str]]:
         """Compile and invoke a ``Provider`` method asynchronously inside V8."""
-        prepared = prepare_extension_source(source, language)
+        rendered_source = apply_user_config_placeholders(source, user_config, defaults)
+        prepared = prepare_extension_source(rendered_source, language)
         shim = load_shim_source()
         initial_store = dict(store) if store is not None else self.get_store(extension_id)
         loop = asyncio.get_running_loop()
@@ -362,17 +442,85 @@ class MiniRacerSeanimeRuntime:
             raise SeanimeRuntimeError(f"Moteur V8 indisponible : {exc}") from exc
 
         verification_error: VerificationRequired | None = None
+        deadline = time.monotonic() + float(timeout)
 
         def _capture_verification(exc: VerificationRequired) -> None:
             nonlocal verification_error
             verification_error = exc
 
         async def _bridge_fetch(req_json: str) -> str:
-            return await host_fetch_json(
-                req_json,
-                client_factory=self._client_factory,
-                on_verification=_capture_verification,
-            )
+            remaining = deadline - time.monotonic()
+            if remaining <= 0.25:
+                return json.dumps({"error": f"Délai d'exécution Seanime dépassé ({timeout:.0f}s)"})
+
+            cache_key: tuple[Any, ...] | None = None
+            if self._client_factory is None:
+                try:
+                    req_obj = json.loads(req_json) if req_json else {}
+                except Exception:
+                    req_obj = None
+                if isinstance(req_obj, dict):
+                    req_method = str(req_obj.get("method") or "GET").upper()
+                    req_url = str(req_obj.get("url") or "").strip()
+                    raw_headers = req_obj.get("headers") or {}
+                    has_auth = isinstance(raw_headers, dict) and any(
+                        str(k).lower() == "authorization" for k in raw_headers
+                    )
+                    if req_method == "GET" and req_url and not has_auth:
+                        norm_headers = tuple(
+                            sorted(
+                                (str(k).lower(), str(v))
+                                for k, v in (raw_headers.items() if isinstance(raw_headers, dict) else ())
+                                if k is not None and v is not None
+                            )
+                        )
+                        redirect_mode = str(req_obj.get("redirect") or "follow").lower()
+                        cache_key = (extension_id, req_url, norm_headers, redirect_mode)
+                        cached = self._get_cached_response(cache_key)
+                        if cached is not None:
+                            return cached
+
+            if cache_key is None:
+                return await host_fetch_json(
+                    req_json,
+                    client_factory=self._client_factory,
+                    on_verification=_capture_verification,
+                    max_timeout=remaining,
+                )
+
+            inflight_key = (id(loop), cache_key)
+            task = self._inflight_gets.get(inflight_key)
+            if task is None:
+                async def _run_cached_get() -> str:
+                    try:
+                        out = await host_fetch_json(
+                            req_json,
+                            client_factory=None,
+                            on_verification=_capture_verification,
+                            max_timeout=remaining,
+                        )
+                        self._put_cached_response(cache_key, out)
+                        return out
+                    finally:
+                        if self._inflight_gets.get(inflight_key) is task:
+                            self._inflight_gets.pop(inflight_key, None)
+
+                task = asyncio.create_task(_run_cached_get())
+                self._inflight_gets[inflight_key] = task
+
+            raw_out = await asyncio.shield(task)
+            try:
+                parsed_out = json.loads(raw_out)
+                if isinstance(parsed_out, dict) and parsed_out.get("verificationRequired"):
+                    _capture_verification(
+                        VerificationRequired(
+                            parsed_out.get("verificationUrl") or cache_key[1],
+                            parsed_out.get("error") or None,
+                        )
+                    )
+            except Exception:
+                pass
+            return raw_out
 
         with mini_racer(event_loop=loop) as ctx:
             async with ctx.wrap_py_function(_bridge_fetch) as js_fetch:
@@ -444,6 +592,9 @@ class AndroidSeanimeRuntime:
     def engine_name(self) -> str:
         return "android-webview"
 
+    def clear_http_cache(self, extension_id: str | None = None) -> None:
+        return
+
     def clear_store(self, extension_id: str) -> None:
         with self._lock:
             self._stores.pop(extension_id, None)
@@ -462,9 +613,12 @@ class AndroidSeanimeRuntime:
         *,
         language: str = "javascript",
         extension_id: str = "validate",
+        user_config: dict[str, Any] | None = None,
+        defaults: dict[str, Any] | None = None,
     ) -> tuple[bool, str | None]:
         try:
-            prepared = prepare_extension_source(source, language)
+            rendered = apply_user_config_placeholders(source, user_config, defaults)
+            prepared = prepare_extension_source(rendered, language)
         except Exception as exc:
             return False, f"Erreur de transpilation TypeScript : {exc}"
         try:
@@ -488,7 +642,8 @@ class AndroidSeanimeRuntime:
         store: dict[str, Any] | None = None,
         timeout: float = 30.0,
     ) -> tuple[Any, dict[str, Any], list[str]]:
-        prepared = prepare_extension_source(source, language)
+        rendered_source = apply_user_config_placeholders(source, user_config, defaults)
+        prepared = prepare_extension_source(rendered_source, language)
         initial_store = dict(store) if store is not None else self.get_store(extension_id)
         request_payload = json.dumps(
             {
@@ -540,6 +695,9 @@ class SeanimeRuntimeFacade:
     def engine_name(self) -> str:
         return self.backend.engine_name()
 
+    def clear_http_cache(self, extension_id: str | None = None) -> None:
+        self.backend.clear_http_cache(extension_id)
+
     def clear_store(self, extension_id: str) -> None:
         self.backend.clear_store(extension_id)
 
@@ -555,8 +713,16 @@ class SeanimeRuntimeFacade:
         *,
         language: str = "javascript",
         extension_id: str = "validate",
+        user_config: dict[str, Any] | None = None,
+        defaults: dict[str, Any] | None = None,
     ) -> tuple[bool, str | None]:
-        return self.backend.validate_syntax(source, language=language, extension_id=extension_id)
+        return self.backend.validate_syntax(
+            source,
+            language=language,
+            extension_id=extension_id,
+            user_config=user_config,
+            defaults=defaults,
+        )
 
     async def invoke(
         self,

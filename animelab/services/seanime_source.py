@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+from collections import OrderedDict
+import contextvars
 import logging
 import re
 import time
@@ -13,11 +15,108 @@ from animelab.models.anime import AnimeDetail, AnimeResult, Episode
 from animelab.security import is_safe_url_async
 from animelab.services.extension_references import NativeReferences
 from animelab.services.media_contracts import normalize_tracks
-from animelab.services.source_http import VerificationRequired
+from animelab.services.seanime_runtime import SeanimeRuntimeError
+from animelab.services.source_http import VerificationRequired, source_http
 
 logger = logging.getLogger(__name__)
 
 _SYNTHETIC_HOST = "seanime.local"
+_USES_MEDIA_RE = re.compile(
+    r"\bmedia\s*\.\s*(?:id|idMal|startDate|synonyms|episodeCount|englishTitle|romajiTitle)\b"
+)
+_NO_RESULTS_RE = re.compile(
+    r"(?i)\b(?:no\s+(?:results?|anime|matches?|items?)\s+found|nothing\s+found|aucun\s+r[ée]sultat)\b"
+)
+_ANILIST_URL = "https://graphql.anilist.co"
+_ANILIST_QUERY = """
+query ($search: String) {
+  Media(search: $search, type: ANIME) {
+    id
+    idMal
+    status
+    format
+    episodes
+    isAdult
+    title {
+      romaji
+      english
+    }
+    synonyms
+    startDate {
+      year
+      month
+      day
+    }
+  }
+}
+"""
+_ANILIST_CACHE: OrderedDict[str, tuple[float, dict[str, Any] | None]] = OrderedDict()
+_ANILIST_CACHE_TTL = 3600.0
+_ANILIST_CACHE_MAX = 128
+_DIAGNOSE_LOG_SINK: contextvars.ContextVar[list[str] | None] = contextvars.ContextVar(
+    "_seanime_diagnose_logs", default=None
+)
+
+
+async def _lookup_anilist_media(query: str) -> dict[str, Any] | None:
+    """Fetch basic AniList media metadata for extensions requiring AniList/MAL IDs."""
+    key = (query or "").strip().lower()
+    if not key:
+        return None
+    now = time.monotonic()
+    cached = _ANILIST_CACHE.get(key)
+    if cached is not None:
+        ts, data = cached
+        if (now - ts) < _ANILIST_CACHE_TTL:
+            _ANILIST_CACHE.move_to_end(key)
+            return dict(data) if data is not None else None
+        _ANILIST_CACHE.pop(key, None)
+
+    try:
+        async with source_http.async_client(timeout=2.5) as client:
+            resp = await client.request(
+                "POST",
+                _ANILIST_URL,
+                headers={"Content-Type": "application/json", "Accept": "application/json"},
+                json={"query": _ANILIST_QUERY, "variables": {"search": query.strip()}},
+            )
+        if resp.status_code != 200:
+            return None
+        payload = resp.json()
+        media = payload.get("data", {}).get("Media") if isinstance(payload, dict) else None
+        if not isinstance(media, dict):
+            parsed: dict[str, Any] | None = None
+        else:
+            title_obj = media.get("title") if isinstance(media.get("title"), dict) else {}
+            start_obj = media.get("startDate") if isinstance(media.get("startDate"), dict) else {}
+            parsed = {
+                "id": int(media.get("id") or 0),
+                "idMal": int(media.get("idMal") or 0),
+                "status": str(media.get("status") or "RELEASING"),
+                "format": str(media.get("format") or "TV"),
+                "englishTitle": str(
+                    title_obj.get("english") or title_obj.get("romaji") or query.strip()
+                ),
+                "romajiTitle": str(
+                    title_obj.get("romaji") or title_obj.get("english") or query.strip()
+                ),
+                "synonyms": [str(s) for s in (media.get("synonyms") or []) if isinstance(s, str) and s],
+                "isAdult": bool(media.get("isAdult", False)),
+                "episodeCount": int(media.get("episodes") or 0),
+                "startDate": {
+                    "year": int(start_obj.get("year") or 0),
+                    "month": int(start_obj.get("month") or 1),
+                    "day": int(start_obj.get("day") or 1),
+                },
+            }
+        _ANILIST_CACHE[key] = (now, parsed)
+        _ANILIST_CACHE.move_to_end(key)
+        while len(_ANILIST_CACHE) > _ANILIST_CACHE_MAX:
+            _ANILIST_CACHE.popitem(last=False)
+        return dict(parsed) if parsed is not None else None
+    except Exception as exc:
+        logger.debug("Optional AniList lookup skipped for %r: %s", query, exc)
+        return None
 
 
 def _normalize_sub_or_dub(raw: Any) -> str:
@@ -121,17 +220,25 @@ class SeanimeSource:
         if not state or not state.get("payload"):
             raise RuntimeError(f"Extension Seanime '{self.extension_id}' introuvable ou non installée.")
 
-        result, new_store, logs = await self._runtime.invoke(
-            extension_id=self.extension_id,
-            source=str(state["payload"]),
-            language=str(state.get("language") or "javascript"),
-            method=method,
-            args=args or [],
-            user_config=dict(state.get("saved_config") or {}),
-            defaults=dict(state.get("defaults") or {}),
-            store=dict(state.get("store") or {}),
-            timeout=timeout,
-        )
+        sink = _DIAGNOSE_LOG_SINK.get()
+        try:
+            result, new_store, logs = await self._runtime.invoke(
+                extension_id=self.extension_id,
+                source=str(state["payload"]),
+                language=str(state.get("language") or "javascript"),
+                method=method,
+                args=args or [],
+                user_config=dict(state.get("saved_config") or {}),
+                defaults=dict(state.get("defaults") or {}),
+                store=dict(state.get("store") or {}),
+                timeout=timeout,
+            )
+        except SeanimeRuntimeError as exc:
+            if sink is not None and exc.logs:
+                sink.extend(exc.logs)
+            raise
+        if sink is not None and logs:
+            sink.extend(logs)
         try:
             self._store_saver(self.extension_id, new_store)
         except Exception as exc:
@@ -168,23 +275,54 @@ class SeanimeSource:
         if not cleaned:
             return []
 
+        media_payload: dict[str, Any] = {
+            "id": 0,
+            "idMal": 0,
+            "status": "RELEASING",
+            "format": "TV",
+            "englishTitle": cleaned,
+            "romajiTitle": cleaned,
+            "synonyms": [],
+            "isAdult": False,
+            "episodeCount": 0,
+            "startDate": {"year": int(year or 0), "month": 1, "day": 1},
+        }
+        effective_year = int(year) if year else 0
+        state = self._state_loader(self.extension_id)
+        payload = str((state or {}).get("payload") or "")
+        backend = getattr(self._runtime, "backend", self._runtime)
+        if getattr(backend, "_client_factory", None) is None and _USES_MEDIA_RE.search(payload):
+            ani = await _lookup_anilist_media(cleaned)
+            if ani:
+                media_payload.update(
+                    {
+                        "id": ani.get("id", 0),
+                        "idMal": ani.get("idMal", 0),
+                        "status": ani.get("status") or media_payload["status"],
+                        "format": ani.get("format") or media_payload["format"],
+                        "englishTitle": ani.get("englishTitle") or cleaned,
+                        "romajiTitle": ani.get("romajiTitle") or cleaned,
+                        "synonyms": list(ani.get("synonyms") or []),
+                        "isAdult": bool(ani.get("isAdult", False)),
+                        "episodeCount": int(ani.get("episodeCount") or 0),
+                        "startDate": dict(ani.get("startDate") or media_payload["startDate"]),
+                    }
+                )
+                if not effective_year and int(media_payload["startDate"].get("year") or 0):
+                    effective_year = int(media_payload["startDate"]["year"])
+
         opts: dict[str, Any] = {
-            "media": {
-                "id": 0,
-                "idMal": 0,
-                "status": "RELEASING",
-                "format": "TV",
-                "englishTitle": cleaned,
-                "romajiTitle": cleaned,
-                "synonyms": [],
-                "isAdult": False,
-                "startDate": {"year": int(year or 0), "month": 1, "day": 1},
-            },
+            "media": media_payload,
             "query": cleaned,
             "dub": bool(dub),
-            "year": int(year) if year else 0,
+            "year": effective_year,
         }
-        raw, _ = await self._invoke("search", [opts], timeout=35.0)
+        try:
+            raw, _ = await self._invoke("search", [opts], timeout=35.0)
+        except SeanimeRuntimeError as exc:
+            if _NO_RESULTS_RE.search(str(exc)):
+                return []
+            raise
         if not isinstance(raw, list):
             return []
 
@@ -358,11 +496,17 @@ class SeanimeSource:
         except Exception:
             servers = list(self.episode_servers or ["default"])
 
-        if preferred_server and preferred_server.strip():
-            pref = preferred_server.strip()
-            servers = [pref] + [s for s in servers if s.lower() != pref.lower()]
         if not servers:
             servers = ["default"]
+
+        preferred_canonical: str | None = None
+        if preferred_server and preferred_server.strip() and preferred_server.strip().lower() != "auto":
+            pref = preferred_server.strip()
+            matched = next((s for s in servers if s.lower() == pref.lower()), None)
+            preferred_canonical = matched or pref
+            remaining_servers = [s for s in servers if s.lower() != preferred_canonical.lower()]
+        else:
+            remaining_servers = list(servers)
 
         sem = asyncio.Semaphore(3)
         verification_exc: VerificationRequired | None = None
@@ -375,7 +519,7 @@ class SeanimeSource:
                     data, _ = await self._invoke(
                         "findEpisodeServer",
                         [ep_arg, server_name],
-                        timeout=20.0,
+                        timeout=25.0,
                     )
                 except VerificationRequired as exc:
                     verification_exc = exc
@@ -478,15 +622,52 @@ class SeanimeSource:
                 )
             return out
 
-        batches = await asyncio.gather(*(_query_server(s) for s in servers))
         candidates: list[dict[str, Any]] = []
         seen_keys: set[tuple[str, str]] = set()
-        for batch in batches:
-            for cand in batch:
+
+        if preferred_canonical is not None:
+            pref_batch = await _query_server(preferred_canonical)
+            for cand in pref_batch:
                 key = (cand["url"], cand["server"])
                 if key not in seen_keys:
                     seen_keys.add(key)
                     candidates.append(cand)
+            if candidates:
+                return candidates
+
+        if remaining_servers:
+            pending: set[asyncio.Task[list[dict[str, Any]]]] = {
+                asyncio.create_task(_query_server(s)) for s in remaining_servers
+            }
+            grace_deadline: float | None = None
+            try:
+                while pending:
+                    wait_timeout: float | None = None
+                    if grace_deadline is not None:
+                        wait_timeout = max(0.0, grace_deadline - time.monotonic())
+                        if wait_timeout <= 0.0:
+                            break
+                    done, pending = await asyncio.wait(
+                        pending,
+                        timeout=wait_timeout,
+                        return_when=asyncio.FIRST_COMPLETED,
+                    )
+                    if not done:
+                        break
+                    for finished in done:
+                        batch = finished.result()
+                        for cand in batch:
+                            key = (cand["url"], cand["server"])
+                            if key not in seen_keys:
+                                seen_keys.add(key)
+                                candidates.append(cand)
+                    if candidates and grace_deadline is None and pending:
+                        grace_deadline = time.monotonic() + 3.0
+            finally:
+                if pending:
+                    for leftover in pending:
+                        leftover.cancel()
+                    await asyncio.gather(*pending, return_exceptions=True)
 
         if not candidates:
             if verification_exc is not None:
@@ -527,6 +708,8 @@ class SeanimeSource:
             payload,
             language=language,
             extension_id=self.extension_id,
+            user_config=dict((state or {}).get("saved_config") or {}),
+            defaults=dict((state or {}).get("defaults") or {}),
         )
         report: dict[str, Any] = {
             "extension_id": self.extension_id,
@@ -539,12 +722,16 @@ class SeanimeSource:
             "sample_titles": [],
             "episode_count": 0,
             "stream_count": 0,
+            "ok": False,
             "error": syntax_err,
+            "logs": [],
         }
         if not syntax_ok:
             report["duration_ms"] = int((time.monotonic() - started) * 1000)
             return report
 
+        collected_logs: list[str] = []
+        token = _DIAGNOSE_LOG_SINK.set(collected_logs)
         try:
             report["settings"] = await self.get_settings()
             search_results = await self.search_anime(query or "naruto")
@@ -556,11 +743,26 @@ class SeanimeSource:
                 if detail.episodes:
                     streams = await self.get_episode_sources(detail.episodes[0].playerUrl)
                     report["stream_count"] = len(streams)
-            report["ok"] = True
-            report["error"] = None
+            report["ok"] = bool(
+                syntax_ok
+                and report["search_count"] > 0
+                and report["episode_count"] > 0
+                and report["stream_count"] > 0
+            )
+            if report["ok"]:
+                report["error"] = None
+            elif report["search_count"] == 0:
+                report["error"] = "La recherche n'a renvoyé aucun résultat pour ce titre."
+            elif report["episode_count"] == 0:
+                report["error"] = "La recherche a réussi mais aucun épisode n'a été trouvé."
+            else:
+                report["error"] = "Les épisodes ont été trouvés mais aucun flux vidéo jouable n'a été extrait."
         except Exception as exc:
             report["ok"] = False
             report["error"] = str(exc)
+        finally:
+            _DIAGNOSE_LOG_SINK.reset(token)
 
+        report["logs"] = collected_logs[-10:]
         report["duration_ms"] = int((time.monotonic() - started) * 1000)
         return report

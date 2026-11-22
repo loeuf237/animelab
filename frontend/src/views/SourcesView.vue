@@ -132,7 +132,7 @@
               @input="invalidatePending"
             /><button class="btn btn-primary" type="submit">{{ tx('Rechercher') }}</button>
           </div>
-          <div class="catalogue-tools">
+          <div v-if="currentSource?.runtime !== 'seanime'" class="catalogue-tools">
             <button
               class="btn btn-secondary"
               type="button"
@@ -264,7 +264,9 @@
           {{
             tx(
               mode === 'search' && !query.trim() && !selectedTags.length
-                ? 'Saisissez un titre pour lancer la recherche.'
+                ? currentSource.runtime === 'seanime'
+                  ? "Cette extension Seanime fonctionne par recherche : saisissez le titre d'un animé ci-dessus pour explorer son catalogue."
+                  : 'Saisissez un titre pour lancer la recherche.'
                 : 'Aucun résultat avec ces critères.',
             )
           }}

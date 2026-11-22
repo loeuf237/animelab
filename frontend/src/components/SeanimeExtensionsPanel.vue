@@ -279,11 +279,31 @@
             <span class="seanime-pill" :class="{ muted: !ext.supported }">
               {{ ext.ext_type }}
             </span>
-            <span v-if="ext.marketplace_meta?.workingTag" class="seanime-pill ok">
-              {{ tx('Fonctionnelle') }}
+            <span
+              v-if="ext.marketplace_meta?.workingTag"
+              class="seanime-pill ok"
+              :title="
+                tx(
+                  'Étiquette déclarée dans l’index distant du Marketplace Seanime (non vérifiée localement).',
+                )
+              "
+            >
+              {{ tx('Tag marketplace : OK') }}
             </span>
             <span v-if="ext.marketplace_meta?.brokenTag" class="seanime-pill warn">
               {{ tx('Signalée cassée') }}
+            </span>
+            <span
+              v-if="ext.installed && ext.health?.last_diagnose"
+              class="seanime-pill"
+              :class="ext.health.last_diagnose.ok ? 'ok' : 'warn'"
+              :title="
+                ext.health.last_diagnose.ok
+                  ? `${tx('Dernier test local réussi')} (${ext.health.last_diagnose.stream_count} ${tx('flux')})`
+                  : ext.health.last_diagnose.error || tx('Dernier test local en échec')
+              "
+            >
+              {{ tx(ext.health.last_diagnose.ok ? 'Test local : OK' : 'Test local : Échec') }}
             </span>
             <span v-if="ext.needs_config && ext.installed" class="seanime-pill warn">
               {{ tx('Configuration requise') }}
@@ -503,8 +523,10 @@
         </header>
         <div class="seanime-diagnose-body">
           <p>
-            <strong>{{ tx('Moteur :') }}</strong> {{ diagnoseResult.engine }} ·
-            <strong>{{ tx('Durée :') }}</strong> {{ diagnoseResult.duration_ms }} ms
+            <strong>{{ tx('Statut :') }}</strong>
+            {{ diagnoseResult.ok ? tx('OK') : tx('Échec') }} · <strong>{{ tx('Moteur :') }}</strong>
+            {{ diagnoseResult.engine }} · <strong>{{ tx('Durée :') }}</strong>
+            {{ diagnoseResult.duration_ms }} ms
           </p>
           <p>
             <strong>{{ tx('Compilation JS/TS :') }}</strong>
