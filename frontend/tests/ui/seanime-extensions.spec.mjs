@@ -192,7 +192,12 @@ test('Seanime ecosystem tab manages marketplaces, streaming providers, config, d
 
   // Default tab stays Aniyomi for coexistence & backwards compatibility
   await expect(page.getByTestId('ecosystem-tab-aniyomi')).toHaveAttribute('aria-selected', 'true')
-  await expect(page.getByText('Aniyomi: Extension au nom particulièrement long 1')).toBeVisible()
+  await expect(
+    page.getByRole('heading', {
+      name: 'Aniyomi: Extension au nom particulièrement long 1',
+      exact: true,
+    }),
+  ).toBeVisible()
 
   // Switch to Seanime ecosystem tab
   await page.getByTestId('ecosystem-tab-seanime').click()
@@ -222,8 +227,9 @@ test('Seanime ecosystem tab manages marketplaces, streaming providers, config, d
 
   // Switch catalog view filter to All and verify non-executable badge on manga-provider
   await page.getByTestId('seanime-filter-all').click()
-  await expect(page.getByTestId('seanime-ext-demo-manga')).toBeVisible()
-  await expect(page.getByTestId('seanime-non-executable-badge')).toContainText(
+  const mangaCard = page.getByTestId('seanime-ext-demo-manga')
+  await expect(mangaCard).toBeVisible()
+  await expect(mangaCard.getByTestId('seanime-non-executable-badge')).toContainText(
     'Non exécutable (streaming uniquement)',
   )
 })
