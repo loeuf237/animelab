@@ -102,7 +102,11 @@
             @click="openAnime(item)"
             @mouseenter="activeIdx = idx"
           >
-            <img :src="item.imageUrl || '/static/placeholder.jpg'" class="palette-thumb" alt="" />
+            <img
+              :src="resolveImageUrl(item.imageUrl) || '/static/placeholder.jpg'"
+              class="palette-thumb"
+              alt=""
+            />
             <div class="palette-item-info">
               <span class="palette-item-title">{{ tx(item.title) }}</span>
               <div class="palette-item-meta">
@@ -138,6 +142,7 @@
 
 <script setup lang="ts">
 import { tx } from '@/utils/locale'
+import { resolveImageUrl } from '@/utils/media'
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSourcePreferences } from '@/stores/sourcePreferences'

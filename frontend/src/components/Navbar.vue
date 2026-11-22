@@ -66,7 +66,11 @@
               class="search-result-item"
               @click="selectAnime(item)"
             >
-              <img :src="item.imageUrl || '/static/placeholder.jpg'" class="result-thumb" alt="" />
+              <img
+                :src="resolveImageUrl(item.imageUrl) || '/static/placeholder.jpg'"
+                class="result-thumb"
+                alt=""
+              />
               <div class="result-details">
                 <span class="result-title">{{ tx(item.title) }}</span>
                 <div class="result-meta">
@@ -126,6 +130,7 @@
 
 <script setup lang="ts">
 import { tx } from '@/utils/locale'
+import { resolveImageUrl } from '@/utils/media'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAnimeStore } from '@/stores/anime'

@@ -61,6 +61,55 @@ class VoirAnimeScrapingService:
     def _normalize_url(self, url: str) -> str:
         return normalize_voiranime_url(url, self.base_url)
 
+    def _extract_image_url(self, img: Any, fallback_el: Any = None) -> str:
+        """Pick a non-placeholder image URL, preferring crisp srcset posters over tiny thumbnails."""
+        primary = ""
+        if img is not None:
+            for attr in ("data-src", "data-lazy-src", "data-original", "src"):
+                val = str(img.get(attr) or "").strip()
+                if val and not val.lower().startswith("data:"):
+                    primary = val
+                    break
+            candidates: List[Tuple[int, str]] = []
+            for srcset_attr in ("data-srcset", "srcset"):
+                raw_set = str(img.get(srcset_attr) or "").strip()
+                if not raw_set:
+                    continue
+                for entry in raw_set.split(","):
+                    parts = entry.strip().split()
+                    if not parts:
+                        continue
+                    cand_url = parts[0].strip()
+                    if not cand_url or cand_url.lower().startswith("data:"):
+                        continue
+                    width = 0
+                    if len(parts) > 1:
+                        wm = re.match(r"^(\d+)w$", parts[1].strip(), re.IGNORECASE)
+                        if wm:
+                            width = int(wm.group(1))
+                    candidates.append((width, cand_url))
+            if candidates:
+                thumb_match = re.search(r"-(\d+)x(\d+)\.[a-z0-9]+(?:$|\?)", primary, re.IGNORECASE)
+                is_tiny_thumb = bool(thumb_match and int(thumb_match.group(1)) < 220)
+                if not primary or is_tiny_thumb:
+                    bounded = [c for c in candidates if 0 < c[0] <= 600]
+                    pool = bounded or candidates
+                    best = max(pool, key=lambda c: c[0])
+                    if best[1]:
+                        primary = best[1]
+        if not primary and fallback_el is not None:
+            style = str(fallback_el.get("style") or "")
+            bg_match = re.search(r"background-image\s*:\s*url\((['\"]?)(.+?)\1\)", style, re.IGNORECASE)
+            if bg_match:
+                bg_url = bg_match.group(2).strip()
+                if bg_url and not bg_url.lower().startswith("data:"):
+                    primary = bg_url
+        if not primary:
+            return ""
+        if not re.match(r"^https?://", primary, re.IGNORECASE):
+            return urljoin(self.base_url, primary)
+        return primary
+
     def _load_persistent_cache(self):
         try:
             cache_file = settings.CACHE_DIR / "latest_voir_anime.json"
@@ -189,9 +238,8 @@ class VoirAnimeScrapingService:
                     url = urljoin(self.base_url, url)
 
                 img = item.select_one(".asp_image img, img")
-                image_url = (img.get("src") or img.get("data-src") or "").strip() if img else ""
-                if image_url and not image_url.startswith("http"):
-                    image_url = urljoin(self.base_url, image_url)
+                asp_bg = item.select_one(".asp_image")
+                image_url = self._extract_image_url(img, fallback_el=asp_bg)
 
                 version = default_version
                 if "(VF)" in title.upper() or "-vf/" in url.lower() or "/vf/" in url.lower():
@@ -401,13 +449,7 @@ class VoirAnimeScrapingService:
 
                 # Image / poster
                 img = card.select_one("img")
-                image_url = ""
-                if img:
-                    image_url = img.get("data-src", "") or img.get("data-lazy-src", "") or img.get("src", "")
-                    if not image_url and img.get("srcset"):
-                        image_url = img["srcset"].split()[0]
-                    if image_url and not image_url.startswith("http"):
-                        image_url = urljoin(self.base_url, image_url)
+                image_url = self._extract_image_url(img)
 
                 # Episode badge
                 ep_el = card.select_one(".list-chapter .chapter a, .chapter-item a.btn-link, .chapter a, .tick-eps, .latest-chap, a.btn-link, .chapter-item")
@@ -474,13 +516,7 @@ class VoirAnimeScrapingService:
                             img = cand
                             break
 
-                image_url = ""
-                if img:
-                    image_url = img.get("data-src", "") or img.get("src", "") or img.get("data-lazy-src", "")
-                    if not image_url and img.get("srcset"):
-                        image_url = img["srcset"].split()[0]
-                    if image_url and not image_url.startswith("http"):
-                        image_url = urljoin(self.base_url, image_url)
+                image_url = self._extract_image_url(img)
 
                 syn_el = soup.select_one(".description-summary .summary__content, .description-summary, .film-description .text")
                 synopsis = syn_el.get_text().strip() if syn_el else ""

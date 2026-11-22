@@ -3,19 +3,19 @@
     <router-link :to="to" class="card-link">
       <div class="poster-card-media">
         <div
-          v-if="imageUrl && !imageBroken && !imageLoaded"
+          v-if="displayImageUrl && !imageBroken && !imageLoaded"
           class="poster-card-shimmer"
           aria-hidden="true"
         />
         <img
-          v-if="imageUrl && !imageBroken"
+          v-if="displayImageUrl && !imageBroken"
           ref="imgEl"
-          :src="imageUrl"
+          :src="displayImageUrl"
           :alt="tx(title)"
           :class="{ 'is-loaded': imageLoaded }"
           loading="lazy"
           @load="imageLoaded = true"
-          @error="imageBroken = true"
+          @error="onImageError"
         />
         <div v-else class="poster-card-fallback" aria-hidden="true">
           <Film :size="28" />
@@ -47,10 +47,11 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
 import { Film } from 'lucide-vue-next'
 import { tx } from '@/utils/locale'
+import { canFallbackToImageProxy, proxyImageUrl, resolveImageUrl } from '@/utils/media'
 
 const props = defineProps<{
   title: string
@@ -65,7 +66,20 @@ const props = defineProps<{
 
 const imageBroken = ref(false)
 const imageLoaded = ref(false)
+const useProxyFallback = ref(false)
 const imgEl = ref<HTMLImageElement | null>(null)
+const displayImageUrl = computed(() =>
+  useProxyFallback.value ? proxyImageUrl(props.imageUrl) : resolveImageUrl(props.imageUrl),
+)
+
+function onImageError() {
+  if (!useProxyFallback.value && canFallbackToImageProxy(props.imageUrl, displayImageUrl.value)) {
+    useProxyFallback.value = true
+    imageLoaded.value = false
+    return
+  }
+  imageBroken.value = true
+}
 
 function syncCompleteState() {
   if (imgEl.value?.complete && imgEl.value.naturalWidth > 0) {
@@ -79,6 +93,8 @@ watch(
   () => {
     imageBroken.value = false
     imageLoaded.value = false
+    useProxyFallback.value = false
+    void nextTick(syncCompleteState)
   },
 )
 </script>

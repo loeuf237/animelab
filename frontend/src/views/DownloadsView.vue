@@ -1035,6 +1035,7 @@
 <script setup lang="ts">
 import { Zap } from 'lucide-vue-next'
 import { language, tx } from '@/utils/locale'
+import { resolveImageUrl } from '@/utils/media'
 import ProxyRotationButton from '@/components/ProxyRotationButton.vue'
 import VerificationPrompt from '@/components/VerificationPrompt.vue'
 import ExportStatusNotice from '@/components/ExportStatusNotice.vue'
@@ -1263,7 +1264,7 @@ function getAnimePoster(animeName?: string): string | null {
   const match = libraryStore.favorites.find(
     (f) => f.title.toLowerCase().trim() === animeName.toLowerCase().trim(),
   )
-  return match?.imageUrl || null
+  return match?.imageUrl ? resolveImageUrl(match.imageUrl) : null
 }
 
 function getInitials(name?: string): string {

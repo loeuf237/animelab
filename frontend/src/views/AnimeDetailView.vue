@@ -144,12 +144,15 @@
     <!-- Detail Content -->
     <div v-else-if="detail">
       <!-- Immersive Hero Card with Backdrop -->
-      <section
-        class="tachiyomi-hero fade-in"
-        :style="{ '--hero-bg-img': `url('${detail.anime.backdropUrl || detail.anime.imageUrl}')` }"
-      >
+      <section class="tachiyomi-hero fade-in" :style="{ '--hero-bg-img': heroBgImg }">
         <div class="tachiyomi-cover-wrap">
-          <img class="tachiyomi-cover" :src="detail.anime.imageUrl" :alt="tx(detail.anime.title)" />
+          <img
+            v-if="coverSrc && !coverBroken"
+            class="tachiyomi-cover"
+            :src="coverSrc"
+            :alt="tx(detail.anime.title)"
+            @error="onCoverError"
+          />
         </div>
 
         <div class="tachiyomi-meta">
@@ -468,7 +471,12 @@
               ></span>
 
               <div v-if="ep.thumbnailUrl" class="tachiyomi-ep-thumb-wrap">
-                <img :src="ep.thumbnailUrl" class="tachiyomi-ep-thumb" alt="" loading="lazy" />
+                <img
+                  :src="resolveImageUrl(ep.thumbnailUrl)"
+                  class="tachiyomi-ep-thumb"
+                  alt=""
+                  loading="lazy"
+                />
               </div>
 
               <div class="tachiyomi-ep-content">
@@ -687,6 +695,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useSearchContext } from '@/stores/searchContext'
 import { useNotifications } from '@/stores/notifications'
 import { episodeKey, episodeFileName } from '@/utils/episodes'
+import { canFallbackToImageProxy, proxyImageUrl, resolveImageUrl } from '@/utils/media'
 import type { Episode, OutputProfile } from '@/types'
 import OutputProfilePicker from '@/components/OutputProfilePicker.vue'
 import VerificationPrompt from '@/components/VerificationPrompt.vue'
@@ -742,6 +751,35 @@ function returnToResults() {
 }
 
 const detail = computed(() => animeStore.currentDetail)
+const coverUseProxy = ref(false)
+const coverBroken = ref(false)
+const coverSrc = computed(() => {
+  const raw = detail.value?.anime.imageUrl
+  return coverUseProxy.value ? proxyImageUrl(raw) : resolveImageUrl(raw)
+})
+const heroBgImg = computed(() => {
+  const raw = detail.value?.anime.backdropUrl || detail.value?.anime.imageUrl
+  const resolved =
+    coverUseProxy.value && raw === detail.value?.anime.imageUrl
+      ? proxyImageUrl(raw)
+      : resolveImageUrl(raw)
+  return resolved ? `url("${resolved.replace(/"/g, '\\"')}")` : 'none'
+})
+function onCoverError() {
+  const raw = detail.value?.anime.imageUrl
+  if (!coverUseProxy.value && canFallbackToImageProxy(raw, coverSrc.value)) {
+    coverUseProxy.value = true
+    return
+  }
+  coverBroken.value = true
+}
+watch(
+  () => detail.value?.anime.imageUrl,
+  () => {
+    coverUseProxy.value = false
+    coverBroken.value = false
+  },
+)
 const nativeStatus = computed(
   () =>
     (({ 1: 'En cours', 2: 'Terminé', 4: 'En pause', 5: 'Annulé' }) as Record<number, string>)[

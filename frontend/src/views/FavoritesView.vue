@@ -28,7 +28,7 @@
     <div v-else class="favorites-grid">
       <div v-for="fav in libraryStore.favorites" :key="fav.url" class="favorite-card glass-panel">
         <div class="card-thumb" @click="openAnime(fav)">
-          <img :src="fav.imageUrl" :alt="tx(fav.title)" />
+          <img :src="resolveImageUrl(fav.imageUrl)" :alt="tx(fav.title)" />
           <span class="badge badge-source card-source">{{ tx(fav.source) }}</span>
         </div>
 
@@ -68,6 +68,7 @@
 
 <script setup lang="ts">
 import { tx } from '@/utils/locale'
+import { resolveImageUrl } from '@/utils/media'
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'

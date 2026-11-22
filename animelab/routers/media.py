@@ -39,8 +39,11 @@ MAX_IMAGE_CACHE_BYTES = 50 * 1024 * 1024  # 50 Mo max en mémoire vive
 MAX_IMAGE_CACHE_ITEMS = 200
 IMAGE_DISK_CACHE_DIR = settings.CACHE_DIR / "images"
 IMAGE_DISK_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+MAX_IMAGE_DISK_CACHE_BYTES = 50 * 1024 * 1024
+MAX_IMAGE_DISK_CACHE_FILES = 400
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 Mo max pour prévenir les attaques OOM
 CACHE_HEADERS = {"Cache-Control": "public, max-age=604800, immutable"}
+_IMAGE_FETCH_LOCKS: dict[tuple[int, str], list[Any]] = {}
 
 def _get_memory_cached_image(url: str) -> Optional[tuple[bytes, str]]:
     global IMAGE_CACHE
@@ -76,8 +79,35 @@ def _get_disk_cached_image(url: str) -> Optional[tuple[bytes, str]]:
         logger.debug("[media] Error reading image disk cache: %s", e)
     return None
 
+def _prune_disk_image_cache():
+    try:
+        entries = []
+        total_bytes = 0
+        for bin_path in IMAGE_DISK_CACHE_DIR.glob("*.bin"):
+            try:
+                stat = bin_path.stat()
+                total_bytes += stat.st_size
+                entries.append((stat.st_mtime, stat.st_size, bin_path))
+            except OSError:
+                continue
+        if len(entries) <= MAX_IMAGE_DISK_CACHE_FILES and total_bytes <= MAX_IMAGE_DISK_CACHE_BYTES:
+            return
+        entries.sort(key=lambda item: item[0])
+        count = len(entries)
+        for _, size, bin_path in entries:
+            if count <= MAX_IMAGE_DISK_CACHE_FILES and total_bytes <= MAX_IMAGE_DISK_CACHE_BYTES:
+                break
+            bin_path.unlink(missing_ok=True)
+            bin_path.with_suffix(".meta").unlink(missing_ok=True)
+            total_bytes -= size
+            count -= 1
+    except Exception as e:
+        logger.debug("[media] Error pruning image disk cache: %s", e)
+
+
 def _save_disk_cached_image(url: str, content: bytes, ctype: str):
     try:
+        IMAGE_DISK_CACHE_DIR.mkdir(parents=True, exist_ok=True)
         url_hash = hashlib.sha256(url.encode()).hexdigest()
         cache_bin = IMAGE_DISK_CACHE_DIR / f"{url_hash}.bin"
         cache_meta = IMAGE_DISK_CACHE_DIR / f"{url_hash}.meta"
@@ -87,6 +117,7 @@ def _save_disk_cached_image(url: str, content: bytes, ctype: str):
         tmp_meta.write_text(ctype, encoding="utf-8")
         os.replace(tmp_bin, cache_bin)
         os.replace(tmp_meta, cache_meta)
+        _prune_disk_image_cache()
     except Exception as e:
         logger.debug("[media] Error writing image disk cache: %s", e)
 
@@ -195,73 +226,95 @@ async def proxy_image(url: str):
         _put_memory_cached_image(url, content, ctype)
         return Response(content=content, media_type=ctype, headers=CACHE_HEADERS)
 
+    lock_key = (id(asyncio.get_running_loop()), url)
+    lock_entry = _IMAGE_FETCH_LOCKS.get(lock_key)
+    if lock_entry is None:
+        lock_entry = [asyncio.Lock(), 0]
+        _IMAGE_FETCH_LOCKS[lock_key] = lock_entry
+    lock_entry[1] += 1
     try:
-        parsed_url = urllib.parse.urlparse(url)
-        host = (parsed_url.hostname or "").lower()
-        is_animepahe = any(host == d or host.endswith("." + d) for d in [
-            "animepahe.com", "animepahe.org", "animepahe.pw", "animepahe.ru",
-            "animepahe.si", "animepahe.su", "kwik.cx", "kwik.si", "kwik.link",
-            "kwik.top", "pahe.win", "owocdn.top", "kwikcdn.com"
-        ])
-        if host in ("themoviedb.org", "image.tmdb.org", "api.themoviedb.org") or host.endswith(".tmdb.org") or host.endswith(".themoviedb.org"):
-            referer = "https://www.themoviedb.org/"
-        elif is_animepahe:
-            referer = f"{settings.ANIMEPAHE_URL}/"
-        elif any(host == d or host.endswith("." + d) for d in ["voiranime.cx", "voir-anime.to", "voiranime.to", "voiranime.io", "voiranime.homes", "voembed.net", "vidmoly.to"]):
-            referer = f"{settings.VOIR_ANIME_URL.rstrip('/')}/"
-        else:
-            referer = "https://french-manga.net/"
-            for cs in extension_service.get_enabled_container_sources():
-                if cs.base_url:
-                    try:
-                        cs_host = (urllib.parse.urlparse(cs.base_url).hostname or "").lower()
-                        if cs_host and (host == cs_host or host.endswith("." + cs_host)):
-                            referer = cs.base_url.rstrip("/") + "/"
-                            break
-                    except VerificationRequired:
-                        raise
-                    except Exception:
-                        pass
+        async with lock_entry[0]:
+            mem_data = _get_memory_cached_image(url)
+            if mem_data:
+                content, ctype = mem_data
+                return Response(content=content, media_type=ctype, headers=CACHE_HEADERS)
 
-        if is_animepahe and os.getenv('ANIMELAB_SHARED_WORKER') != '1':
-            media_data = await animepahe_service.fetch_media_bytes(url, referer=referer)
-            if media_data:
-                final_bytes, ctype = media_data
-                if len(final_bytes) > MAX_IMAGE_SIZE:
-                    raise HTTPException(status_code=413, detail="Image trop volumineuse (max 10 Mo)")
-                _save_disk_cached_image(url, final_bytes, ctype)
-                _put_memory_cached_image(url, final_bytes, ctype)
-                return Response(content=final_bytes, media_type=ctype, headers=CACHE_HEADERS)
+            disk_data = _get_disk_cached_image(url)
+            if disk_data:
+                content, ctype = disk_data
+                _put_memory_cached_image(url, content, ctype)
+                return Response(content=content, media_type=ctype, headers=CACHE_HEADERS)
 
-        headers = {
-            "User-Agent": proxy_service.get_user_agent(),
-            "Referer": referer,
-            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-        }
-        async with _get_media_async_client(timeout=10.0) as client:
-            async with client.stream("GET", url, headers=headers) as resp:
-                if resp.status_code != 200:
-                    raise HTTPException(status_code=resp.status_code, detail="Image inaccessible")
+            parsed_url = urllib.parse.urlparse(url)
+            host = (parsed_url.hostname or "").lower()
+            is_animepahe = any(host == d or host.endswith("." + d) for d in [
+                "animepahe.com", "animepahe.org", "animepahe.pw", "animepahe.ru",
+                "animepahe.si", "animepahe.su", "kwik.cx", "kwik.si", "kwik.link",
+                "kwik.top", "pahe.win", "owocdn.top", "kwikcdn.com"
+            ])
+            va_host = (urllib.parse.urlparse(settings.VOIR_ANIME_URL).hostname or "").lower()
+            va_domains = ["voiranime.cx", "voir-anime.to", "voiranime.to", "voiranime.io", "voiranime.homes", "voembed.net", "vidmoly.to"]
+            if va_host and va_host not in va_domains:
+                va_domains.append(va_host)
+            if host in ("themoviedb.org", "image.tmdb.org", "api.themoviedb.org") or host.endswith(".tmdb.org") or host.endswith(".themoviedb.org"):
+                referer = "https://www.themoviedb.org/"
+            elif is_animepahe:
+                referer = f"{settings.ANIMEPAHE_URL}/"
+            elif any(host == d or host.endswith("." + d) for d in va_domains):
+                referer = f"{settings.VOIR_ANIME_URL.rstrip('/')}/"
+            else:
+                referer = "https://french-manga.net/"
+                for cs in extension_service.get_enabled_container_sources():
+                    if cs.base_url:
+                        try:
+                            cs_host = (urllib.parse.urlparse(cs.base_url).hostname or "").lower()
+                            if cs_host and (host == cs_host or host.endswith("." + cs_host)):
+                                referer = cs.base_url.rstrip("/") + "/"
+                                break
+                        except VerificationRequired:
+                            raise
+                        except Exception:
+                            pass
 
-                ctype = resp.headers.get("content-type", "image/jpeg")
-                if not (ctype.startswith("image/") or ctype == "application/octet-stream"):
-                    raise HTTPException(status_code=400, detail="Le contenu distant n'est pas une image valide")
+            if is_animepahe and os.getenv('ANIMELAB_SHARED_WORKER') != '1':
+                media_data = await animepahe_service.fetch_media_bytes(url, referer=referer)
+                if media_data:
+                    final_bytes, ctype = media_data
+                    if len(final_bytes) > MAX_IMAGE_SIZE:
+                        raise HTTPException(status_code=413, detail="Image trop volumineuse (max 10 Mo)")
+                    _save_disk_cached_image(url, final_bytes, ctype)
+                    _put_memory_cached_image(url, final_bytes, ctype)
+                    return Response(content=final_bytes, media_type=ctype, headers=CACHE_HEADERS)
 
-                clength = resp.headers.get("content-length")
-                if clength and int(clength) > MAX_IMAGE_SIZE:
-                    raise HTTPException(status_code=413, detail="Image trop volumineuse (max 10 Mo)")
+            headers = {
+                "User-Agent": proxy_service.get_user_agent(),
+                "Referer": referer,
+                "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+            }
+            async with _get_media_async_client(timeout=10.0) as client:
+                async with client.stream("GET", url, headers=headers) as resp:
+                    if resp.status_code != 200:
+                        raise HTTPException(status_code=resp.status_code, detail="Image inaccessible")
 
-                content = bytearray()
-                async for chunk in resp.aiter_bytes(65536):
-                    content.extend(chunk)
-                    if len(content) > MAX_IMAGE_SIZE:
+                    ctype = resp.headers.get("content-type", "image/jpeg")
+                    if not (ctype.startswith("image/") or ctype == "application/octet-stream"):
+                        raise HTTPException(status_code=400, detail="Le contenu distant n'est pas une image valide")
+
+                    clength = resp.headers.get("content-length")
+                    if clength and int(clength) > MAX_IMAGE_SIZE:
                         raise HTTPException(status_code=413, detail="Image trop volumineuse (max 10 Mo)")
 
-                final_bytes = bytes(content)
-                _save_disk_cached_image(url, final_bytes, ctype)
-                _put_memory_cached_image(url, final_bytes, ctype)
+                    content = bytearray()
+                    async for chunk in resp.aiter_bytes(65536):
+                        content.extend(chunk)
+                        if len(content) > MAX_IMAGE_SIZE:
+                            raise HTTPException(status_code=413, detail="Image trop volumineuse (max 10 Mo)")
 
-                return Response(content=final_bytes, media_type=ctype, headers=CACHE_HEADERS)
+                    final_bytes = bytes(content)
+                    _save_disk_cached_image(url, final_bytes, ctype)
+                    _put_memory_cached_image(url, final_bytes, ctype)
+
+                    return Response(content=final_bytes, media_type=ctype, headers=CACHE_HEADERS)
     except HTTPException:
         raise
     except VerificationRequired:
@@ -269,6 +322,10 @@ async def proxy_image(url: str):
     except Exception as e:
         logger.debug("Error in image-proxy: %s", e)
         raise HTTPException(status_code=502, detail="Erreur proxy image")
+    finally:
+        lock_entry[1] -= 1
+        if lock_entry[1] <= 0 and _IMAGE_FETCH_LOCKS.get(lock_key) is lock_entry:
+            _IMAGE_FETCH_LOCKS.pop(lock_key, None)
 
 def parse_subtitle_paths(path_field: Optional[str]) -> List[str]:
     if not path_field:

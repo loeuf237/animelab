@@ -266,3 +266,118 @@ test('diagnostics panel uses Android native export bridge and exposes copy and b
   expect(sent).toHaveLength(1)
   expect(sent[0]).toContain('"recentErrorCount": 1')
 })
+
+test('VoirAnime posters route through image-proxy and direct cover errors fall back to image-proxy', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await mockApp(page)
+
+  // Valid 1x1 PNG so <img> fires load with naturalWidth === 1.
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    'base64',
+  )
+  const proxiedUrls = []
+  const vaPoster = 'https://voiranime.cx/wp-content/uploads/2026/09/frieren-460x630.jpg'
+  const fallbackPoster = 'https://cdn.ext.invalid/cover.jpg'
+
+  await page.route('https://cdn.ext.invalid/**', (route) => route.abort())
+  await page.route('**/api/media/image-proxy*', async (route) => {
+    const reqUrl = new URL(route.request().url())
+    proxiedUrls.push(reqUrl.searchParams.get('url'))
+    await route.fulfill({
+      status: 200,
+      contentType: 'image/png',
+      body: png,
+    })
+  })
+  await page.route('**/api/home/feed', (route) =>
+    route.fulfill({
+      json: {
+        success: true,
+        challenges: [],
+        errors: [],
+        latestReleases: {
+          'voir-anime': [
+            {
+              id: 'frieren',
+              title: 'Sousou no Frieren',
+              imageUrl: vaPoster,
+              url: 'https://voiranime.cx/anime/sousou-no-frieren/',
+              version: 'VF',
+              type: 'Anime',
+              episodeInfo: 'Ep 28',
+              source: 'voir-anime',
+            },
+            {
+              id: 'ext-fallback',
+              title: 'Fallback Show',
+              imageUrl: fallbackPoster,
+              url: 'https://example.test/anime/fallback',
+              version: 'VOSTFR',
+              type: 'Anime',
+              episodeInfo: 'Ep 1',
+              source: 'french-manga',
+            },
+          ],
+        },
+        favorites: [],
+        recentHistory: [],
+        enabledExtensions: [],
+      },
+    }),
+  )
+
+  await page.goto('/app/')
+  await page.getByRole('tab', { name: 'VoirAnime' }).click()
+  const imgs = page.locator('.poster-card-media img')
+  await expect(imgs).toHaveCount(2)
+  await expect(imgs.nth(0)).toHaveAttribute(
+    'src',
+    `/api/media/image-proxy?url=${encodeURIComponent(vaPoster)}`,
+  )
+  await expect(imgs.nth(0)).toHaveClass(/is-loaded/)
+  await expect(imgs.nth(1)).toHaveAttribute(
+    'src',
+    `/api/media/image-proxy?url=${encodeURIComponent(fallbackPoster)}`,
+  )
+  await expect(imgs.nth(1)).toHaveClass(/is-loaded/)
+  await expect(page.locator('.poster-card-fallback')).toHaveCount(0)
+  expect(proxiedUrls).toContain(vaPoster)
+  expect(proxiedUrls).toContain(fallbackPoster)
+
+  // AnimeDetailView also resolves VoirAnime cover via image-proxy while preserving hero load.
+  await page.route('**/api/anime/detail*', (route) =>
+    route.fulfill({
+      json: {
+        success: true,
+        source: 'voir-anime',
+        sourceName: 'VoirAnime',
+        isFavorite: false,
+        autoDownload: false,
+        anime: {
+          title: 'Sousou no Frieren',
+          imageUrl: vaPoster,
+          url: 'https://voiranime.cx/anime/sousou-no-frieren/',
+          synopsis: 'Test synopsis',
+          genres: ['Fantasy'],
+          episodes: [],
+          source: 'voir-anime',
+        },
+      },
+    }),
+  )
+  await page.goto(
+    '/app/anime?url=https%3A%2F%2Fvoiranime.cx%2Fanime%2Fsousou-no-frieren%2F&source=voir-anime',
+  )
+  const detailCover = page.locator('img.tachiyomi-cover')
+  await expect(detailCover).toBeVisible()
+  await expect(detailCover).toHaveAttribute(
+    'src',
+    `/api/media/image-proxy?url=${encodeURIComponent(vaPoster)}`,
+  )
+  await expect
+    .poll(() => detailCover.evaluate((el) => el.complete && el.naturalWidth > 0))
+    .toBe(true)
+})

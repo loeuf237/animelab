@@ -486,4 +486,111 @@ def test_media_proxies_normalize_legacy_voiranime_urls(monkeypatch):
     ]
 
 
+def test_voiranime_extracts_high_res_srcset_and_skips_lazy_placeholders():
+    card_html = """
+    <div class="page-item-detail video">
+      <div class="item-thumb c-image-hover">
+        <a href="https://voiranime.cx/anime/frieren/" title="Frieren">
+          <img
+            src="data:image/svg+xml;base64,PHN2Zz4="
+            data-src="https://voiranime.cx/wp-content/uploads/2026/09/poster-110x150.jpg"
+            srcset="https://voiranime.cx/wp-content/uploads/2026/09/poster-110x150.jpg 110w, https://voiranime.cx/wp-content/uploads/2026/09/poster-460x630.jpg 460w, https://voiranime.cx/wp-content/uploads/2026/09/poster-900x1200.jpg 900w"
+            class="img-responsive"
+          />
+        </a>
+      </div>
+      <div class="item-summary">
+        <div class="post-title"><h3 class="h4"><a href="https://voiranime.cx/anime/frieren/">Frieren</a></h3></div>
+      </div>
+    </div>
+    """
+    cards = voiranime_service.parse_cards(card_html)
+    assert len(cards) == 1
+    assert cards[0].imageUrl == "https://voiranime.cx/wp-content/uploads/2026/09/poster-460x630.jpg"
+
+    asp_html = """___ASPSTART_HTML___
+    <div class="item">
+      <div class="asp_image" style="background-image: url('/wp-content/uploads/bg-poster.jpg')"></div>
+      <h3><a class="asp_res_url" href="https://voiranime.cx/anime/dandadan/">Dandadan</a></h3>
+    </div>
+    <div class="item">
+      <div class="asp_image">
+        <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" data-src="/wp-content/uploads/lazy-350x476.jpg" />
+      </div>
+      <h3><a class="asp_res_url" href="https://voiranime.cx/anime/bleach/">Bleach</a></h3>
+    </div>
+    ___ASPEND_HTML___"""
+    asp_items = voiranime_service.parse_asp_html(asp_html)
+    assert [i.imageUrl for i in asp_items] == [
+        "https://voiranime.cx/wp-content/uploads/bg-poster.jpg",
+        "https://voiranime.cx/wp-content/uploads/lazy-350x476.jpg",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_image_proxy_coalesces_concurrent_requests_and_prunes_disk_cache(monkeypatch, tmp_path):
+    import asyncio
+    from collections import OrderedDict
+    import os
+    import time
+    import httpx
+    from fastapi import FastAPI
+    from animelab.routers import media
+
+    calls = []
+
+    class SlowStreamResp:
+        status_code = 200
+        headers = {"content-type": "image/jpeg"}
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        async def aiter_bytes(self, size):
+            await asyncio.sleep(0.05)
+            yield b"VOIRANIME_JPEG"
+
+    class CountingClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        def stream(self, method, url, headers=None):
+            calls.append((url, (headers or {}).get("Referer", "")))
+            return SlowStreamResp()
+
+    monkeypatch.setattr(media, "IMAGE_CACHE", OrderedDict())
+    monkeypatch.setattr(media, "IMAGE_CACHE_CURRENT_BYTES", 0)
+    monkeypatch.setattr(media, "IMAGE_DISK_CACHE_DIR", tmp_path)
+    monkeypatch.setattr(media, "MAX_IMAGE_DISK_CACHE_FILES", 2)
+    monkeypatch.setattr(media, "_get_media_async_client", lambda **kwargs: CountingClient())
+
+    test_app = FastAPI()
+    test_app.include_router(media.router)
+    target = "https://voiranime.cx/wp-content/uploads/2026/09/poster-460x630.jpg"
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(test_app), base_url="http://127.0.0.1") as client:
+        r1, r2 = await asyncio.gather(
+            client.get("/api/media/image-proxy", params={"url": target}),
+            client.get("/api/media/image-proxy", params={"url": target}),
+        )
+        assert r1.status_code == 200 and r1.content == b"VOIRANIME_JPEG"
+        assert r2.status_code == 200 and r2.content == b"VOIRANIME_JPEG"
+        assert len(calls) == 1
+        assert calls[0] == (target, "https://voiranime.cx/")
+
+        # Write 2 more distinct cached images and verify oldest is pruned when cap is 2 files.
+        now = time.time()
+        first_bin = next(tmp_path.glob("*.bin"))
+        os.utime(first_bin, (now - 120, now - 120))
+        media._save_disk_cached_image("https://voiranime.cx/2.jpg", b"TWO", "image/jpeg")
+        second_bin = [p for p in tmp_path.glob("*.bin") if p != first_bin][0]
+        os.utime(second_bin, (now - 60, now - 60))
+        media._save_disk_cached_image("https://voiranime.cx/3.jpg", b"THREE", "image/jpeg")
+        assert len(list(tmp_path.glob("*.bin"))) == 2
+        assert not first_bin.exists()
 
