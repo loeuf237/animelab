@@ -17,4 +17,5 @@ Source code and build instructions: https://github.com/loeuf237/animelab
 For a release, use the source commit recorded in its build-info JSON file.
 
 Third-party components retain their copyright notices and licenses.
+- PyMiniRacer (`mini-racer` / `py_mini_racer`): ISC License (embedded V8 runtime on desktop/server builds).
 This notice does not replace their licenses or grant rights to third-party media.

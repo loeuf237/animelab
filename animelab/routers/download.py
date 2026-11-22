@@ -134,7 +134,7 @@ async def start_batch_download(request: Request):
     from animelab.services.extension_observability import InvalidSelector,extension_observability
     for source_id in {ep.get('source') or source for ep in episodes}:
         container=extension_service.get_container_source_by_id(source_id)
-        if container and getattr(container, 'runtime', '') != 'android-apk':
+        if container and getattr(container, 'runtime', '') not in ('android-apk', 'seanime'):
             visible=next((ext for ext in extension_service.get_visible_extensions() if ext['pkg']==container.pkg),None)
             if visible and any(check['recipe_revision']==visible['recipe_revision'] and check['status'] in ('selector_error','parse_error','unsupported') for check in visible.get('health',[]) if check['operation'] in ('load','latest','detail')):
                 return JSONResponse(status_code=409,content={'code':'source_recipe_invalid','error':'Testez ou corrigez cette recette avant de télécharger une série.'})

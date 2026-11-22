@@ -85,6 +85,18 @@ export async function mockApp(
       case '/api/extensions/android':
         data = { available: false, packages: [], operations: [] }
         break
+      case '/api/extensions/seanime':
+        data = {
+          runtime_available: true,
+          engine: 'mini-racer',
+          extensions: [],
+          counts: {},
+          repositories: [],
+        }
+        break
+      case '/api/extensions/seanime/repositories':
+        data = { repositories: [] }
+        break
       case '/api/extensions/repositories':
         data = { repositories: [] }
         break
@@ -196,6 +208,7 @@ export async function mockApp(
           }
         else if (url.pathname.endsWith('/catalogue'))
           data = { results: [], nextCursor: null, queryScope: 'catalogue' }
+        else if (url.pathname.startsWith('/api/extensions/seanime')) data = {}
         else if (url.pathname.startsWith('/api/extensions'))
           data = {
             active_repo: 'example/test-repo',

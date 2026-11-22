@@ -21,12 +21,13 @@ datas = [(str(project / 'animelab' / 'static'), 'animelab/static'),
          (str(project / 'animelab/desktop/panel.js'), 'animelab/desktop'),
          (str(project / 'animelab/desktop/panel.css'), 'animelab/desktop'),
          (str(project / 'animelab/shared/web'), 'animelab/shared/web'),
+         (str(project / 'animelab/services/seanime_shim.js'), 'animelab/services'),
          (str(project / 'docs' / 'desktop-distribution.md'), '.')]
 datas += collect_data_files('PySide6', includes=['*.json', 'Qt/translations/qtbase_fr.qm'])
-datas += collect_data_files('webview') + collect_data_files('curl_cffi')
+datas += collect_data_files('webview') + collect_data_files('curl_cffi') + collect_data_files('py_mini_racer')
 metadata = project / 'build' / 'release-metadata'
 if metadata.exists(): datas.append((str(metadata), 'release-metadata'))
-binaries = collect_dynamic_libs('curl_cffi')
+binaries = collect_dynamic_libs('curl_cffi') + collect_dynamic_libs('py_mini_racer')
 for name in ('ffmpeg', 'ffprobe'):
     source = os.getenv('ANIMAN_' + name.upper() + '_BINARY') or shutil.which(name)
     if not source: raise RuntimeError(f'{name} must be available at build time')
@@ -35,7 +36,16 @@ hiddenimports = ['uvicorn.logging', 'uvicorn.loops.auto', 'uvicorn.loops.asyncio
     'uvicorn.protocols.http.h11_impl', 'uvicorn.protocols.websockets.websockets_impl',
     'uvicorn.lifespan.on', 'sqlalchemy.dialects.sqlite', 'yt_dlp', '_cffi_backend', 'PySide6.QtWidgets']
 hiddenimports += collect_submodules('animelab.services.extractors')
-hiddenimports += ['animelab.services.recipe_runtime', 'animelab.services.recipe_plans']
+hiddenimports += [
+    'animelab.services.recipe_runtime',
+    'animelab.services.recipe_plans',
+    'py_mini_racer',
+    'animelab.services.seanime_service',
+    'animelab.services.seanime_runtime',
+    'animelab.services.seanime_catalog',
+    'animelab.services.seanime_ts',
+    'animelab.services.seanime_source',
+]
 if sys.platform == 'win32':
     hiddenimports += ['webview.platforms.edgechromium', 'webview.platforms.winforms']
 elif sys.platform == 'darwin':

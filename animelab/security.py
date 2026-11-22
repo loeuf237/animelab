@@ -63,6 +63,11 @@ def get_all_allowed_domains() -> set:
         domains.update(extension_service.get_allowed_domains())
     except Exception:
         pass
+    try:
+        from animelab.services.seanime_service import seanime_service
+        domains.update(seanime_service.get_allowed_domains())
+    except Exception:
+        pass
     return domains
 
 import time

@@ -123,14 +123,24 @@ class RegisteredSource:
                     existing_ids.add(fid)
         return {'id': self.id, 'name': self.name, 'baseUrl': self.base_url,
                 'lang': self.language, 'type': 'imported' if self.imported else 'native',
+                'runtime': getattr(self.service, 'runtime', '') or ('native' if not self.imported else 'recipe'),
                 'isEnabled': True, 'views': views, 'multiTags': self.capabilities.multi_tags,
                 'capabilities': {key: getattr(self.capabilities, key) for key in self.capabilities.__dataclass_fields__}}
 
 
 class SourceRegistry:
-    def __init__(self, natives=None, extensions=None):
+    def __init__(self, natives=None, extensions=None, seanime=None):
         self._natives = natives
         self._extensions = extensions
+        self._seanime = seanime
+
+    def seanime(self):
+        if self._seanime is not None:
+            return self._seanime
+        if self._extensions is not None:
+            return None
+        from animelab.services.seanime_service import seanime_service
+        return seanime_service
 
     def natives(self) -> dict[str, SourceProvider]:
         if self._natives is not None:
@@ -153,6 +163,9 @@ class SourceRegistry:
         if imported and getattr(service, 'runtime', '') == 'android-apk':
             capabilities = SourceCapabilities(search=True, detail=True, latest=service.supports_latest,
                                               popular=True, catalogue=True, multi_tags=True)
+        elif imported and getattr(service, 'runtime', '') == 'seanime':
+            capabilities = SourceCapabilities(search=True, detail=True, latest=False,
+                                              popular=False, catalogue=False, multi_tags=False)
         elif imported and isinstance(recipe, SourceRecipe):
             api_catalogue = bool(recipe.runtime.get('catalogue'))
             popular = bool(
@@ -180,6 +193,9 @@ class SourceRegistry:
     def all(self) -> list[RegisteredSource]:
         providers = dict(self.natives())
         providers.update({source_identity(source,source.pkg): source for source in self.extensions().get_enabled_container_sources()})
+        seanime_svc = self.seanime()
+        if seanime_svc is not None:
+            providers.update({source.source_id: source for source in seanime_svc.get_enabled_sources()})
         return [self.describe(sid, service) for sid, service in providers.items()]
 
     def get(self, source_id: str) -> RegisteredSource:
@@ -187,6 +203,10 @@ class SourceRegistry:
         service = self.natives().get(source_id)
         if service is None:
             service = self.extensions().get_container_source_by_id(source_id)
+        if service is None:
+            seanime_svc = self.seanime()
+            if seanime_svc is not None:
+                service = seanime_svc.get_source_by_id(source_id)
         if service is None:
             raise APIProblem('source_not_found', status=404, category='not_found')
         return self.describe(source_identity(service,source_id), service)

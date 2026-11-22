@@ -13,6 +13,13 @@ from urllib.parse import urlparse
 _loop = None
 
 
+def seanime_fetch(payload):
+    """Execute one Seanime fetch() call through Python's SSRF-protected transport."""
+    from animelab.services.seanime_runtime import host_fetch_json_sync
+
+    return host_fetch_json_sync(str(payload or "{}"))
+
+
 def extension_http(payload):
     """Native default OkHttp gateway: keep the shared URL/cookie/proxy policy."""
     import base64
@@ -155,6 +162,8 @@ def start(data_dir, cache_dir, port, token, test_mode=False):
     source_http.default_user_agent = source_http.valid_user_agent(str(verification.userAgent()))
     storage = jclass("com.animan.app.StorageAccess")
     update_environment(ANIMELAB_RELEASE_VERSION=str(jclass('com.animan.app.BuildConfig').RELEASE_VERSION))
+    from animelab.services.seanime_runtime import seanime_runtime
+    seanime_runtime.configure_android(jclass("com.animan.app.SeanimeJsBridge"))
     platform_events.storage_status_handler = lambda: json.loads(str(storage.status()))
     platform_events.storage_action_handler = lambda action: json.loads(str(storage.request(action)))
     import run

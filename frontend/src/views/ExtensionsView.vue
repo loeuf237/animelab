@@ -71,627 +71,657 @@
     </header>
 
     <ExplorerNavigation active="extensions" />
-    <label class="explorer-search">
-      <span>{{ tx('Rechercher une extension') }}</span>
-      <input
-        v-model="searchQuery"
-        type="search"
-        class="input-premium"
-        :placeholder="tx('Nom, langue ou paquet')"
-      />
-    </label>
-    <AndroidExtensionsPanel
-      ref="androidPanel"
-      :query="searchQuery"
-      :catalogue="extensions"
-      :filter-mode="filterLang"
-      @changed="fetchExtensions({ silent: true, skipAndroidReload: true })"
-    />
-    <details class="extension-management">
-      <summary>{{ tx('Dépôts, importation et mises à jour') }}</summary>
-      <ExtensionRepositoriesPanel
-        ref="repositoryPanel"
-        @changed="fetchExtensions({ silent: true })"
-      />
+    <div class="ecosystem-tabs" role="tablist" :aria-label="tx('Écosystème d’extensions')">
+      <button
+        type="button"
+        role="tab"
+        class="tab-btn"
+        :class="{ active: ecosystem === 'aniyomi' }"
+        :aria-selected="ecosystem === 'aniyomi'"
+        data-testid="ecosystem-tab-aniyomi"
+        @click="setEcosystem('aniyomi')"
+      >
+        {{ tx('Aniyomi') }}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        class="tab-btn"
+        :class="{ active: ecosystem === 'seanime' }"
+        :aria-selected="ecosystem === 'seanime'"
+        data-testid="ecosystem-tab-seanime"
+        @click="setEcosystem('seanime')"
+      >
+        {{ tx('Seanime') }}
+      </button>
+    </div>
 
-      <!-- Carte d'importation d'un magasin -->
-      <section class="settings-card-pro extension-repo-card">
-        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px">
-          <div
-            style="
-              width: 40px;
-              height: 40px;
-              border-radius: 10px;
-              background: rgba(139, 92, 246, 0.2);
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              color: #a78bfa;
-            "
-          >
-            <svg
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" />
-              <path d="M12 12v9" />
-              <path d="m8 17 4 4 4-4" />
-            </svg>
-          </div>
-          <div>
-            <h2 style="font-size: 1.15rem; font-weight: 600; color: var(--text); margin: 0">
-              {{ tx("Magasin d'extensions Aniyomi") }}
-            </h2>
-            <p style="font-size: 0.85rem; color: var(--muted); margin: 2px 0 0 0">
-              {{
-                tx(
-                  'Ajoutez un dépôt pour synchroniser automatiquement les extensions de visionnage.',
-                )
-              }}
-            </p>
-          </div>
-        </div>
+    <template v-if="ecosystem === 'aniyomi'">
+      <label class="explorer-search">
+        <span>{{ tx('Rechercher une extension') }}</span>
+        <input
+          v-model="searchQuery"
+          type="search"
+          class="input-premium"
+          :placeholder="tx('Nom, langue ou paquet')"
+        />
+      </label>
+      <AndroidExtensionsPanel
+        ref="androidPanel"
+        :query="searchQuery"
+        :catalogue="extensions"
+        :filter-mode="filterLang"
+        @changed="fetchExtensions({ silent: true, skipAndroidReload: true })"
+      />
+      <details class="extension-management">
+        <summary>{{ tx('Dépôts, importation et mises à jour') }}</summary>
+        <ExtensionRepositoriesPanel
+          ref="repositoryPanel"
+          @changed="fetchExtensions({ silent: true })"
+        />
 
-        <!-- Barre d'import -->
-        <form @submit.prevent="handleImportRepo" style="margin-top: 16px">
-          <div style="display: flex; gap: 10px; flex-wrap: wrap">
-            <input
-              v-model="repoUrl"
-              type="url"
-              class="input-premium extension-repo-input"
-              placeholder="https://raw.githubusercontent.com/yuzono/anime-repo/repo/index.min.json"
-              required
-            />
-            <button
-              type="submit"
-              class="btn btn-primary"
-              :disabled="isImporting"
+        <!-- Carte d'importation d'un magasin -->
+        <section class="settings-card-pro extension-repo-card">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px">
+            <div
               style="
-                padding: 12px 24px;
-                font-weight: 600;
+                width: 40px;
+                height: 40px;
+                border-radius: 10px;
+                background: rgba(139, 92, 246, 0.2);
                 display: flex;
                 align-items: center;
-                gap: 8px;
+                justify-content: center;
+                color: #a78bfa;
               "
             >
-              <div v-if="isImporting" class="spinner-sm"></div>
-              <span>{{ tx(isImporting ? 'Importation en cours...' : 'Importer le magasin') }}</span>
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" />
+                <path d="M12 12v9" />
+                <path d="m8 17 4 4 4-4" />
+              </svg>
+            </div>
+            <div>
+              <h2 style="font-size: 1.15rem; font-weight: 600; color: var(--text); margin: 0">
+                {{ tx("Magasin d'extensions Aniyomi") }}
+              </h2>
+              <p style="font-size: 0.85rem; color: var(--muted); margin: 2px 0 0 0">
+                {{
+                  tx(
+                    'Ajoutez un dépôt pour synchroniser automatiquement les extensions de visionnage.',
+                  )
+                }}
+              </p>
+            </div>
+          </div>
+
+          <!-- Barre d'import -->
+          <form @submit.prevent="handleImportRepo" style="margin-top: 16px">
+            <div style="display: flex; gap: 10px; flex-wrap: wrap">
+              <input
+                v-model="repoUrl"
+                type="url"
+                class="input-premium extension-repo-input"
+                placeholder="https://raw.githubusercontent.com/yuzono/anime-repo/repo/index.min.json"
+                required
+              />
+              <button
+                type="submit"
+                class="btn btn-primary"
+                :disabled="isImporting"
+                style="
+                  padding: 12px 24px;
+                  font-weight: 600;
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+                "
+              >
+                <div v-if="isImporting" class="spinner-sm"></div>
+                <span>{{
+                  tx(isImporting ? 'Importation en cours...' : 'Importer le magasin')
+                }}</span>
+              </button>
+            </div>
+          </form>
+
+          <!-- Raccourcis Dépôts Populaires -->
+          <div
+            style="
+              margin-top: 14px;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              flex-wrap: wrap;
+              font-size: 0.85rem;
+              color: #9ca3af;
+            "
+          >
+            <span>{{ tx('Dépôts recommandés :') }}</span>
+            <button
+              type="button"
+              class="speed-preset-chip"
+              @click="
+                setRepoPreset(
+                  'https://raw.githubusercontent.com/yuzono/anime-repo/repo/index.min.json',
+                )
+              "
+            >
+              <Zap :size="13" aria-hidden="true" /> Yuzono Anime Repo
+            </button>
+            <button
+              type="button"
+              class="speed-preset-chip"
+              @click="
+                setRepoPreset(
+                  'https://raw.githubusercontent.com/aniyomiorg/aniyomi-extensions/repo/index.min.json',
+                )
+              "
+            >
+              📦 Aniyomi Repo
             </button>
           </div>
-        </form>
 
-        <!-- Raccourcis Dépôts Populaires -->
+          <!-- Message d'information de règles -->
+          <div
+            style="
+              margin-top: 16px;
+              padding: 10px 14px;
+              background: rgba(59, 130, 246, 0.08);
+              border-left: 3px solid #60a5fa;
+              border-radius: 4px;
+              font-size: 0.82rem;
+              color: #bfdbfe;
+            "
+          >
+            ℹ️ <strong>{{ tx('Règle de visibilité :') }}</strong>
+            {{
+              tx(
+                'Les dépôts activés sont regroupés ici. Les extensions installées restent disponibles même si leur dépôt est désactivé ou les retire. Les nouvelles extensions sont',
+              )
+            }}
+            <strong>{{ tx('désactivées') }}</strong>
+            {{
+              tx(
+                ': activez manuellement uniquement celles que vous souhaitez utiliser dans la recherche et le streaming.',
+              )
+            }}
+          </div>
+        </section>
+
+        <!-- Informations sur le magasin actuellement actif -->
         <div
+          v-if="activeRepo"
           style="
-            margin-top: 14px;
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 8px;
+            background: var(--panel);
+            border: 1px solid var(--line);
+            padding: 14px 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
             flex-wrap: wrap;
-            font-size: 0.85rem;
-            color: #9ca3af;
+            gap: 10px;
           "
         >
-          <span>{{ tx('Dépôts recommandés :') }}</span>
-          <button
-            type="button"
-            class="speed-preset-chip"
-            @click="
-              setRepoPreset(
-                'https://raw.githubusercontent.com/yuzono/anime-repo/repo/index.min.json',
-              )
+          <div style="display: flex; align-items: center; gap: 10px">
+            <span
+              style="
+                display: inline-block;
+                width: 10px;
+                height: 10px;
+                border-radius: 50%;
+                background: #10b981;
+                box-shadow: 0 0 8px #10b981;
+              "
+            ></span>
+            <div>
+              <span
+                style="
+                  font-size: 0.8rem;
+                  text-transform: uppercase;
+                  letter-spacing: 0.05em;
+                  color: var(--muted);
+                "
+                >{{ tx('Dernier dépôt consulté :') }}</span
+              >
+              <strong style="color: var(--text); margin-left: 6px; font-size: 0.95rem">{{
+                tx(activeRepo.name)
+              }}</strong>
+            </div>
+          </div>
+          <div
+            style="
+              font-size: 0.85rem;
+              color: #9ca3af;
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              flex-wrap: wrap;
             "
           >
-            <Zap :size="13" aria-hidden="true" /> Yuzono Anime Repo
-          </button>
-          <button
-            type="button"
-            class="speed-preset-chip"
-            @click="
-              setRepoPreset(
-                'https://raw.githubusercontent.com/aniyomiorg/aniyomi-extensions/repo/index.min.json',
-              )
-            "
-          >
-            📦 Aniyomi Repo
-          </button>
+            <button
+              class="btn btn-sm"
+              :disabled="isCheckingUpdates || isImporting"
+              @click="checkUpdates"
+            >
+              {{ tx(isCheckingUpdates ? 'Vérification...' : 'Vérifier les mises à jour') }}
+            </button>
+            <button
+              v-if="updatesCount > 0"
+              class="btn btn-sm btn-primary"
+              :disabled="isUpdatingAll"
+              @click="handleUpdateAll"
+            >
+              {{ tx(isUpdatingAll ? 'Mise à jour...' : 'Tout mettre à jour') }} ({{
+                tx(updatesCount)
+              }})
+            </button>
+            <button class="btn btn-sm" :disabled="isImporting" @click="refreshRepo">
+              {{ tx('Actualiser le dépôt') }}
+            </button>
+            <span>{{ tx('Catalogue :') }} {{ tx(totalCount) }} sources</span>
+            <span>{{ tx('Actives :') }} {{ tx(enabledCount) }}</span>
+          </div>
         </div>
-
-        <!-- Message d'information de règles -->
-        <div
-          style="
-            margin-top: 16px;
-            padding: 10px 14px;
-            background: rgba(59, 130, 246, 0.08);
-            border-left: 3px solid #60a5fa;
-            border-radius: 4px;
-            font-size: 0.82rem;
-            color: #bfdbfe;
-          "
-        >
-          ℹ️ <strong>{{ tx('Règle de visibilité :') }}</strong>
-          {{
-            tx(
-              'Les dépôts activés sont regroupés ici. Les extensions installées restent disponibles même si leur dépôt est désactivé ou les retire. Les nouvelles extensions sont',
-            )
-          }}
-          <strong>{{ tx('désactivées') }}</strong>
-          {{
-            tx(
-              ': activez manuellement uniquement celles que vous souhaitez utiliser dans la recherche et le streaming.',
-            )
-          }}
-        </div>
-      </section>
-
-      <!-- Informations sur le magasin actuellement actif -->
+      </details>
+      <!-- Barre d'outils de filtrage & Recherche instantanée -->
       <div
-        v-if="activeRepo"
         style="
           display: flex;
           justify-content: space-between;
           align-items: center;
-          background: var(--panel);
-          border: 1px solid var(--line);
-          padding: 14px 20px;
-          border-radius: 12px;
+          gap: 12px;
           margin-bottom: 20px;
           flex-wrap: wrap;
-          gap: 10px;
         "
       >
-        <div style="display: flex; align-items: center; gap: 10px">
-          <span
-            style="
-              display: inline-block;
-              width: 10px;
-              height: 10px;
-              border-radius: 50%;
-              background: #10b981;
-              box-shadow: 0 0 8px #10b981;
-            "
-          ></span>
-          <div>
-            <span
-              style="
-                font-size: 0.8rem;
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-                color: var(--muted);
-              "
-              >{{ tx('Dernier dépôt consulté :') }}</span
-            >
-            <strong style="color: var(--text); margin-left: 6px; font-size: 0.95rem">{{
-              tx(activeRepo.name)
-            }}</strong>
-          </div>
-        </div>
-        <div
-          style="
-            font-size: 0.85rem;
-            color: #9ca3af;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
-          "
-        >
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
           <button
-            class="btn btn-sm"
-            :disabled="isCheckingUpdates || isImporting"
-            @click="checkUpdates"
+            type="button"
+            class="tab-btn"
+            :class="{ active: filterLang === 'all' }"
+            @click="filterLang = 'all'"
           >
-            {{ tx(isCheckingUpdates ? 'Vérification...' : 'Vérifier les mises à jour') }}
+            {{ tx('Toutes (') }}{{ tx(totalCount) }})
           </button>
           <button
-            v-if="updatesCount > 0"
-            class="btn btn-sm btn-primary"
-            :disabled="isUpdatingAll"
-            @click="handleUpdateAll"
+            type="button"
+            class="tab-btn"
+            :class="{ active: filterLang === 'fr' }"
+            @click="filterLang = 'fr'"
           >
-            {{ tx(isUpdatingAll ? 'Mise à jour...' : 'Tout mettre à jour') }} ({{
-              tx(updatesCount)
-            }})
+            {{ tx('🇫🇷 Français (') }}{{ tx(frCount) }})
           </button>
-          <button class="btn btn-sm" :disabled="isImporting" @click="refreshRepo">
-            {{ tx('Actualiser le dépôt') }}
+          <button
+            type="button"
+            class="tab-btn"
+            :class="{ active: filterLang === 'active' }"
+            @click="filterLang = 'active'"
+          >
+            {{ tx('Sources actives uniquement (') }}{{ tx(enabledCount) }})
           </button>
-          <span>{{ tx('Catalogue :') }} {{ tx(totalCount) }} sources</span>
-          <span>{{ tx('Actives :') }} {{ tx(enabledCount) }}</span>
+          <button
+            type="button"
+            class="tab-btn"
+            :class="{ active: filterLang === 'updates' }"
+            @click="filterLang = 'updates'"
+          >
+            {{ tx('🔄 Mises à jour (') }}{{ tx(updatesCount) }})
+          </button>
         </div>
       </div>
-    </details>
-    <!-- Barre d'outils de filtrage & Recherche instantanée -->
-    <div
-      style="
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 20px;
-        flex-wrap: wrap;
-      "
-    >
-      <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
-        <button
-          type="button"
-          class="tab-btn"
-          :class="{ active: filterLang === 'all' }"
-          @click="filterLang = 'all'"
-        >
-          {{ tx('Toutes (') }}{{ tx(totalCount) }})
-        </button>
-        <button
-          type="button"
-          class="tab-btn"
-          :class="{ active: filterLang === 'fr' }"
-          @click="filterLang = 'fr'"
-        >
-          {{ tx('🇫🇷 Français (') }}{{ tx(frCount) }})
-        </button>
-        <button
-          type="button"
-          class="tab-btn"
-          :class="{ active: filterLang === 'active' }"
-          @click="filterLang = 'active'"
-        >
-          {{ tx('Sources actives uniquement (') }}{{ tx(enabledCount) }})
-        </button>
-        <button
-          type="button"
-          class="tab-btn"
-          :class="{ active: filterLang === 'updates' }"
-          @click="filterLang = 'updates'"
-        >
-          {{ tx('🔄 Mises à jour (') }}{{ tx(updatesCount) }})
-        </button>
+
+      <!-- Loading spinner -->
+      <VerificationPrompt :challenges="extensionChallenges" />
+      <p v-if="diagnoseFailure" role="alert">
+        {{ tx(diagnoseFailure.message) }}
+        <ProxyRotationButton
+          :domain="diagnoseFailure.domain"
+          :retry="() => diagnose(diagnoseFailure!.extension)"
+        />
+      </p>
+      <div v-if="isLoading" class="loading-state" style="padding: 60px 20px; text-align: center">
+        <div class="spinner" style="margin: 0 auto 16px"></div>
+        <p style="color: var(--muted)">{{ tx('Chargement du catalogue des extensions...') }}</p>
       </div>
-    </div>
 
-    <!-- Loading spinner -->
-    <VerificationPrompt :challenges="extensionChallenges" />
-    <p v-if="diagnoseFailure" role="alert">
-      {{ tx(diagnoseFailure.message) }}
-      <ProxyRotationButton
-        :domain="diagnoseFailure.domain"
-        :retry="() => diagnose(diagnoseFailure!.extension)"
-      />
-    </p>
-    <div v-if="isLoading" class="loading-state" style="padding: 60px 20px; text-align: center">
-      <div class="spinner" style="margin: 0 auto 16px"></div>
-      <p style="color: var(--muted)">{{ tx('Chargement du catalogue des extensions...') }}</p>
-    </div>
+      <!-- Grille des extensions compacte et fluide -->
+      <div v-else-if="filteredExtensions.length > 0" class="extension-sections">
+        <section v-for="group in extensionGroups" :key="group.label" class="extension-section">
+          <h2>
+            {{ tx(group.label) }} <small>{{ group.items.length }}</small>
+          </h2>
+          <article v-for="ext in group.items" :key="ext.id" class="ext-card ext-card-compact">
+            <div class="ext-compact-left ext-main-info">
+              <ExtensionAvatar :name="ext.name" :src="ext.icon_url || ext.iconUrl" />
 
-    <!-- Grille des extensions compacte et fluide -->
-    <div v-else-if="filteredExtensions.length > 0" class="extension-sections">
-      <section v-for="group in extensionGroups" :key="group.label" class="extension-section">
-        <h2>
-          {{ tx(group.label) }} <small>{{ group.items.length }}</small>
-        </h2>
-        <article v-for="ext in group.items" :key="ext.id" class="ext-card ext-card-compact">
-          <div class="ext-compact-left ext-main-info">
-            <ExtensionAvatar :name="ext.name" :src="ext.icon_url || ext.iconUrl" />
-
-            <div style="flex: 1; min-width: 0">
-              <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap">
-                <h3 class="ext-title-text" :title="tx(ext.name)">{{ tx(ext.name) }}</h3>
-                <span
-                  class="version-badge"
-                  :style="{
-                    fontSize: '0.68rem',
-                    padding: '1px 5px',
-                    background:
-                      ext.lang === 'fr' ? '#2563eb' : ext.lang === 'all' ? '#7c3aed' : '#4b5563',
-                  }"
-                >
-                  {{ tx((ext.lang || 'ALL').toUpperCase()) }}
-                </span>
-                <span
-                  v-if="hasExtensionUpdate(ext)"
-                  class="version-badge"
-                  style="
-                    font-size: 0.68rem;
-                    padding: 1px 6px;
-                    background: #d97706;
-                    color: #fffbeb;
-                    font-weight: 600;
-                  "
-                >
-                  {{ tx('Mise à jour dispo') }}
-                </span>
-              </div>
-
-              <div
-                style="
-                  display: flex;
-                  align-items: center;
-                  gap: 8px;
-                  font-size: 0.75rem;
-                  color: #9ca3af;
-                  margin-top: 2px;
-                  flex-wrap: wrap;
-                "
-              >
-                <span v-if="hasExtensionUpdate(ext)" style="color: #fbbf24; font-weight: 600">
-                  v{{ tx(ext.installed_version || ext.version || '1.0') }} → v{{
-                    tx(ext.available_version || ext.version || '1.0')
-                  }}
-                </span>
-                <span v-else>v{{ tx(ext.installed_version || ext.version || '1.0') }}</span>
-                <template v-if="ext.base_url || ext.baseUrl">
-                  <span>•</span>
-                  <a
-                    :href="ext.base_url || ext.baseUrl!"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style="
-                      color: #818cf8;
-                      text-decoration: none;
-                      overflow: hidden;
-                      text-overflow: ellipsis;
-                      max-width: 140px;
-                      white-space: nowrap;
-                    "
-                    :title="tx(ext.base_url || ext.baseUrl!)"
+              <div style="flex: 1; min-width: 0">
+                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap">
+                  <h3 class="ext-title-text" :title="tx(ext.name)">{{ tx(ext.name) }}</h3>
+                  <span
+                    class="version-badge"
+                    :style="{
+                      fontSize: '0.68rem',
+                      padding: '1px 5px',
+                      background:
+                        ext.lang === 'fr' ? '#2563eb' : ext.lang === 'all' ? '#7c3aed' : '#4b5563',
+                    }"
                   >
-                    {{ tx(formatDomain(ext.base_url || ext.baseUrl!)) }}
-                  </a>
-                </template>
-              </div>
+                    {{ tx((ext.lang || 'ALL').toUpperCase()) }}
+                  </span>
+                  <span
+                    v-if="hasExtensionUpdate(ext)"
+                    class="version-badge"
+                    style="
+                      font-size: 0.68rem;
+                      padding: 1px 6px;
+                      background: #d97706;
+                      color: #fffbeb;
+                      font-weight: 600;
+                    "
+                  >
+                    {{ tx('Mise à jour dispo') }}
+                  </span>
+                </div>
 
-              <div
-                v-if="ext.capabilities_summary"
-                style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px"
-              >
-                <span
-                  v-if="ext.capabilities_summary.popular"
+                <div
                   style="
-                    font-size: 0.68rem;
-                    padding: 1px 6px;
-                    border-radius: 999px;
-                    background: rgba(16, 185, 129, 0.14);
-                    color: #6ee7b7;
-                    display: inline-flex;
+                    display: flex;
                     align-items: center;
-                    gap: 3px;
+                    gap: 8px;
+                    font-size: 0.75rem;
+                    color: #9ca3af;
+                    margin-top: 2px;
+                    flex-wrap: wrap;
                   "
                 >
-                  <Flame :size="11" aria-hidden="true" /> {{ tx('Populaires') }}
-                </span>
-                <span
-                  v-if="(ext.capabilities_summary.tags_count || 0) > 0"
-                  style="
-                    font-size: 0.68rem;
-                    padding: 1px 6px;
-                    border-radius: 999px;
-                    background: var(--accent-container);
-                    color: var(--on-accent-container);
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 3px;
-                  "
+                  <span v-if="hasExtensionUpdate(ext)" style="color: #fbbf24; font-weight: 600">
+                    v{{ tx(ext.installed_version || ext.version || '1.0') }} → v{{
+                      tx(ext.available_version || ext.version || '1.0')
+                    }}
+                  </span>
+                  <span v-else>v{{ tx(ext.installed_version || ext.version || '1.0') }}</span>
+                  <template v-if="ext.base_url || ext.baseUrl">
+                    <span>•</span>
+                    <a
+                      :href="ext.base_url || ext.baseUrl!"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style="
+                        color: #818cf8;
+                        text-decoration: none;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        max-width: 140px;
+                        white-space: nowrap;
+                      "
+                      :title="tx(ext.base_url || ext.baseUrl!)"
+                    >
+                      {{ tx(formatDomain(ext.base_url || ext.baseUrl!)) }}
+                    </a>
+                  </template>
+                </div>
+
+                <div
+                  v-if="ext.capabilities_summary"
+                  style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px"
                 >
-                  <Tag :size="11" aria-hidden="true" />
-                  {{ tx(ext.capabilities_summary.tags_count) }} {{ tx('tags') }}
-                </span>
-                <span
-                  v-for="feedLabel in (ext.capabilities_summary.custom_feeds || []).slice(0, 2)"
-                  :key="feedLabel"
-                  style="
-                    font-size: 0.68rem;
-                    padding: 1px 6px;
-                    border-radius: 999px;
-                    background: rgba(236, 72, 153, 0.14);
-                    color: #f9a8d4;
-                  "
-                >
-                  ✨ {{ tx(feedLabel) }}
-                </span>
+                  <span
+                    v-if="ext.capabilities_summary.popular"
+                    style="
+                      font-size: 0.68rem;
+                      padding: 1px 6px;
+                      border-radius: 999px;
+                      background: rgba(16, 185, 129, 0.14);
+                      color: #6ee7b7;
+                      display: inline-flex;
+                      align-items: center;
+                      gap: 3px;
+                    "
+                  >
+                    <Flame :size="11" aria-hidden="true" /> {{ tx('Populaires') }}
+                  </span>
+                  <span
+                    v-if="(ext.capabilities_summary.tags_count || 0) > 0"
+                    style="
+                      font-size: 0.68rem;
+                      padding: 1px 6px;
+                      border-radius: 999px;
+                      background: var(--accent-container);
+                      color: var(--on-accent-container);
+                      display: inline-flex;
+                      align-items: center;
+                      gap: 3px;
+                    "
+                  >
+                    <Tag :size="11" aria-hidden="true" />
+                    {{ tx(ext.capabilities_summary.tags_count) }} {{ tx('tags') }}
+                  </span>
+                  <span
+                    v-for="feedLabel in (ext.capabilities_summary.custom_feeds || []).slice(0, 2)"
+                    :key="feedLabel"
+                    style="
+                      font-size: 0.68rem;
+                      padding: 1px 6px;
+                      border-radius: 999px;
+                      background: rgba(236, 72, 153, 0.14);
+                      color: #f9a8d4;
+                    "
+                  >
+                    ✨ {{ tx(feedLabel) }}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div v-if="ext.health?.length" class="extension-health" role="status">
-            <strong>{{
-              tx(
-                ext.health[0]!.recipe_revision === ext.recipe_revision
-                  ? ext.health[0]!.messageKey
-                  : 'Recette modifiée, test nécessaire.',
-              )
-            }}</strong>
-            <small
-              >{{ tx('Dernière vérification') }} :
-              {{ new Date(ext.health[0]!.checked_at).toLocaleString() }} ·
-              {{ Math.round(ext.health[0]!.duration_ms) }} ms · r{{
-                ext.health[0]!.recipe_revision
-              }}</small
-            >
-          </div>
-          <div class="extension-actions">
-            <button
-              v-if="hasExtensionUpdate(ext)"
-              class="btn btn-sm btn-primary"
-              :disabled="busyExtensions.has(ext.id)"
-              @click="handleUpdateExtension(ext)"
-            >
-              {{ tx('Mettre à jour') }} (v{{ tx(ext.available_version) }})
-            </button>
-            <router-link
-              v-if="isExtensionActive(ext) && ext.runtime !== 'android-apk'"
-              :to="{ name: 'sources', params: { sourceId: ext.pkg } }"
-              class="btn btn-sm"
-            >
-              {{ tx('Explorer') }}
-            </router-link>
-            <details class="extension-row-tools">
-              <summary
-                :aria-label="tx(`Réglages de ${ext.name}`)"
-                :title="tx(`Réglages de ${ext.name}`)"
+            <div v-if="ext.health?.length" class="extension-health" role="status">
+              <strong>{{
+                tx(
+                  ext.health[0]!.recipe_revision === ext.recipe_revision
+                    ? ext.health[0]!.messageKey
+                    : 'Recette modifiée, test nécessaire.',
+                )
+              }}</strong>
+              <small
+                >{{ tx('Dernière vérification') }} :
+                {{ new Date(ext.health[0]!.checked_at).toLocaleString() }} ·
+                {{ Math.round(ext.health[0]!.duration_ms) }} ms · r{{
+                  ext.health[0]!.recipe_revision
+                }}</small
               >
-                <Settings2 :size="22" />
-              </summary>
+            </div>
+            <div class="extension-actions">
               <button
-                class="btn btn-sm"
+                v-if="hasExtensionUpdate(ext)"
+                class="btn btn-sm btn-primary"
                 :disabled="busyExtensions.has(ext.id)"
-                @click="diagnose(ext)"
+                @click="handleUpdateExtension(ext)"
               >
-                {{ tx('Tester') }}
+                {{ tx('Mettre à jour') }} (v{{ tx(ext.available_version) }})
               </button>
-              <button
-                v-if="ext.runtime !== 'android-apk'"
+              <router-link
+                v-if="isExtensionActive(ext) && ext.runtime !== 'android-apk'"
+                :to="{ name: 'sources', params: { sourceId: ext.pkg } }"
                 class="btn btn-sm"
-                :disabled="busyExtensions.has(ext.id)"
-                @click="handleRecompileExtension(ext)"
               >
-                {{ tx('Recompiler') }}
-              </button>
-              <button
-                v-if="ext.runtime !== 'android-apk'"
-                class="btn btn-sm"
-                @click="editRecipe(ext)"
-              >
-                {{ tx('Configurer') }}
-              </button>
-            </details>
-            <template v-if="androidAvailable">
-              <button
-                v-if="busyExtensions.has(ext.id)"
-                type="button"
-                class="btn btn-sm btn-secondary ext-install-btn"
-                disabled
-              >
-                <span class="spinner-sm" aria-hidden="true"></span>
-                <span>{{ tx('Téléchargement…') }}</span>
-              </button>
-              <div v-else-if="activeAndroidOp(ext.pkg)" class="ext-android-pending">
-                <span class="ext-pending-chip">
-                  <span class="spinner-sm" aria-hidden="true"></span>
-                  {{
-                    tx(
-                      activeAndroidOp(ext.pkg)!.state === 'permission_required'
-                        ? 'Autorisation requise'
-                        : 'En attente…',
-                    )
-                  }}
-                </span>
-                <button
-                  type="button"
-                  class="btn btn-sm btn-secondary"
-                  @click="androidPanel?.cancelOperation(activeAndroidOp(ext.pkg)!.id)"
+                {{ tx('Explorer') }}
+              </router-link>
+              <details class="extension-row-tools">
+                <summary
+                  :aria-label="tx(`Réglages de ${ext.name}`)"
+                  :title="tx(`Réglages de ${ext.name}`)"
                 >
-                  {{ tx('Annuler') }}
+                  <Settings2 :size="22" />
+                </summary>
+                <button
+                  class="btn btn-sm"
+                  :disabled="busyExtensions.has(ext.id)"
+                  @click="diagnose(ext)"
+                >
+                  {{ tx('Tester') }}
                 </button>
-              </div>
-              <button
-                v-else
-                type="button"
-                class="btn btn-sm btn-primary ext-install-btn"
-                @click="handleToggleExtension(ext, true)"
-              >
-                <Download :size="15" aria-hidden="true" />
-                <span>{{ tx('Installer') }}</span>
-              </button>
-            </template>
-            <label v-else class="toggle-switch">
-              <input
-                type="checkbox"
-                :aria-label="
-                  tx(
-                    `${isExtensionActive(ext) ? 'Désactiver' : 'Installer ou activer'} ${ext.name}`,
-                  )
-                "
-                :checked="isExtensionActive(ext)"
-                :disabled="busyExtensions.has(ext.id)"
-                @change="handleToggleExtension(ext, ($event.target as HTMLInputElement).checked)"
-              />
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-        </article>
+                <button
+                  v-if="ext.runtime !== 'android-apk'"
+                  class="btn btn-sm"
+                  :disabled="busyExtensions.has(ext.id)"
+                  @click="handleRecompileExtension(ext)"
+                >
+                  {{ tx('Recompiler') }}
+                </button>
+                <button
+                  v-if="ext.runtime !== 'android-apk'"
+                  class="btn btn-sm"
+                  @click="editRecipe(ext)"
+                >
+                  {{ tx('Configurer') }}
+                </button>
+              </details>
+              <template v-if="androidAvailable">
+                <button
+                  v-if="busyExtensions.has(ext.id)"
+                  type="button"
+                  class="btn btn-sm btn-secondary ext-install-btn"
+                  disabled
+                >
+                  <span class="spinner-sm" aria-hidden="true"></span>
+                  <span>{{ tx('Téléchargement…') }}</span>
+                </button>
+                <div v-else-if="activeAndroidOp(ext.pkg)" class="ext-android-pending">
+                  <span class="ext-pending-chip">
+                    <span class="spinner-sm" aria-hidden="true"></span>
+                    {{
+                      tx(
+                        activeAndroidOp(ext.pkg)!.state === 'permission_required'
+                          ? 'Autorisation requise'
+                          : 'En attente…',
+                      )
+                    }}
+                  </span>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-secondary"
+                    @click="androidPanel?.cancelOperation(activeAndroidOp(ext.pkg)!.id)"
+                  >
+                    {{ tx('Annuler') }}
+                  </button>
+                </div>
+                <button
+                  v-else
+                  type="button"
+                  class="btn btn-sm btn-primary ext-install-btn"
+                  @click="handleToggleExtension(ext, true)"
+                >
+                  <Download :size="15" aria-hidden="true" />
+                  <span>{{ tx('Installer') }}</span>
+                </button>
+              </template>
+              <label v-else class="toggle-switch">
+                <input
+                  type="checkbox"
+                  :aria-label="
+                    tx(
+                      `${isExtensionActive(ext) ? 'Désactiver' : 'Installer ou activer'} ${ext.name}`,
+                    )
+                  "
+                  :checked="isExtensionActive(ext)"
+                  :disabled="busyExtensions.has(ext.id)"
+                  @change="handleToggleExtension(ext, ($event.target as HTMLInputElement).checked)"
+                />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </article>
+        </section>
+      </div>
+
+      <!-- Empty State -->
+      <div
+        v-else-if="
+          extensions.length === 0 || !androidAvailable || (androidPanel?.visibleCount ?? 0) === 0
+        "
+        class="empty-state"
+        style="
+          padding: 60px 20px;
+          text-align: center;
+          background: rgba(18, 22, 40, 0.4);
+          border-radius: 16px;
+          border: 1px dashed rgba(255, 255, 255, 0.1);
+        "
+      >
+        <div style="font-size: 2.5rem; margin-bottom: 12px">📦</div>
+        <h3 style="font-size: 1.25rem; font-weight: 600; color: #f3f4f6; margin-bottom: 6px">
+          {{
+            tx(
+              extensions.length === 0
+                ? "Aucun magasin d'extensions actif"
+                : 'Aucune extension ne correspond aux filtres',
+            )
+          }}
+        </h3>
+        <p style="color: #9ca3af; max-width: 460px; margin: 0 auto 20px auto; font-size: 0.9rem">
+          {{
+            tx(
+              extensions.length === 0
+                ? "Importez un catalogue d'extensions Aniyomi ci-dessus pour afficher et activer vos sources d'animation préférées."
+                : 'Modifiez votre recherche ou sélectionnez un autre filtre de langue.',
+            )
+          }}
+        </p>
+        <button
+          v-if="extensions.length === 0"
+          type="button"
+          class="btn btn-primary"
+          @click="importDefaultRepo"
+        >
+          <Zap :size="15" aria-hidden="true" />
+          <span>{{ tx('Importer Yuzono Anime Repo en 1 clic') }}</span>
+        </button>
+      </div>
+
+      <section
+        v-if="editingExtension"
+        class="settings-card-pro"
+        style="padding: 20px; margin-top: 20px"
+      >
+        <h2>{{ tx('Recette de') }} {{ tx(editingExtension.name) }}</h2>
+        <p>
+          {{
+            tx(
+              'Modifiez l’adresse du site et ses sélecteurs si son fonctionnement a changé. Les extensions utilisant une API nécessitent un adaptateur compatible.',
+            )
+          }}
+        </p>
+        <textarea
+          v-model="recipeText"
+          class="input-premium"
+          style="width: 100%; min-height: 240px"
+          :aria-label="tx('Recette JSON')"
+        ></textarea>
+        <button
+          class="btn btn-primary"
+          :disabled="busyExtensions.has(editingExtension.id)"
+          @click="saveRecipe"
+        >
+          {{ tx('Enregistrer') }}
+        </button>
+        <button class="btn" @click="editingExtension = null">{{ tx('Fermer') }}</button>
+        <RecipeHistory
+          :key="editingExtension.id"
+          :extension-id="editingExtension.id"
+          @restored="recipeRestored"
+        />
       </section>
-    </div>
-
-    <!-- Empty State -->
-    <div
-      v-else-if="
-        extensions.length === 0 || !androidAvailable || (androidPanel?.visibleCount ?? 0) === 0
-      "
-      class="empty-state"
-      style="
-        padding: 60px 20px;
-        text-align: center;
-        background: rgba(18, 22, 40, 0.4);
-        border-radius: 16px;
-        border: 1px dashed rgba(255, 255, 255, 0.1);
-      "
-    >
-      <div style="font-size: 2.5rem; margin-bottom: 12px">📦</div>
-      <h3 style="font-size: 1.25rem; font-weight: 600; color: #f3f4f6; margin-bottom: 6px">
-        {{
-          tx(
-            extensions.length === 0
-              ? "Aucun magasin d'extensions actif"
-              : 'Aucune extension ne correspond aux filtres',
-          )
-        }}
-      </h3>
-      <p style="color: #9ca3af; max-width: 460px; margin: 0 auto 20px auto; font-size: 0.9rem">
-        {{
-          tx(
-            extensions.length === 0
-              ? "Importez un catalogue d'extensions Aniyomi ci-dessus pour afficher et activer vos sources d'animation préférées."
-              : 'Modifiez votre recherche ou sélectionnez un autre filtre de langue.',
-          )
-        }}
-      </p>
-      <button
-        v-if="extensions.length === 0"
-        type="button"
-        class="btn btn-primary"
-        @click="importDefaultRepo"
-      >
-        <Zap :size="15" aria-hidden="true" />
-        <span>{{ tx('Importer Yuzono Anime Repo en 1 clic') }}</span>
-      </button>
-    </div>
-
-    <section
-      v-if="editingExtension"
-      class="settings-card-pro"
-      style="padding: 20px; margin-top: 20px"
-    >
-      <h2>{{ tx('Recette de') }} {{ tx(editingExtension.name) }}</h2>
-      <p>
-        {{
-          tx(
-            'Modifiez l’adresse du site et ses sélecteurs si son fonctionnement a changé. Les extensions utilisant une API nécessitent un adaptateur compatible.',
-          )
-        }}
-      </p>
-      <textarea
-        v-model="recipeText"
-        class="input-premium"
-        style="width: 100%; min-height: 240px"
-        :aria-label="tx('Recette JSON')"
-      ></textarea>
-      <button
-        class="btn btn-primary"
-        :disabled="busyExtensions.has(editingExtension.id)"
-        @click="saveRecipe"
-      >
-        {{ tx('Enregistrer') }}
-      </button>
-      <button class="btn" @click="editingExtension = null">{{ tx('Fermer') }}</button>
-      <RecipeHistory
-        :key="editingExtension.id"
-        :extension-id="editingExtension.id"
-        @restored="recipeRestored"
-      />
-    </section>
+    </template>
+    <SeanimeExtensionsPanel v-else />
     <!-- Notification Toast -->
   </div>
 </template>
@@ -703,14 +733,38 @@ import ExplorerNavigation from '@/components/ExplorerNavigation.vue'
 import ExtensionAvatar from '@/components/ExtensionAvatar.vue'
 import VerificationPrompt from '@/components/VerificationPrompt.vue'
 import ProxyRotationButton from '@/components/ProxyRotationButton.vue'
+import SeanimeExtensionsPanel from '@/components/SeanimeExtensionsPanel.vue'
 import { useVerificationStore, challengeFromError } from '@/stores/verification'
 import type { SourceChallenge } from '@/types'
 import { tx } from '@/utils/locale'
 import { useNotifications } from '@/stores/notifications'
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import AndroidExtensionsPanel from '@/components/AndroidExtensionsPanel.vue'
 import ExtensionRepositoriesPanel from '@/components/ExtensionRepositoriesPanel.vue'
+
+const route = useRoute()
+const router = useRouter()
+const ecosystem = ref<'aniyomi' | 'seanime'>(
+  route.query.ecosystem === 'seanime' ? 'seanime' : 'aniyomi',
+)
+watch(
+  () => route.query.ecosystem,
+  (val) => {
+    ecosystem.value = val === 'seanime' ? 'seanime' : 'aniyomi'
+  },
+)
+function setEcosystem(next: 'aniyomi' | 'seanime') {
+  ecosystem.value = next
+  const nextQuery = { ...route.query }
+  if (next === 'seanime') {
+    nextQuery.ecosystem = 'seanime'
+  } else {
+    delete nextQuery.ecosystem
+  }
+  void router.replace({ query: nextQuery })
+}
 const repositoryPanel = ref<InstanceType<typeof ExtensionRepositoriesPanel> | null>(null)
 const androidPanel = ref<InstanceType<typeof AndroidExtensionsPanel> | null>(null)
 const androidAvailable = computed(() => Boolean(androidPanel.value?.available))
@@ -1294,5 +1348,11 @@ onMounted(() => {
   background: var(--panel);
   border: 1px solid var(--line);
   color: var(--muted);
+}
+.ecosystem-tabs {
+  display: inline-flex;
+  gap: 8px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
 }
 </style>

@@ -263,6 +263,60 @@ def startup_preferences(conn):
     conn.exec_driver_sql('CREATE TABLE app_preferences (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
 
 
+def seanime_extensions(conn):
+    conn.exec_driver_sql("""
+        CREATE TABLE IF NOT EXISTS seanime_repos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            url TEXT UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            kind TEXT NOT NULL DEFAULT 'marketplace',
+            is_active INTEGER NOT NULL DEFAULT 1,
+            last_error TEXT,
+            checked_at TEXT,
+            snapshot_hash TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.exec_driver_sql("""
+        CREATE TABLE IF NOT EXISTS seanime_extensions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            repo_id INTEGER NOT NULL REFERENCES seanime_repos(id) ON DELETE CASCADE,
+            ext_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            version TEXT NOT NULL DEFAULT '1.0.0',
+            installed_version TEXT,
+            available_version TEXT,
+            has_update INTEGER NOT NULL DEFAULT 0,
+            ext_type TEXT NOT NULL,
+            language TEXT NOT NULL DEFAULT 'javascript',
+            lang TEXT NOT NULL DEFAULT 'en',
+            author TEXT NOT NULL DEFAULT '',
+            description TEXT NOT NULL DEFAULT '',
+            notes TEXT NOT NULL DEFAULT '',
+            icon_url TEXT NOT NULL DEFAULT '',
+            website TEXT NOT NULL DEFAULT '',
+            readme TEXT NOT NULL DEFAULT '',
+            manifest_uri TEXT NOT NULL DEFAULT '',
+            payload_uri TEXT NOT NULL DEFAULT '',
+            payload TEXT NOT NULL DEFAULT '',
+            payload_sha256 TEXT NOT NULL DEFAULT '',
+            user_config_json TEXT NOT NULL DEFAULT '{}',
+            saved_config_json TEXT NOT NULL DEFAULT '{}',
+            marketplace_meta_json TEXT NOT NULL DEFAULT '{}',
+            catalog_state TEXT NOT NULL DEFAULT 'available',
+            is_installed INTEGER NOT NULL DEFAULT 0,
+            is_enabled INTEGER NOT NULL DEFAULT 0,
+            last_error TEXT,
+            health_json TEXT NOT NULL DEFAULT '{}',
+            installed_at TEXT,
+            updated_at TEXT,
+            UNIQUE(repo_id, ext_id)
+        )
+    """)
+    conn.exec_driver_sql('CREATE INDEX IF NOT EXISTS idx_seanime_extensions_ext_id ON seanime_extensions(ext_id)')
+    conn.exec_driver_sql('CREATE INDEX IF NOT EXISTS idx_seanime_extensions_enabled ON seanime_extensions(is_enabled)')
+
+
 MIGRATIONS = (
     Migration(1, 'core_tables', bootstrap),
     Migration(2, 'download_identity_and_verification', download_identity),
@@ -278,6 +332,7 @@ MIGRATIONS = (
     Migration(12, 'extension_catalog_installation_and_runtime', extension_lifecycle),
     Migration(13, 'persistent_native_extension_references', native_extension_references),
     Migration(14, 'startup_appearance_and_update_preferences', startup_preferences),
+    Migration(15, 'seanime_extensions', seanime_extensions),
 )
 
 

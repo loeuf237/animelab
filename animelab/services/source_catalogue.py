@@ -48,6 +48,14 @@ class SourceCatalogueService:
                 entries.append({'id': ext['pkg'], 'name': ext['name'], 'type': 'imported',
                                 'lang': ext['lang'], 'baseUrl': ext.get('base_url') or '',
                                 'isEnabled': False, 'views': [], 'multiTags': False})
+        try:
+            seanime_svc = source_registry.seanime()
+            if seanime_svc is not None:
+                for seanime_src in seanime_svc.get_enabled_sources():
+                    if seanime_src.source_id not in active:
+                        entries.append(self.descriptor(seanime_src.source_id, seanime_src))
+        except Exception:
+            pass
         return entries
 
     async def html(self, service, url, method='GET', data=None):
@@ -58,6 +66,8 @@ class SourceCatalogueService:
 
     async def filters(self, source_id):
         service = self.provider(source_id).service
+        if getattr(service, 'runtime', '') == 'seanime':
+            return {'tags': [], 'groups': [], 'orders': [{'id': 'source', 'label': 'Ordre de la source'}]}
         if getattr(service,'runtime','') == 'android-apk':
             return {'tags':[], 'groups':[], 'orders':[{'id':'source','label':'Ordre de la source'}],
                     'nativeFilters':await service.call('filters')}
@@ -351,6 +361,12 @@ class SourceCatalogueService:
 
     async def browse(self, source_id, mode='latest', query='', tags=(), order='source', cursor=None, native_filters=None):
         provider=self.provider(source_id)
+        if getattr(provider.service, 'runtime', '') == 'seanime':
+            if mode == 'search' and (query or '').strip():
+                items = await provider.observe('browse', provider.service.search_anime(query.strip()))
+            else:
+                items = []
+            return {'source': source_id, 'results': items, 'queryScope': 'catalogue', 'nextCursor': None}
         if getattr(provider.service,'runtime','') == 'android-apk':
             if mode not in ('search','popular','catalogue','latest') or (mode=='latest' and not provider.service.supports_latest):
                 raise CatalogueError('Opération indisponible pour cette source APK.')

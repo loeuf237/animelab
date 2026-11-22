@@ -55,6 +55,7 @@ export interface CatalogueSource {
   id: string
   name: string
   type: string
+  runtime?: string
   lang: string
   baseUrl: string
   isEnabled: boolean
@@ -260,7 +261,7 @@ export interface ExtensionCapabilitiesSummary {
 
 export interface ExtensionSource {
   catalog_state?: string
-  runtime?: 'recipe' | 'android-apk'
+  runtime?: 'recipe' | 'android-apk' | 'seanime'
   native_state?: string
   health?: import('./api').ExtensionHealth[]
   recipe_revision?: number
@@ -320,3 +321,5 @@ export interface VideoStreamInfo {
   referer?: string
   headers?: Record<string, string>
 }
+
+export * from './extensions'

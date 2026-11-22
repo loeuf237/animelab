@@ -8,6 +8,8 @@
 -keep class com.animan.app.ExtensionBridge { *; }
 -keep class com.animan.app.ExtensionResponsePipe { *; }
 -keep class com.animan.app.ExtensionInstallReceiver { *; }
+-keep class com.animan.app.SeanimeJsBridge { *; }
+-keepclassmembers class com.animan.app.SeanimeJsBridge$* { @android.webkit.JavascriptInterface <methods>; }
 -keep class com.animan.app.NativeUiBridge { *; }
 -keep class com.animan.app.CrashReporter { *; }
 -keepclassmembers class * {

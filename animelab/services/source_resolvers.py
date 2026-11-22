@@ -37,10 +37,27 @@ async def resolve_imported(ctx, task, direct_url, skip_local):
     except Exception:
         pass
 
-    if not matched_container and (task.source or '').startswith('aniyomi:'):
+    if not matched_container:
+        try:
+            from animelab.services.seanime_service import seanime_service
+            if task.source and task.source not in ("french-manga", "voir-anime", "animepahe"):
+                matched_container = seanime_service.get_source_by_id(task.source)
+            elif not task.source:
+                for s_src in seanime_service.get_enabled_sources():
+                    if s_src.has_reference(task.fileUrl):
+                        matched_container = s_src
+                        break
+                    source_host = (urlparse(s_src.base_url).hostname or "").lower()
+                    if source_host and u_host and (u_host == source_host or u_host.endswith("." + source_host)):
+                        matched_container = s_src
+                        break
+        except Exception:
+            pass
+
+    if not matched_container and ((task.source or '').startswith('aniyomi:') or (task.source or '').startswith('seanime:')):
         raise APIProblem('source_not_found', status=404, category='not_found')
 
-    native = getattr(matched_container, 'runtime', '') == 'android-apk'
+    native = getattr(matched_container, 'runtime', '') in ('android-apk', 'seanime')
     target_url = task.fileUrl if native else direct_url
     video_sources = []
     # Recipes can attach all alternate players to a known embed in its fragment.

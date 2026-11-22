@@ -53,7 +53,10 @@ async def search_api(
         # Let their bounded search worker (90 s) and parent (105 s) finish;
         # cancelling them after 12 s turns a healthy source into an error.
         timeout = 120 if getattr(provider, 'runtime', '') == 'android-apk' else (
-            45 if expands or source_id.endswith('.franime') else 12)
+            45 if expands or source_id.endswith('.franime') else (
+                35 if getattr(provider, 'runtime', '') == 'seanime' else 12
+            )
+        )
         return await asyncio.wait_for(service.search_anime(q.strip()), timeout=timeout)
 
     responses = await asyncio.gather(*(run(service) for _, service in providers), return_exceptions=True)
@@ -83,15 +86,33 @@ async def search_api(
         raise first_challenge
     return results
 
+def _is_seanime_reference(url: str, source: str) -> bool:
+    if not source.lower().startswith("seanime:") or not url.startswith(("http://", "https://")):
+        return False
+    try:
+        seanime_svc = source_registry.seanime()
+        src = seanime_svc.get_source_by_id(source) if seanime_svc is not None else None
+        return bool(src and src.has_reference(url))
+    except Exception:
+        return False
+
+
 async def fetch_enriched_anime_detail(url: str, source: str = "french-manga") -> Optional[Dict[str, Any]]:
     """Récupère et enrichit la fiche complète d'un animé (TMDB, épisodes, favoris, progression)."""
-    fetch_url = normalize_voiranime_url(url)
-    if not fetch_url or not is_safe_url(fetch_url):
-        return None
+    if source.lower().startswith("seanime:"):
+        fetch_url = (url or "").strip()
+        if not fetch_url.startswith(("http://", "https://")) or (
+            not _is_seanime_reference(fetch_url, source) and not is_safe_url(fetch_url)
+        ):
+            return None
+    else:
+        fetch_url = normalize_voiranime_url(url)
+        if not fetch_url or not is_safe_url(fetch_url):
+            return None
 
-    detected_source = detect_source_from_url(fetch_url, fallback=source)
-    if detected_source != source:
-        source = detected_source
+        detected_source = detect_source_from_url(fetch_url, fallback=source)
+        if detected_source != source:
+            source = detected_source
 
     provider = source_registry.get(source)
     detail = await provider.get_anime_detail(fetch_url)
@@ -165,7 +186,7 @@ async def api_anime_detail(
     source: str = Query("french-manga", alias="source")
 ):
     """Retourne la fiche anime complète avec épisodes et métadonnées en JSON pur."""
-    if not is_safe_url(normalize_voiranime_url(url)):
+    if not _is_seanime_reference(url, source) and not is_safe_url(normalize_voiranime_url(url)):
         raise HTTPException(status_code=400, detail="URL d'animé invalide ou non sécurisée")
     res = await fetch_enriched_anime_detail(url, source)
     if not res:

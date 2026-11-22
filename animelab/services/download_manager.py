@@ -604,6 +604,24 @@ class DownloadManagerService:
                     raise
                 except Exception:
                     pass
+                if not matched_container and source not in ("french-manga", "voir-anime", "animepahe"):
+                    try:
+                        from animelab.services.seanime_service import seanime_service
+                        if source:
+                            matched_container = seanime_service.get_source_by_id(source)
+                        elif download_page_url:
+                            for s_src in seanime_service.get_enabled_sources():
+                                if s_src.has_reference(download_page_url):
+                                    matched_container = s_src
+                                    break
+                                source_host = (urlparse(s_src.base_url).hostname or "").lower()
+                                if source_host and u_host and (u_host == source_host or u_host.endswith("." + source_host)):
+                                    matched_container = s_src
+                                    break
+                    except VerificationRequired:
+                        raise
+                    except Exception:
+                        pass
 
                 if matched_container:
                     is_imported = True
@@ -620,7 +638,7 @@ class DownloadManagerService:
                     qualities = {}
                     video_sources = []
                     target = None
-                    if matched_container and (not is_known_embed or parsed_u.fragment or getattr(matched_container, 'runtime', '') == 'android-apk'):
+                    if matched_container and (not is_known_embed or parsed_u.fragment or getattr(matched_container, 'runtime', '') in ('android-apk', 'seanime')):
                         try:
                             video_sources = await matched_container.get_episode_sources(download_page_url)
                         except VerificationRequired:
@@ -648,11 +666,11 @@ class DownloadManagerService:
                     # Two native Video objects can share an unresolved URL but
                     # carry different quality/memo data. Do not collapse them.
                     candidates = ([target] if target else []) + [row for row in video_sources if row is not target]
-                    if not candidates and getattr(matched_container, 'runtime', '') != 'android-apk':
+                    if not candidates and getattr(matched_container, 'runtime', '') not in ('android-apk', 'seanime'):
                         candidates = [{'url': target_url}]
                     for candidate in candidates:
                         try:
-                            if matched_container and getattr(matched_container, 'runtime', '') == 'android-apk':
+                            if matched_container and getattr(matched_container, 'runtime', '') in ('android-apk', 'seanime'):
                                 cand_res = await matched_container.resolve_candidate(candidate)
                             else:
                                 cand_res = await self.resolve_imported_video_stream(

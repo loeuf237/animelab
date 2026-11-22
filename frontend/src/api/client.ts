@@ -1172,6 +1172,156 @@ export const api = {
       body: JSON.stringify({ url }),
     })
   },
+
+  async getSeanimeExtensions(
+    params: {
+      repoId?: number
+      extType?: string
+      installedOnly?: boolean
+      supportedOnly?: boolean
+      search?: string
+    } = {},
+  ): Promise<import('@/types/extensions').SeanimeCatalogResponse> {
+    const qs = new URLSearchParams()
+    if (params.repoId !== undefined) qs.set('repo_id', String(params.repoId))
+    if (params.extType) qs.set('ext_type', params.extType)
+    if (params.installedOnly) qs.set('installed_only', 'true')
+    if (params.supportedOnly) qs.set('supported_only', 'true')
+    if (params.search?.trim()) qs.set('search', params.search.trim())
+    const suffix = qs.toString() ? `?${qs.toString()}` : ''
+    return request(`/api/extensions/seanime${suffix}`)
+  },
+
+  async getSeanimeRepositories(): Promise<{
+    repositories: import('@/types/extensions').SeanimeRepository[]
+  }> {
+    return request('/api/extensions/seanime/repositories')
+  },
+
+  async importSeanimeRepository(
+    url: string,
+    name?: string,
+  ): Promise<{
+    repo: import('@/types/extensions').SeanimeRepository
+    count: number
+    executable_count: number
+    warnings: string[]
+  }> {
+    return request('/api/extensions/seanime/repositories', {
+      method: 'POST',
+      body: JSON.stringify({ url, name: name || null }),
+    })
+  },
+
+  async toggleSeanimeRepository(
+    repoId: number,
+    enabled: boolean,
+  ): Promise<import('@/types/extensions').SeanimeRepository> {
+    return request(`/api/extensions/seanime/repositories/${repoId}/toggle`, {
+      method: 'POST',
+      body: JSON.stringify({ enabled }),
+    })
+  },
+
+  async deleteSeanimeRepository(repoId: number): Promise<{ success: boolean }> {
+    return request(`/api/extensions/seanime/repositories/${repoId}`, {
+      method: 'DELETE',
+    })
+  },
+
+  async refreshSeanimeRepositories(repoId?: number): Promise<{
+    refreshed: unknown[]
+    errors: { repo_id: number; url: string; error: string }[]
+  }> {
+    const qs = repoId !== undefined ? `?repo_id=${repoId}` : ''
+    return request(`/api/extensions/seanime/refresh${qs}`, { method: 'POST' })
+  },
+
+  async installSeanimeManifest(
+    manifestUrl: string,
+    enable = true,
+  ): Promise<import('@/types/extensions').SeanimeExtension> {
+    return request('/api/extensions/seanime/install-manifest', {
+      method: 'POST',
+      body: JSON.stringify({ manifest_url: manifestUrl, enable }),
+    })
+  },
+
+  async installSeanimeExtension(
+    extId: string,
+    options: { repoId?: number; enable?: boolean } = {},
+  ): Promise<import('@/types/extensions').SeanimeExtension> {
+    return request(`/api/extensions/seanime/${encodeURIComponent(extId)}/install`, {
+      method: 'POST',
+      body: JSON.stringify({ repo_id: options.repoId ?? null, enable: options.enable ?? true }),
+    })
+  },
+
+  async toggleSeanimeExtension(
+    extId: string,
+    enabled: boolean,
+  ): Promise<import('@/types/extensions').SeanimeExtension> {
+    return request(`/api/extensions/seanime/${encodeURIComponent(extId)}/toggle`, {
+      method: 'POST',
+      body: JSON.stringify({ enabled }),
+    })
+  },
+
+  async uninstallSeanimeExtension(
+    extId: string,
+  ): Promise<import('@/types/extensions').SeanimeExtension> {
+    return request(`/api/extensions/seanime/${encodeURIComponent(extId)}`, {
+      method: 'DELETE',
+    })
+  },
+
+  async checkSeanimeUpdates(): Promise<{
+    updates: import('@/types/extensions').SeanimeExtension[]
+    count: number
+  }> {
+    return request('/api/extensions/seanime/check-updates', { method: 'POST' })
+  },
+
+  async updateSeanimeExtension(
+    extId: string,
+  ): Promise<import('@/types/extensions').SeanimeExtension> {
+    return request(`/api/extensions/seanime/${encodeURIComponent(extId)}/update`, {
+      method: 'POST',
+    })
+  },
+
+  async updateAllSeanimeExtensions(): Promise<{
+    updated: import('@/types/extensions').SeanimeExtension[]
+    errors: { ext_id: string; error: string }[]
+  }> {
+    return request('/api/extensions/seanime/update-all', { method: 'POST' })
+  },
+
+  async getSeanimeExtensionConfig(
+    extId: string,
+  ): Promise<import('@/types/extensions').SeanimeConfigResponse> {
+    return request(`/api/extensions/seanime/${encodeURIComponent(extId)}/config`)
+  },
+
+  async saveSeanimeExtensionConfig(
+    extId: string,
+    values: Record<string, string>,
+  ): Promise<import('@/types/extensions').SeanimeConfigResponse> {
+    return request(`/api/extensions/seanime/${encodeURIComponent(extId)}/config`, {
+      method: 'PUT',
+      body: JSON.stringify({ values }),
+    })
+  },
+
+  async diagnoseSeanimeExtension(
+    extId: string,
+    query = 'naruto',
+  ): Promise<import('@/types/extensions').SeanimeDiagnoseResult> {
+    return request(`/api/extensions/seanime/${encodeURIComponent(extId)}/diagnose`, {
+      method: 'POST',
+      body: JSON.stringify({ query }),
+    })
+  },
 }
 
 export { ApiError }

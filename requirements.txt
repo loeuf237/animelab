@@ -48,6 +48,8 @@ idna==3.20
     #   httpx
 lxml==6.1.3
     # via animelab
+mini-racer==0.14.1
+    # via animelab
 pycparser==3.12 ; implementation_name != 'PyPy'
     # via cffi
 pydantic==2.13.5

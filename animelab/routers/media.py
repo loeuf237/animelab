@@ -402,6 +402,24 @@ async def resolve_stream(
     container_source = None
     if source not in ("voir-anime", "animepahe", "french-manga"):
         container_source = extension_service.get_container_source_by_id(source)
+        if not container_source:
+            try:
+                from animelab.services.seanime_service import seanime_service
+                if source:
+                    container_source = seanime_service.get_source_by_id(source)
+                else:
+                    parsed_ep = urllib.parse.urlparse(episodeUrl)
+                    ep_host = (parsed_ep.hostname or "").lower()
+                    for s_src in seanime_service.get_enabled_sources():
+                        if s_src.has_reference(episodeUrl):
+                            container_source = s_src
+                            break
+                        s_host = (urllib.parse.urlparse(s_src.base_url).hostname or "").lower()
+                        if s_host and ep_host and (ep_host == s_host or ep_host.endswith("." + s_host)):
+                            container_source = s_src
+                            break
+            except Exception:
+                pass
         if not container_source and not source:
             try:
                 parsed_ep = urllib.parse.urlparse(episodeUrl)
@@ -450,13 +468,13 @@ async def resolve_stream(
                     continue
 
                 try:
-                    if getattr(container_source, 'runtime', '') == 'android-apk':
+                    if getattr(container_source, 'runtime', '') in ('android-apk', 'seanime'):
                         resolved = await container_source.resolve_candidate(cand)
                     else:
                         resolved = await download_manager.resolve_imported_video_stream(
                             cand_url, referer=episodeUrl, preferred_quality=quality or cand_q)
                     if resolved and resolved.get("videoUrl"):
-                        if getattr(container_source, 'runtime', '') == 'android-apk':
+                        if getattr(container_source, 'runtime', '') in ('android-apk', 'seanime'):
                             native_media = resolved
                         video_url = resolved["videoUrl"]
                         server_type = resolved.get("serverType") or cand_srv
@@ -472,7 +490,7 @@ async def resolve_stream(
                 raise candidate_failures[0]
 
         # Si toujours non résolu, tenter directement sur episodeUrl
-        if not video_url and episodeUrl and getattr(container_source, 'runtime', '') != 'android-apk':
+        if not video_url and episodeUrl and getattr(container_source, 'runtime', '') not in ('android-apk', 'seanime'):
             try:
                 resolved = await download_manager.resolve_imported_video_stream(
                     episodeUrl,

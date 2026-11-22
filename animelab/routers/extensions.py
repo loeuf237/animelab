@@ -1,6 +1,6 @@
 from animelab.api_contracts import ContractRoute
 import logging
-from typing import Optional
+from typing import Any, Optional
 from fastapi import APIRouter, HTTPException, Body, Query, Request
 from fastapi.responses import JSONResponse
 
@@ -300,3 +300,200 @@ class RestoreRecipeRequest(BaseModel):
 async def restore_extension_recipe(ext_id: int, body: RestoreRecipeRequest):
     try: return await extension_service.restore_recipe(ext_id,body.revision)
     except ValueError as exc: raise HTTPException(400,str(exc)) from exc
+
+
+class SeanimeRepoRequest(BaseModel):
+    url: str = Field(min_length=1, max_length=4096)
+    name: str | None = Field(default=None, max_length=256)
+
+
+class SeanimeToggleRequest(BaseModel):
+    enabled: bool
+
+
+class SeanimeInstallRequest(BaseModel):
+    repo_id: int | None = None
+    enable: bool = True
+
+
+class SeanimeManifestInstallRequest(BaseModel):
+    manifest_url: str = Field(min_length=1, max_length=4096)
+    enable: bool = True
+
+
+class SeanimeConfigRequest(BaseModel):
+    values: dict[str, Any] = Field(default_factory=dict)
+
+
+class SeanimeDiagnoseRequest(BaseModel):
+    query: str = Field(default="naruto", max_length=250)
+
+
+@router.get("/api/extensions/seanime")
+async def list_seanime_extensions_api(
+    repo_id: int | None = None,
+    ext_type: str | None = None,
+    installed_only: bool = False,
+    supported_only: bool = False,
+    search: str | None = None,
+):
+    from animelab.services.seanime_service import seanime_service
+
+    return seanime_service.list_extensions(
+        repo_id=repo_id,
+        ext_type=ext_type,
+        installed_only=installed_only,
+        supported_only=supported_only,
+        search=search,
+    )
+
+
+@router.get("/api/extensions/seanime/repositories")
+async def list_seanime_repositories_api():
+    from animelab.services.seanime_service import seanime_service
+
+    return {"repositories": seanime_service.list_repositories()}
+
+
+@router.post("/api/extensions/seanime/repositories")
+async def import_seanime_repository_api(body: SeanimeRepoRequest):
+    from animelab.services.seanime_service import seanime_service
+
+    try:
+        return await seanime_service.import_repository(body.url, name=body.name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/api/extensions/seanime/repositories/{repo_id}/toggle")
+async def toggle_seanime_repository_api(repo_id: int, body: SeanimeToggleRequest):
+    from animelab.services.seanime_service import seanime_service
+
+    try:
+        return seanime_service.set_repository_enabled(repo_id, body.enabled)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.delete("/api/extensions/seanime/repositories/{repo_id}")
+async def delete_seanime_repository_api(repo_id: int):
+    from animelab.services.seanime_service import seanime_service
+
+    try:
+        seanime_service.delete_repository(repo_id)
+        return {"success": True}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/api/extensions/seanime/refresh")
+async def refresh_seanime_repositories_api(repo_id: int | None = None):
+    from animelab.services.seanime_service import seanime_service
+
+    return await seanime_service.refresh_repositories(repo_id=repo_id)
+
+
+@router.post("/api/extensions/seanime/install-manifest")
+async def install_seanime_manifest_api(body: SeanimeManifestInstallRequest):
+    from animelab.services.seanime_service import seanime_service
+
+    try:
+        return await seanime_service.install_from_manifest_url(body.manifest_url, enable=body.enable)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/api/extensions/seanime/check-updates")
+async def check_seanime_updates_api():
+    from animelab.services.seanime_service import seanime_service
+
+    return await seanime_service.check_updates()
+
+
+@router.post("/api/extensions/seanime/update-all")
+async def update_all_seanime_extensions_api():
+    from animelab.services.seanime_service import seanime_service
+
+    return await seanime_service.update_all_extensions()
+
+
+@router.post("/api/extensions/seanime/{ext_id}/install")
+async def install_seanime_extension_api(ext_id: str, body: SeanimeInstallRequest | None = None):
+    from animelab.services.seanime_service import seanime_service
+
+    req = body or SeanimeInstallRequest()
+    try:
+        return await seanime_service.install_extension(ext_id, repo_id=req.repo_id, enable=req.enable)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/api/extensions/seanime/{ext_id}/toggle")
+async def toggle_seanime_extension_api(ext_id: str, body: SeanimeToggleRequest):
+    from animelab.services.seanime_service import seanime_service
+
+    try:
+        return seanime_service.toggle_extension(ext_id, body.enabled)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.delete("/api/extensions/seanime/{ext_id}")
+async def uninstall_seanime_extension_api(ext_id: str):
+    from animelab.services.seanime_service import seanime_service
+
+    try:
+        return seanime_service.uninstall_extension(ext_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/api/extensions/seanime/{ext_id}/update")
+async def update_seanime_extension_api(ext_id: str):
+    from animelab.services.seanime_service import seanime_service
+
+    try:
+        return await seanime_service.update_extension(ext_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/api/extensions/seanime/{ext_id}/config")
+async def get_seanime_extension_config_api(ext_id: str):
+    from animelab.services.seanime_service import seanime_service
+
+    try:
+        return seanime_service.get_user_config(ext_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.put("/api/extensions/seanime/{ext_id}/config")
+async def save_seanime_extension_config_api(ext_id: str, body: SeanimeConfigRequest):
+    from animelab.services.seanime_service import seanime_service
+
+    try:
+        return seanime_service.save_user_config(ext_id, body.values)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/api/extensions/seanime/{ext_id}/diagnose")
+async def diagnose_seanime_extension_api(ext_id: str, body: SeanimeDiagnoseRequest | None = None):
+    from animelab.services.seanime_service import seanime_service
+
+    req = body or SeanimeDiagnoseRequest()
+    try:
+        return await seanime_service.diagnose_extension(ext_id, query=req.query)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

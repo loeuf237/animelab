@@ -599,7 +599,14 @@ async function readRoute() {
   results.value = []
   nextCursor.value = null
   loading.value = false
-  mode.value = typeof route.query.mode === 'string' ? route.query.mode : 'latest'
+  const availableModes = (currentSource.value?.views || []).map((v) => v.id)
+  const requestedMode = typeof route.query.mode === 'string' ? route.query.mode : ''
+  mode.value =
+    requestedMode && availableModes.includes(requestedMode)
+      ? requestedMode
+      : availableModes.includes('latest')
+        ? 'latest'
+        : availableModes[0] || requestedMode || 'latest'
   query.value = typeof route.query.q === 'string' ? route.query.q : ''
   order.value = typeof route.query.order === 'string' ? route.query.order : 'source'
   selectedTags.value = (
@@ -638,7 +645,14 @@ async function readRoute() {
     } else if (!sameSourceFiltersCached) {
       void loadFilters()
     }
-    await fetchPage()
+    const skipInitialEmptySearch =
+      currentSource.value?.runtime === 'seanime' &&
+      mode.value === 'search' &&
+      !query.value.trim() &&
+      !selectedTags.value.length
+    if (!skipInitialEmptySearch) {
+      await fetchPage()
+    }
   }
 }
 function refreshCatalogue() {

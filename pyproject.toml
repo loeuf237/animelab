@@ -17,6 +17,7 @@ dependencies = [
     "beautifulsoup4>=4.12.0",
     "yt-dlp>=2026.3.17",
     "lxml>=5.2.0",
+    "mini-racer>=0.14.1",
 ]
 
 [dependency-groups]
