@@ -211,7 +211,7 @@ async def test_animesama_inline_lien_bdd_and_oe_panneau_resolution():
         return ""
 
     with patch.object(container, "_fetch_html", side_effect=fake_fetch):
-        detail = await container.get_anime_detail("https://anime-sama.to/catalogue/kpop-demon-hunter/")
+        detail = await container.get_anime_detail("https://anime-sama.to/catalogue/kpop-demon-hunter/film/vostfr/")
         assert detail is not None
         assert detail.title == "Kpop Demon Hunter — Film"
         assert len(detail.episodes) == 1

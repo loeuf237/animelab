@@ -248,23 +248,17 @@ class RecipeRuntime:
 
     async def section_detail(self, url):
         root = self.section_root(url)
-        if not root:
+        if not root or root.rstrip('/') == url.rstrip('/'):
             return None
         metadata, sections = await self.section_data(root)
-        if root.rstrip('/') == url.rstrip('/'):
-            if not sections:
-                return None
-            section = sections[0]
-            url = section.url
-        else:
-            path = urlparse(url).path.rstrip('/')
-            section = next((item for item in sections if urlparse(item.url).path.rstrip('/') == path), None)
-            if section is None:
-                # A language variant uses the same season metadata without opening another season.
-                parent = path.rsplit('/', 1)[0]
-                section = next((item for item in sections if urlparse(item.url).path.rstrip('/').rsplit('/', 1)[0] == parent), None)
-            if section is None:
-                return None
+        path = urlparse(url).path.rstrip('/')
+        section = next((item for item in sections if urlparse(item.url).path.rstrip('/') == path), None)
+        if section is None:
+            # A language variant uses the same season metadata without opening another season.
+            parent = path.rsplit('/', 1)[0]
+            section = next((item for item in sections if urlparse(item.url).path.rstrip('/').rsplit('/', 1)[0] == parent), None)
+        if section is None:
+            return None
         html = await self.source._fetch_html(url)
         version = self.section_version(url)
         episodes = await self.episodes(url, BeautifulSoup(html, 'html.parser'), version)
@@ -478,7 +472,11 @@ class RecipeRuntime:
             arrays = self.arrays(active_text, config)
             directory = url if url.endswith('/') else url + '/'
             if not arrays:
-                paths = re.findall(config['pages_pattern'], self.script_text(active_text))
+                paths = list(re.findall(config['pages_pattern'], self.script_text(active_text)))
+                paths.extend(
+                    (card.get('href') or '').strip()
+                    for card in soup.select('a.oe-panneau[href]:not(.oe-panneau-scan)')
+                )
                 for path in paths:
                     clean_segments = [seg.lower() for seg in path.split('/') if seg]
                     if path.strip('/') in ('', 'url', 'undefined') or 'scan' in clean_segments:
