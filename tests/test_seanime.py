@@ -1047,3 +1047,45 @@ async def test_seanime_detail_resolves_per_episode_version_from_json_id(tmp_path
     detail = await provider.get_anime_detail(results[0].url)
     assert [(ep.number, ep.version) for ep in detail.episodes] == [(1, "VOSTFR"), (1, "VF")]
 
+
+@pytest.mark.asyncio
+async def test_seanime_fetch_bytes_retries_with_app_user_agent_on_403(tmp_path, monkeypatch):
+    from animelab import __version__
+    from animelab.services.source_http import AsyncSourceClient
+
+    db_file = tmp_path / "seanime_403.db"
+    init_db(db_file)
+    service = SeanimeExtensionService(db_path=str(db_file), runtime=MiniRacerSeanimeRuntime())
+
+    async def always_safe(_url: str, *, allow_private: bool = False) -> bool:
+        return True
+
+    monkeypatch.setattr("animelab.services.seanime_service.is_safe_url_async", always_safe)
+
+    expected_ua = f"AnimeLab/{__version__}"
+    calls: list[tuple[str, str, dict[str, object]]] = []
+
+    async def fake_request(self, method, url, **kwargs):
+        calls.append((method, url, dict(kwargs)))
+        ua = (kwargs.get("headers") or {}).get("User-Agent")
+        if ua != expected_ua:
+            return httpx.Response(
+                403,
+                content=b"Access denied, old Chrome version.",
+                request=httpx.Request(method, url),
+            )
+        return httpx.Response(
+            200,
+            content=b'{"ok":true}',
+            request=httpx.Request(method, url),
+        )
+
+    monkeypatch.setattr(AsyncSourceClient, "request", fake_request)
+
+    data = await service._fetch_bytes("https://codeberg.org/example/repo/manifest.json", 1024 * 1024)
+    assert data == b'{"ok":true}'
+    assert len(calls) == 2
+    assert "headers" not in calls[0][2]
+    assert calls[1][2]["headers"] == {"User-Agent": expected_ua}
+
+

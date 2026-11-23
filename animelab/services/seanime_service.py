@@ -7,6 +7,7 @@ import logging
 from typing import Any
 from urllib.parse import urlparse
 
+from animelab import __version__
 from animelab.config import settings
 from animelab.database import sqlite_connection
 from animelab.security import is_safe_url_async
@@ -121,6 +122,13 @@ class SeanimeExtensionService:
             raise ValueError(f"URL Seanime bloquée par la protection SSRF : {url}")
         async with source_http.async_client(timeout=25.0, follow_redirects=True) as client:
             resp = await client.request("GET", url, max_response_bytes=max_bytes)
+            if resp.status_code == 403:
+                resp = await client.request(
+                    "GET",
+                    url,
+                    headers={"User-Agent": f"AnimeLab/{__version__}"},
+                    max_response_bytes=max_bytes,
+                )
         if resp.status_code >= 400:
             raise ValueError(f"Échec du téléchargement Seanime (HTTP {resp.status_code}) pour {url}")
         return resp.content or b""

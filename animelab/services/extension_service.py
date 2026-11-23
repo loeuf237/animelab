@@ -1,3 +1,4 @@
+from animelab import __version__
 from animelab.services.extension_observability import save_recipe_revision,extension_observability,HEALTH_MESSAGES
 from animelab.database import init_db, sqlite_connection
 from animelab.services.source_http import source_http, VerificationRequired
@@ -211,10 +212,20 @@ class ExtensionService:
             "key_change_pending": bool(pending),
         }
 
+    async def _get_repo_resource(self, client, url: str, **kwargs):
+        response = await client.get(url, **kwargs)
+        if response.status_code == 403:
+            retry_kwargs = dict(kwargs)
+            retry_headers = dict(retry_kwargs.get("headers") or {})
+            retry_headers["User-Agent"] = f"AnimeLab/{__version__}"
+            retry_kwargs["headers"] = retry_headers
+            response = await client.get(url, **retry_kwargs)
+        return response
+
     async def _fetch_catalog_bytes(self, url):
         async with source_http.async_client(timeout=15.0, verify=settings.SSL_VERIFY, follow_redirects=True,
                                             event_hooks={'request': [self._validate_request]}) as client:
-            response = await client.get(url, headers={'User-Agent': settings.DEFAULT_USER_AGENT}, max_response_bytes=MAX_INDEX_BYTES)
+            response = await self._get_repo_resource(client, url, max_response_bytes=MAX_INDEX_BYTES)
             if response.status_code != 200:
                 raise ValueError(f'Catalogue indisponible (HTTP {response.status_code}).')
             if len(response.content) > MAX_INDEX_BYTES:
@@ -672,7 +683,7 @@ class ExtensionService:
             logger.info("[extensions] Downloading APK for %s from %s", name, apk_url)
             try:
                 async with source_http.async_client(timeout=25.0, verify=settings.SSL_VERIFY, follow_redirects=True, event_hooks={"request": [self._validate_request]}) as client:
-                    resp = await client.get(apk_url, headers={"User-Agent": settings.DEFAULT_USER_AGENT})
+                    resp = await self._get_repo_resource(client, apk_url)
                     if resp.status_code != 200:
                         raise ValueError(f'Téléchargement de l’APK impossible (HTTP {resp.status_code}).')
                     self._validate_apk(resp.content)
@@ -1044,7 +1055,7 @@ class ExtensionService:
             raise ValueError('Aucun APK disponible ; cette extension est déjà installée localement ou retirée du dépôt.')
         async with source_http.async_client(timeout=45, follow_redirects=True,
                                             event_hooks={'request':[self._validate_request]}) as client:
-            response = await client.get(target['apk_url'], max_response_bytes=64*1024*1024)
+            response = await self._get_repo_resource(client, target['apk_url'], max_response_bytes=64*1024*1024)
             if response.status_code != 200:
                 raise ValueError('Téléchargement APK refusé.')
             self._validate_apk(response.content)

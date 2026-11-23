@@ -117,3 +117,90 @@ async def test_bounded_source_response_closes_before_consuming_the_remaining_bod
     with pytest.raises(ValueError,match='taille'):
         await client.get('https://source.example',max_response_bytes=250)
     assert state=={'chunks':3,'closed':True}
+
+
+def test_default_user_agent_matches_source_http_chrome_profile(monkeypatch):
+    import os
+    from animelab.config import _default_chrome_user_agent, settings
+    from animelab.services.source_http import USER_AGENT
+
+    assert "Chrome/125." not in _default_chrome_user_agent()
+    assert _default_chrome_user_agent() == USER_AGENT
+    if "ANIMAN_USER_AGENT" not in os.environ:
+        assert "Chrome/125." not in settings.DEFAULT_USER_AGENT
+        assert settings.DEFAULT_USER_AGENT == USER_AGENT
+
+
+@pytest.mark.asyncio
+async def test_extension_catalog_fetch_omits_stale_ua_and_retries_with_app_ua_on_403(tmp_path, monkeypatch):
+    from animelab import __version__
+    from animelab.services.extension_service import ExtensionService
+    from animelab.services.source_http import AsyncSourceClient
+
+    service = ExtensionService(db_path=str(tmp_path / "codeberg.db"))
+    monkeypatch.setattr("animelab.services.extension_service.is_safe_url", lambda _url: True)
+
+    calls = []
+    index_url = "https://codeberg.org/hollow/aniyomi-extensions-fr/media/branch/repo/index.min.json"
+    repo_url = "https://codeberg.org/hollow/aniyomi-extensions-fr/media/branch/repo/repo.json"
+    expected_ua = f"AnimeLab/{__version__}"
+
+    async def fake_get(self, url, **kwargs):
+        calls.append((url, dict(kwargs)))
+        if url == index_url:
+            ua = (kwargs.get("headers") or {}).get("User-Agent")
+            if ua != expected_ua:
+                return httpx.Response(
+                    403,
+                    content=b"Access denied, old Chrome version.",
+                    request=httpx.Request("GET", url),
+                )
+            payload = [
+                {
+                    "name": "Aniyomi: Anime-Sama",
+                    "pkg": "eu.kanade.tachiyomi.animeextension.fr.animesama",
+                    "apk": "aniyomi-fr.animesama-v14.18.apk",
+                    "lang": "fr",
+                    "code": 18,
+                    "version": "14.18",
+                    "nsfw": 0,
+                    "sources": [
+                        {
+                            "name": "Anime-Sama",
+                            "lang": "fr",
+                            "id": "6170936930338275444",
+                            "baseUrl": "",
+                        }
+                    ],
+                }
+            ]
+            return httpx.Response(
+                200,
+                content=json.dumps(payload).encode(),
+                request=httpx.Request("GET", url),
+            )
+        if url == repo_url:
+            repo_meta = {
+                "meta": {
+                    "name": "Aniyomi Extensions (FR)",
+                    "signingKeyFingerprint": "d2e7ec822b23c78f68fb21cf4c490f47399bad8a53f371749b7a4c4a39049dae",
+                }
+            }
+            return httpx.Response(
+                200,
+                content=json.dumps(repo_meta).encode(),
+                request=httpx.Request("GET", url),
+            )
+        raise AssertionError(f"Unexpected URL: {url}")
+
+    monkeypatch.setattr(AsyncSourceClient, "get", fake_get)
+
+    res = await service.import_repository(index_url)
+    assert res["success"] is True
+    assert res["repo_name"] == "Aniyomi Extensions (FR)"
+    assert res["count"] == 1
+    assert len(calls) == 3
+    assert calls[0][0] == index_url and "headers" not in calls[0][1]
+    assert calls[1][0] == index_url and calls[1][1]["headers"] == {"User-Agent": expected_ua}
+    assert calls[2][0] == repo_url and "headers" not in calls[2][1]
+

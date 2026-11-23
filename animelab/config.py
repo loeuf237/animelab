@@ -48,6 +48,23 @@ def parse_allowed_hosts(value: str | None) -> list[str]:
     return hosts
 
 
+def _default_chrome_user_agent() -> str:
+    try:
+        from curl_cffi.requests.impersonate import DEFAULT_CHROME
+        version = DEFAULT_CHROME.removeprefix("chrome")
+        if version.isdigit():
+            return (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                f"(KHTML, like Gecko) Chrome/{version}.0.0.0 Safari/537.36"
+            )
+    except Exception:
+        pass
+    return (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
+    )
+
+
 class Settings:
     MAX_MEDIA_WORKERS: int = max(1, int(getenv("ANIMAN_MEDIA_WORKERS", "1")))
     MAX_EXPORT_WORKERS: int = max(1, int(getenv("ANIMAN_EXPORT_WORKERS", "1")))
@@ -72,7 +89,7 @@ class Settings:
     )
     DEFAULT_USER_AGENT: str = os.getenv(
         "ANIMAN_USER_AGENT",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+        _default_chrome_user_agent(),
     )
 
     # Téléchargement
