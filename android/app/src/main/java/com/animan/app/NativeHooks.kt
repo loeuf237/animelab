@@ -17,9 +17,6 @@ object NativeHooks {
         EngineHost.main.post { DownloadService.finishIdle(EngineHost.context) }
     }
 
-    @JvmStatic fun installAppUpdate(path: String): String =
-        ExtensionPackages.installSelfUpdate(EngineHost.context, path).toString()
-
     @JvmStatic @Synchronized fun progress(count: Int, percent: Int, label: String, taskId: String, status: String): Boolean {
         taskStates[taskId] = status.uppercase()
         val changed = count != EngineHost.activeCount
