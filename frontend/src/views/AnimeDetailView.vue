@@ -445,7 +445,7 @@
         <div class="episode-list">
           <div
             v-for="ep in filteredEpisodes"
-            :key="episodeKey(ep)"
+            :key="rowKey(ep)"
             class="episode-item tachiyomi-episode-item"
             :class="{
               'ep-downloaded': ep.isDownloaded,
@@ -459,9 +459,9 @@
                   type="checkbox"
                   class="episode-check"
                   :aria-label="tx(`Sélectionner l’épisode ${ep.number} ${ep.version || ''}`)"
-                  :checked="selectedEpisodes.has(episodeKey(ep))"
+                  :checked="selectedEpisodes.has(rowKey(ep))"
                   @click.stop
-                  @change="toggleEpisodeSelection(episodeKey(ep))"
+                  @change="toggleEpisodeSelection(rowKey(ep))"
                 />
               </label>
 
@@ -592,13 +592,13 @@
                 v-else
                 type="button"
                 class="tachiyomi-circle-btn btn-download-ep"
-                :class="{ 'is-loading': downloadingEpisodes.has(episodeKey(ep)) }"
-                :disabled="downloadingEpisodes.has(episodeKey(ep))"
+                :class="{ 'is-loading': downloadingEpisodes.has(rowKey(ep)) }"
+                :disabled="downloadingEpisodes.has(rowKey(ep))"
                 :aria-label="tx(`Télécharger l’épisode ${ep.number} ${ep.version || ''}`)"
                 :title="tx('Télécharger l\'épisode')"
                 @click.stop="downloadEp(ep)"
               >
-                <svg v-if="!downloadingEpisodes.has(episodeKey(ep))" viewBox="0 0 24 24">
+                <svg v-if="!downloadingEpisodes.has(rowKey(ep))" viewBox="0 0 24 24">
                   <circle
                     cx="12"
                     cy="12"
@@ -673,7 +673,9 @@
         </p>
         <ul class="batch-preview-list">
           <li v-for="(ep, index) in pendingBatch.episodes" :key="index">
-            {{ tx('Épisode') }} {{ tx(ep.number) }} · {{ tx(ep.version || 'Version non précisée') }}
+            {{ tx('Épisode') }} {{ tx(ep.number) }}
+            <span v-if="ep.title">· {{ tx(ep.title) }}</span> ·
+            {{ tx(ep.version || 'Version non précisée') }}
             <span v-if="ep.downloadSubtitles">{{ tx('· Sous-titres demandés') }}</span>
           </li>
         </ul>
@@ -694,7 +696,7 @@ import { useLibraryStore } from '@/stores/library'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useSearchContext } from '@/stores/searchContext'
 import { useNotifications } from '@/stores/notifications'
-import { episodeKey, episodeFileName } from '@/utils/episodes'
+import { buildEpisodeRowKeys, episodeKey, episodeFileName } from '@/utils/episodes'
 import { canFallbackToImageProxy, proxyImageUrl, resolveImageUrl } from '@/utils/media'
 import type { Episode, OutputProfile } from '@/types'
 import OutputProfilePicker from '@/components/OutputProfilePicker.vue'
@@ -751,6 +753,14 @@ function returnToResults() {
 }
 
 const detail = computed(() => animeStore.currentDetail)
+const episodeRowKeys = computed(() => buildEpisodeRowKeys(detail.value?.anime.episodes || []))
+function rowKey(ep: Episode): string {
+  return episodeRowKeys.value.get(ep) || episodeKey(ep)
+}
+function episodeSeason(ep: Episode): number {
+  const val = Number(ep.nativeMetadata?.season)
+  return Number.isInteger(val) && val > 0 ? val : 0
+}
 const coverUseProxy = ref(false)
 const coverBroken = ref(false)
 const coverSrc = computed(() => {
@@ -807,7 +817,9 @@ const filteredEpisodes = computed(() => {
   )
   if (episodeOrder.value !== 'source')
     list.sort(
-      (a, b) => (Number(a.number) - Number(b.number)) * (episodeOrder.value === 'desc' ? -1 : 1),
+      (a, b) =>
+        ((episodeSeason(a) - episodeSeason(b)) * 100000 + (Number(a.number) - Number(b.number))) *
+        (episodeOrder.value === 'desc' ? -1 : 1),
     )
   if (!epFilter.value.trim()) return list
   const q = epFilter.value.trim().toLowerCase()
@@ -817,17 +829,19 @@ const filteredEpisodes = computed(() => {
 })
 
 const selectedCount = computed(() => selectedEpisodes.value.size)
-const hiddenSelectedCount = computed(
-  () =>
+const hiddenSelectedCount = computed(() =>
+  Math.max(
+    0,
     selectedCount.value -
-    filteredEpisodes.value.filter((ep) => selectedEpisodes.value.has(episodeKey(ep))).length,
+      filteredEpisodes.value.filter((ep) => selectedEpisodes.value.has(rowKey(ep))).length,
+  ),
 )
 
 const nextUnwatchedEpisode = computed(() => {
   if (!detail.value) return null
   const episodes = [...detail.value.anime.episodes]
     .filter((ep) => !versionFilter.value || ep.version === versionFilter.value)
-    .sort((a, b) => Number(a.number) - Number(b.number))
+    .sort((a, b) => episodeSeason(a) - episodeSeason(b) || Number(a.number) - Number(b.number))
   return episodes.find((e) => !isWatched(e)) || episodes[0]
 })
 
@@ -856,7 +870,7 @@ function isWatched(ep: Episode) {
 }
 
 function isSubEnabled(ep: Episode) {
-  const num = episodeKey(ep)
+  const num = rowKey(ep)
   if (epSubtitles.value[num] !== undefined) {
     return epSubtitles.value[num]
   }
@@ -864,7 +878,7 @@ function isSubEnabled(ep: Episode) {
 }
 
 function toggleEpSub(ep: Episode) {
-  const num = episodeKey(ep)
+  const num = rowKey(ep)
   const current = isSubEnabled(ep)
   epSubtitles.value[num] = !current
 }
@@ -873,7 +887,7 @@ function toggleBatchSubtitles() {
   const val = batchSubtitles.value
   if (detail.value) {
     for (const ep of filteredEpisodes.value) {
-      epSubtitles.value[episodeKey(ep)] = val
+      epSubtitles.value[rowKey(ep)] = val
     }
   }
 }
@@ -889,7 +903,7 @@ function toggleEpisodeSelection(num: string) {
 function selectAllEpisodes() {
   if (!detail.value) return
   for (const ep of filteredEpisodes.value) {
-    selectedEpisodes.value.add(episodeKey(ep))
+    selectedEpisodes.value.add(rowKey(ep))
   }
 }
 
@@ -898,7 +912,7 @@ function selectUnwatchedEpisodes() {
   selectedEpisodes.value.clear()
   for (const ep of filteredEpisodes.value) {
     if (!isWatched(ep)) {
-      selectedEpisodes.value.add(episodeKey(ep))
+      selectedEpisodes.value.add(rowKey(ep))
     }
   }
 }
@@ -908,7 +922,7 @@ function selectNotDownloadedEpisodes() {
   selectedEpisodes.value.clear()
   for (const ep of filteredEpisodes.value) {
     if (!ep.isDownloaded) {
-      selectedEpisodes.value.add(episodeKey(ep))
+      selectedEpisodes.value.add(rowKey(ep))
     }
   }
 }
@@ -916,7 +930,7 @@ function selectNotDownloadedEpisodes() {
 function invertSelection() {
   if (!detail.value) return
   for (const ep of filteredEpisodes.value) {
-    const num = episodeKey(ep)
+    const num = rowKey(ep)
     if (selectedEpisodes.value.has(num)) {
       selectedEpisodes.value.delete(num)
     } else {
@@ -963,7 +977,7 @@ function playEpisode(ep: Episode) {
 
 async function downloadEp(ep: Episode) {
   if (!detail.value) return
-  const numStr = episodeKey(ep)
+  const numStr = rowKey(ep)
   downloadingEpisodes.value.add(numStr)
   const targetUrl = ep.downloadPageUrl || ep.playerUrl || detail.value.anime.url
   const subEnabled = isSubEnabled(ep)
@@ -1013,7 +1027,7 @@ function previewBatch(targetEps: Episode[]) {
 }
 function downloadSelectedEpisodes() {
   previewBatch(
-    detail.value?.anime.episodes.filter((ep) => selectedEpisodes.value.has(episodeKey(ep))) || [],
+    detail.value?.anime.episodes.filter((ep) => selectedEpisodes.value.has(rowKey(ep))) || [],
   )
 }
 async function confirmBatchDownload() {

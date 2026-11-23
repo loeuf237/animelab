@@ -106,7 +106,7 @@ test('unwatch sends false and keeps separate VF/VOSTFR state', async () => {
 })
 
 const episodeUtilsUrl = await moduleUrl('../src/utils/episodes.ts')
-const { episodeKey, episodeFileName } = await import(episodeUtilsUrl)
+const { buildEpisodeRowKeys, episodeKey, episodeFileName } = await import(episodeUtilsUrl)
 const { usePlayerStore } = await import(
   await moduleUrl('../src/stores/player.ts', {
     './verification': `data:text/javascript;base64,${Buffer.from('export const useVerificationStore=()=>({clearPending(){},waitForVerification(){}}); export const challengeFromError=()=>null;').toString('base64')}`,
@@ -246,6 +246,89 @@ test('the actual detail view queues only the checked VF episode', async () => {
   assert.equal(captured[0].episodes[0].url, 'https://anime/vf/1')
   assert.equal(captured[0].episodes[0].downloadSubtitles, true)
   assert.equal(view.epSubtitles.value[episodeKey(detail.anime.episodes[1])], undefined)
+  delete globalThis.__episodeTest
+})
+
+test('duplicate episode rows receive distinct row keys and toggling one selects only that row', async () => {
+  const dupA = {
+    number: 1,
+    title: 'Episode 1',
+    version: 'VOSTFR',
+    playerUrl: 'https://on.jetanimes.com/episodes/dup-1/',
+  }
+  const dupB = {
+    number: 1,
+    title: 'Episode 1',
+    version: 'VOSTFR',
+    playerUrl: 'https://on.jetanimes.com/episodes/dup-1/',
+  }
+  const season2 = {
+    number: 1,
+    title: 'S02E01 — Episode 1',
+    version: 'VOSTFR',
+    playerUrl: 'https://on.jetanimes.com/episodes/s2-1/',
+    nativeMetadata: { season: 2 },
+  }
+  const rowMap = buildEpisodeRowKeys([dupA, dupB, season2])
+  assert.notEqual(rowMap.get(dupA), rowMap.get(dupB))
+  assert.equal(
+    episodeFileName('The Ramparts of Ice', season2),
+    'The Ramparts of Ice - S02E01 [VOSTFR].mp4',
+  )
+
+  const detail = {
+    anime: {
+      title: 'The Ramparts of Ice',
+      url: 'https://on.jetanimes.com/serie/the-ramparts-of-ice/',
+      episodes: [dupA, dupB, season2],
+    },
+    source: 'eu.kanade.tachiyomi.animeextension.fr.jetanime',
+    watchedEpisodes: [],
+  }
+  const captured = []
+  globalThis.__episodeTest = { detail, captured }
+  const inline = (source) => `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`
+  const code = await moduleUrl(
+    '../src/views/AnimeDetailView.vue',
+    {
+      '@/utils/episodes': episodeUtilsUrl,
+      '@/stores/notifications': inline('export const useNotifications=()=>({notify:()=>{}});'),
+      '@/stores/searchContext': inline('export const useSearchContext=()=>({restore:()=>{}});'),
+      vue: inline(
+        `export {ref,computed} from '${import.meta.resolve('vue')}'; export const onMounted=()=>{}; export const onUnmounted=()=>{}; export const watch=()=>{};`,
+      ),
+      'vue-router': inline(
+        `export const useRouter=()=>({push:()=>{}}); export const useRoute=()=>({query:{}});`,
+      ),
+      '@/stores/anime': inline(
+        `export const useAnimeStore=()=>({currentDetail:globalThis.__episodeTest.detail});`,
+      ),
+      '@/stores/player': inline(`export const usePlayerStore=()=>({});`),
+      '@/stores/library': inline(
+        `export const useLibraryStore=()=>({favorites:[],isWatched:()=>undefined});`,
+      ),
+      '@/stores/downloads': inline(
+        `export const useDownloadStore=()=>({startBatchDownload:async p=>{globalThis.__episodeTest.captured.push(p);return {success:true};}});`,
+      ),
+    },
+    (s) =>
+      s
+        .split('<script setup lang="ts">')[1]
+        .split('</script>')[0]
+        .replace("import ConfirmDialog from '@/components/ConfirmDialog.vue';", '')
+        .replace(
+          "const emit = defineEmits<{(event: 'open-palette'): void}>();",
+          'const emit=()=>{};',
+        ) +
+      '\nexport {rowKey, selectedEpisodes, toggleEpisodeSelection, downloadSelectedEpisodes, pendingBatch};',
+  )
+  const view = await import(code)
+  view.toggleEpisodeSelection(view.rowKey(dupA))
+  assert.equal(view.selectedEpisodes.value.has(view.rowKey(dupA)), true)
+  assert.equal(view.selectedEpisodes.value.has(view.rowKey(dupB)), false)
+  assert.equal(view.selectedEpisodes.value.size, 1)
+  view.downloadSelectedEpisodes()
+  assert.equal(view.pendingBatch.value.episodes.length, 1)
   delete globalThis.__episodeTest
 })
 

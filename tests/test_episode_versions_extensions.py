@@ -195,3 +195,193 @@ def test_legacy_shared_destination_is_paused_before_file_validation(isolated, mo
     assert all(t.status == DownloadStatus.PAUSED for t in manager.tasks.values())
     assert manager.resume_download(tasks[0].id) is False
     assert path.read_bytes() == b'old video'
+
+
+def test_versioned_filename_with_slash_in_version_or_title_does_not_collide(isolated, monkeypatch):
+    monkeypatch.setattr(manager, 'plex_organization', False)
+    title = 'One Piece: Kai - Saga 10 (Pays des Wa)'
+    tasks = manager.start_batch_download(
+        title,
+        [
+            {
+                'number': n,
+                'url': f'https://seanime.local/anime-sama-anime/episode/%7B%22index%22%3A{n}%7D',
+                'version': 'VOSTFR / VF',
+                'fileName': f'{title} - Episode {n} [VOSTFR / VF].mp4',
+                'animeUrl': 'https://seanime.local/anime-sama-anime/anime/kai10',
+            }
+            for n in (1, 2, 3)
+        ],
+        source='seanime:anime-sama-anime',
+    )
+    assert len(tasks) == 3
+    names = [t.fileName for t in tasks]
+    assert len(set(names)) == 3
+    assert len({t.savePath for t in tasks}) == 3
+    for n, t in zip((1, 2, 3), tasks):
+        assert 'One Piece_ Kai' in t.fileName
+        assert f'Episode {n}' in t.fileName
+        assert not t.fileName.startswith('VF]')
+        assert manager._has_destination_conflict(t) is False
+
+    fate = manager.start_download(
+        'Fate/stay night',
+        1,
+        'https://anime.example/fate/1',
+        'Fate/stay night - Episode 1 [VOSTFR].mp4',
+        version='VOSTFR',
+    )
+    assert 'Fate_stay night - Episode 1 [VOSTFR].mp4' == fate.fileName
+
+
+@pytest.mark.parametrize('plex', [False, True])
+def test_multi_season_distinct_urls_do_not_collide_and_replace_conflicted_paused_tasks(isolated, monkeypatch, plex):
+    monkeypatch.setattr(manager, 'plex_organization', plex)
+    tasks = manager.start_batch_download(
+        'Black Clover',
+        [
+            {
+                'number': 1,
+                'url': 'https://on.jetanimes.com/episodes/black-clover-saison-1-episode-1/',
+                'version': 'VOSTFR',
+                'fileName': 'Black Clover - S01E01 [VOSTFR].mp4',
+            },
+            {
+                'number': 1,
+                'url': 'https://on.jetanimes.com/episodes/black-clover-saison-2-episode-1/',
+                'version': 'VOSTFR',
+                'fileName': 'Black Clover - S02E01 [VOSTFR].mp4',
+            },
+        ],
+        source='eu.kanade.tachiyomi.animeextension.fr.jetanime',
+    )
+    assert len(tasks) == 2
+    assert tasks[0].savePath != tasks[1].savePath
+    assert not manager._has_destination_conflict(tasks[0])
+    assert not manager._has_destination_conflict(tasks[1])
+
+    # Unhinted same-episode distinct URLs still get unique paths
+    unhinted = manager.start_batch_download(
+        'The Ramparts of Ice',
+        [
+            {
+                'number': 1,
+                'url': 'https://on.jetanimes.com/episodes/ramparts-1/',
+                'version': 'VOSTFR',
+                'fileName': 'The Ramparts of Ice - Episode 1 [VOSTFR].mp4',
+            },
+            {
+                'number': 1,
+                'url': 'https://on.jetanimes.com/episodes/ramparts-2/',
+                'version': 'VOSTFR',
+                'fileName': 'The Ramparts of Ice - Episode 1 [VOSTFR].mp4',
+            },
+        ],
+        source='eu.kanade.tachiyomi.animeextension.fr.jetanime',
+    )
+    assert len(unhinted) == 2
+    assert unhinted[0].savePath != unhinted[1].savePath
+
+    # Seed legacy conflicted PAUSED tasks and re-launch one from anime page
+    shared_path = str(manager.download_dir) + '/Legacy/legacy.mp4'
+    legacy_a = DownloadTask(
+        animeName='Legacy',
+        episodeNumber=1,
+        savePath=shared_path,
+        fileName='legacy.mp4',
+        downloadPageUrl='https://source.example/ep/1',
+        fileUrl='https://source.example/ep/1',
+        source='eu.kanade.tachiyomi.animeextension.fr.jetanime',
+        version='VOSTFR',
+        status=DownloadStatus.PAUSED,
+    )
+    legacy_b = DownloadTask(
+        animeName='Legacy',
+        episodeNumber=1,
+        savePath=shared_path,
+        fileName='legacy.mp4',
+        downloadPageUrl='https://source.example/ep/2',
+        fileUrl='https://source.example/ep/2',
+        source='eu.kanade.tachiyomi.animeextension.fr.jetanime',
+        version='VOSTFR',
+        status=DownloadStatus.PAUSED,
+    )
+    manager.tasks[legacy_a.id] = legacy_a
+    manager.tasks[legacy_b.id] = legacy_b
+    relaunched = manager.start_download(
+        'Legacy',
+        1,
+        'https://source.example/ep/1',
+        'Legacy - Episode 1 [VOSTFR].mp4',
+        source='eu.kanade.tachiyomi.animeextension.fr.jetanime',
+        version='VOSTFR',
+    )
+    assert relaunched.id != legacy_a.id
+    assert legacy_a.status == DownloadStatus.CANCELLED
+    assert relaunched.status == DownloadStatus.PENDING
+    assert not manager._has_destination_conflict(relaunched)
+
+
+@pytest.mark.asyncio
+async def test_jetanime_dooplay_deduplicates_episodes_excludes_sidebar_and_preserves_seasons(monkeypatch):
+    recipe = SourceRecipe(
+        pkg='eu.kanade.tachiyomi.animeextension.fr.jetanime',
+        base_url='https://on.jetanimes.com',
+        episode_list_selector="ul.episodios > li, #seasons .episodiotitle a, .episodiotitle a, a[href*='/episodes/']",
+    )
+    source = AniyomiContainerSource(recipe)
+    assert "a[href*='/episodes/']" not in source.recipe.episode_list_selector
+
+    html = """
+    <html><body>
+      <h1 class="title">The Ramparts of Ice</h1>
+      <div id="seasons">
+        <div class="se-c">
+          <div class="se-a">
+            <ul class="episodios">
+              <li>
+                <div class="imagen"><img src="https://on.jetanimes.com/img/s1e2.jpg"></div>
+                <div class="numerando">1 - 2</div>
+                <div class="episodiotitle"><a href="https://on.jetanimes.com/episodes/ramparts-1x2/">LE SERRURIER</a><span class="date">Apr. 09, 2026</span></div>
+              </li>
+              <li>
+                <div class="imagen"><img src="https://on.jetanimes.com/img/s1e1.jpg"></div>
+                <div class="numerando">1 - 1</div>
+                <div class="episodiotitle"><a href="https://on.jetanimes.com/episodes/ramparts-1x1/">Épisode 1 NOUVEAU</a><span class="date">Apr. 02, 2026</span></div>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="se-c">
+          <div class="se-a">
+            <ul class="episodios">
+              <li>
+                <div class="imagen"><img src="https://on.jetanimes.com/img/s2e1.jpg"></div>
+                <div class="numerando">2 - 1</div>
+                <div class="episodiotitle"><a href="https://on.jetanimes.com/episodes/ramparts-2x1/">Épisode 1 NOUVEAU</a><span class="date">Oct. 01, 2026</span></div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <aside>
+        <h3>DERNIERS EPISODES</h3>
+        <a href="https://on.jetanimes.com/episodes/tokyo-revengers-saison-4-ep-1/">Tokyo Revengers</a>
+      </aside>
+    </body></html>
+    """
+    monkeypatch.setattr('animelab.services.aniyomi_container.is_safe_url', lambda _url: True)
+    monkeypatch.setattr(source, '_fetch_html', AsyncMock(return_value=html))
+    detail = await source.get_anime_detail('https://on.jetanimes.com/serie/the-ramparts-of-ice/')
+    assert detail is not None
+    assert len(detail.episodes) == 3
+    assert [ep.downloadPageUrl for ep in detail.episodes] == [
+        'https://on.jetanimes.com/episodes/ramparts-1x1/',
+        'https://on.jetanimes.com/episodes/ramparts-1x2/',
+        'https://on.jetanimes.com/episodes/ramparts-2x1/',
+    ]
+    assert [ep.nativeMetadata.get('season') for ep in detail.episodes] == [1, 1, 2]
+    assert [ep.number for ep in detail.episodes] == [1, 2, 1]
+    assert detail.episodes[0].title == 'S01E01 — Épisode 1 NOUVEAU'
+    assert detail.episodes[1].title == 'S01E02 — LE SERRURIER'
+    assert detail.episodes[2].title == 'S02E01 — Épisode 1 NOUVEAU'

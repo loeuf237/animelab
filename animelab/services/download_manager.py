@@ -313,13 +313,72 @@ class DownloadManagerService:
             and (other.downloadPageUrl or other.fileUrl) != (task.downloadPageUrl or task.fileUrl)
             for other in self.tasks.values()))
 
+    def _path_claimed_by_other(
+        self,
+        path_str: str,
+        url: str,
+        reserved_paths: Optional[Dict[str, str]] = None,
+    ) -> bool:
+        if reserved_paths and path_str in reserved_paths and reserved_paths[path_str] != url:
+            return True
+        return any(
+            other.savePath == path_str
+            and other.status != DownloadStatus.CANCELLED
+            and (other.downloadPageUrl or other.fileUrl) != url
+            for other in self.tasks.values()
+        )
+
     def _active_episode_task(self, url: str, source: str, version: str):
         active = {DownloadStatus.PENDING, DownloadStatus.DOWNLOADING, DownloadStatus.SCHEDULED,
                   DownloadStatus.PAUSED, DownloadStatus.RETRYING, DownloadStatus.MUXING,
                   DownloadStatus.VERIFICATION_REQUIRED}
-        return next((task for task in self.tasks.values()
-                     if task.status in active and task.downloadPageUrl == url
-                     and task.source == source and task.version == version), None)
+        return next(
+            (
+                task for task in self.tasks.values()
+                if task.status in active and task.downloadPageUrl == url
+                and task.source == source and task.version == version
+                and not (task.status == DownloadStatus.PAUSED and self._has_destination_conflict(task))
+            ),
+            None,
+        )
+
+    def _cancel_conflicted_paused_tasks(self, url: str, source: str) -> None:
+        if not url:
+            return
+        for task in list(self.tasks.values()):
+            if (
+                task.status == DownloadStatus.PAUSED
+                and task.downloadPageUrl == url
+                and task.source == source
+                and self._has_destination_conflict(task)
+            ):
+                task.cancelled = True
+                task.paused = False
+                transition(task, DownloadStatus.CANCELLED)
+                task.speed = 0
+                library_service.save_task(task)
+                self.broadcast_update(task)
+
+    _VIDEO_EXTENSIONS = {".mp4", ".mkv", ".webm", ".avi", ".mov", ".ts", ".m4v", ".flv"}
+
+    def _split_media_filename(self, name: str) -> Tuple[str, str]:
+        clean = self.sanitize_file_name(name)
+        raw_ext = Path(clean).suffix
+        if raw_ext.lower() in self._VIDEO_EXTENSIONS:
+            return clean[:-len(raw_ext)], raw_ext
+        return clean, ".mp4"
+
+    def _extract_season_number(self, text: str, url: str = "") -> Optional[int]:
+        combined = f"{text} {url}"
+        match = (
+            re.search(r"(?i)\bS(\d{1,2})E\d+", combined)
+            or re.search(r"(?i)(?:saison|season)[\s\-_]*(\d+)", combined)
+            or re.search(r"(?:^|[\s\-_/])(\d{1,2})x(\d{1,4})(?:$|[\s\-_/])", url)
+        )
+        if not match:
+            return None
+        val = int(match.group(1))
+        return val if val > 0 else None
 
     def _version_suffix(self, version: str) -> str:
         clean = self.sanitize_file_name(version) if version else ""
@@ -327,10 +386,42 @@ class DownloadManagerService:
 
     def _versioned_filename(self, name: str, version: str) -> str:
         suffix = self._version_suffix(version)
-        path = Path(name)
-        if suffix and not path.stem.endswith(suffix):
-            return f"{path.stem}{suffix}{path.suffix or '.mp4'}"
-        return name
+        stem, ext = self._split_media_filename(name)
+        if suffix and not stem.endswith(suffix):
+            return f"{stem}{suffix}{ext}"
+        return f"{stem}{ext}"
+
+    def _ensure_unique_save_path(
+        self,
+        anime_dir: Path,
+        final_file_name: str,
+        url: str,
+        reserved_paths: Optional[Dict[str, str]] = None,
+        season: Optional[int] = None,
+    ) -> Tuple[str, str]:
+        candidate_name = final_file_name
+        candidate_path = str(anime_dir / candidate_name)
+        if not self._path_claimed_by_other(candidate_path, url, reserved_paths):
+            return candidate_name, candidate_path
+
+        stem, ext = self._split_media_filename(final_file_name)
+        version_match = re.search(r"(\s+\[[^\[\]]+\])$", stem)
+        base_stem = stem[:version_match.start()] if version_match else stem
+        version_tag = version_match.group(1) if version_match else ""
+
+        if season is not None and not re.search(rf"(?i)\bS0*{season}\b", base_stem):
+            season_name = f"{base_stem} S{season:02d}{version_tag}{ext}"
+            season_path = str(anime_dir / season_name)
+            if not self._path_claimed_by_other(season_path, url, reserved_paths):
+                return season_name, season_path
+
+        index = 2
+        while True:
+            alt_name = f"{base_stem} ({index}){version_tag}{ext}"
+            alt_path = str(anime_dir / alt_name)
+            if not self._path_claimed_by_other(alt_path, url, reserved_paths):
+                return alt_name, alt_path
+            index += 1
 
     def check_existing_file(self, anime_name: str, file_name: str, episode_number: int, version: str = "") -> Optional[Path]:
         if not anime_name or not file_name:
@@ -339,9 +430,10 @@ class DownloadManagerService:
         file_name = self._versioned_filename(file_name, version)
         clean_anime = self.sanitize_file_name(anime_name)
         if self.plex_organization:
-            anime_dir = Path(self.download_dir) / clean_anime / "Season 01"
-            ext = Path(file_name).suffix or ".mp4"
-            final_name = f"{clean_anime} - S01E{episode_number:02d}{self._version_suffix(version)}{ext}"
+            season = self._extract_season_number(file_name) or 1
+            anime_dir = Path(self.download_dir) / clean_anime / f"Season {season:02d}"
+            _, ext = self._split_media_filename(file_name)
+            final_name = f"{clean_anime} - S{season:02d}E{episode_number:02d}{self._version_suffix(version)}{ext}"
         else:
             anime_dir = Path(self.download_dir) / clean_anime
             final_name = self.sanitize_file_name(file_name)
@@ -863,6 +955,7 @@ class DownloadManagerService:
         existing_task = self._active_episode_task(download_page_url, source, version)
         if existing_task:
             return existing_task
+        self._cancel_conflicted_paused_tasks(download_page_url, source)
         file_name = self._versioned_filename(file_name, version)
         cache_key = f"{download_page_url}::{source}::{selected_server or self.voiranime_default_server}::{selected_quality or ''}"
         cached = self.resolved_info_cache.get(cache_key)
@@ -876,12 +969,13 @@ class DownloadManagerService:
         is_scheduled = scheduled_start_time is not None and scheduled_start_time > now
         status = DownloadStatus.SCHEDULED if is_scheduled else DownloadStatus.PENDING
 
-        file_name = self._versioned_filename(file_name, version)
         clean_anime = self.sanitize_file_name(anime_name)
+        extracted_season = self._extract_season_number(file_name, download_page_url)
         if self.plex_organization:
-            anime_dir = Path(self.download_dir) / clean_anime / "Season 01"
-            ext = Path(file_name).suffix or ".mp4"
-            final_file_name = f"{clean_anime} - S01E{episode_number:02d}{self._version_suffix(version)}{ext}"
+            plex_season = extracted_season or 1
+            anime_dir = Path(self.download_dir) / clean_anime / f"Season {plex_season:02d}"
+            _, ext = self._split_media_filename(file_name)
+            final_file_name = f"{clean_anime} - S{plex_season:02d}E{episode_number:02d}{self._version_suffix(version)}{ext}"
         else:
             anime_dir = Path(self.download_dir) / clean_anime
             final_file_name = self.sanitize_file_name(file_name)
@@ -890,7 +984,12 @@ class DownloadManagerService:
             anime_dir = Path(self.download_dir) / "Downloads"
 
         anime_dir.mkdir(parents=True, exist_ok=True)
-        save_path = str(anime_dir / final_file_name)
+        final_file_name, save_path = self._ensure_unique_save_path(
+            anime_dir,
+            final_file_name,
+            download_page_url,
+            season=extracted_season,
+        )
 
         task = DownloadTask(
             animeName=anime_name,
@@ -934,13 +1033,9 @@ class DownloadManagerService:
             require_available(profile)
         started = []
         new_tasks = []
+        reserved_paths: Dict[str, str] = {}
 
         clean_anime = self.sanitize_file_name(anime_name)
-        if self.plex_organization:
-            anime_dir = Path(self.download_dir) / clean_anime / "Season 01"
-        else:
-            anime_dir = Path(self.download_dir) / clean_anime
-        anime_dir.mkdir(parents=True, exist_ok=True)
 
         for ep, profile_json in zip(episodes, profiles):
             ep_num = int(ep.get("number", 0))
@@ -951,23 +1046,34 @@ class DownloadManagerService:
             version = ep.get("version") or ""
             if self._active_episode_task(url, ep_source, version):
                 continue
+            self._cancel_conflicted_paused_tasks(url, ep_source)
             name = self._versioned_filename(ep.get("fileName", f"{anime_name} - Episode {ep_num}.mp4"), version)
+            extracted_season = self._extract_season_number(name, url)
+            if self.plex_organization:
+                plex_season = extracted_season or 1
+                anime_dir = Path(self.download_dir) / clean_anime / f"Season {plex_season:02d}"
+            else:
+                anime_dir = Path(self.download_dir) / clean_anime
+            if not is_safe_path(anime_dir, [self.download_dir]):
+                anime_dir = Path(self.download_dir) / "Downloads"
+            anime_dir.mkdir(parents=True, exist_ok=True)
+
             sub_url = ep.get("subtitleUrl")
             dl_subs = require_available(profile_json).mode != "ORIGINAL"
             sel_server = ep.get("selectedServer")
             sel_quality = ep.get("selectedQuality")
 
-            # Check duplicate
+            # Check duplicate only when the existing path is not owned by another episode/season URL
             existing = self.check_existing_file(anime_name, name, ep_num, version)
-            if existing and existing.exists() and existing.stat().st_size > 1024 * 1024:
-                verif = verification_service.verify_file(str(existing), anime_name, name)
-                if verif.valid:
-                    logger.info("Batch: %s Ep%d already exists and is valid (%s), skipping",
-                                anime_name, ep_num, format_bytes(existing.stat().st_size))
-                    library_service.mark_as_downloaded(ep.get("animeUrl") or url, anime_name, ep_num, version)
-                    continue
+            if existing and not self._path_claimed_by_other(str(existing), url, reserved_paths):
+                if existing.exists() and existing.stat().st_size > 1024 * 1024:
+                    verif = verification_service.verify_file(str(existing), anime_name, name)
+                    if verif.valid:
+                        logger.info("Batch: %s Ep%d already exists and is valid (%s), skipping",
+                                    anime_name, ep_num, format_bytes(existing.stat().st_size))
+                        library_service.mark_as_downloaded(ep.get("animeUrl") or url, anime_name, ep_num, version)
+                        continue
 
-            if existing:
                 cache_key = f"{url}::{ep_source}::{sel_server or self.voiranime_default_server}::{sel_quality or ''}"
                 cached = self.resolved_info_cache.get(cache_key)
                 if not cached and not (sel_server or sel_quality):
@@ -1003,12 +1109,20 @@ class DownloadManagerService:
             status = DownloadStatus.SCHEDULED if is_scheduled else DownloadStatus.PENDING
 
             if self.plex_organization:
-                ext = Path(name).suffix or ".mp4"
-                final_file_name = f"{clean_anime} - S01E{ep_num:02d}{self._version_suffix(version)}{ext}"
+                plex_season = extracted_season or 1
+                _, ext = self._split_media_filename(name)
+                final_file_name = f"{clean_anime} - S{plex_season:02d}E{ep_num:02d}{self._version_suffix(version)}{ext}"
             else:
                 final_file_name = self.sanitize_file_name(name)
 
-            save_path = str(anime_dir / final_file_name)
+            final_file_name, save_path = self._ensure_unique_save_path(
+                anime_dir,
+                final_file_name,
+                url,
+                reserved_paths=reserved_paths,
+                season=extracted_season,
+            )
+            reserved_paths[save_path] = url
 
             task = DownloadTask(
                 animeName=anime_name,

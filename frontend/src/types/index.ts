@@ -113,6 +113,7 @@ export interface Episode {
   isDownloaded?: boolean
   isWatched?: boolean
   downloadTaskId?: number | string | null
+  nativeMetadata?: Record<string, unknown>
 }
 
 export interface AnimeDetail {

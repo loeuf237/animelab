@@ -744,7 +744,7 @@ class AniyomiDexParser:
             recipe.item_link_selector = "div.poster a[href], div.image a[href], .data h3 a[href], a[href]"
             recipe.item_title_selector = ".data h3, h3, .title, img[alt]"
             recipe.item_thumb_selector = "div.poster img, div.image img, img[data-src], img[src]"
-            recipe.episode_list_selector = "ul.episodios > li, #seasons .episodiotitle a, .episodiotitle a, a[href*='/episodes/']"
+            recipe.episode_list_selector = "ul.episodios > li, #seasons .episodiotitle a, .episodiotitle a"
             recipe.filter_tags = {
                 "Action": "action",
                 "Aventure": "aventure",

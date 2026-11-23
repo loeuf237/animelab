@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections import OrderedDict
 import contextvars
+import json
 import logging
 import re
 import time
@@ -126,6 +127,38 @@ def _normalize_sub_or_dub(raw: Any) -> str:
     if val == "both":
         return "VOSTFR / VF"
     return "VOSTFR"
+
+
+def _resolve_episode_version(
+    ep: dict[str, Any],
+    ep_id: str,
+    ep_title: str,
+    default_version: str,
+) -> str:
+    raw_ep_sub = ep.get("subOrDub")
+    if raw_ep_sub:
+        normalized = _normalize_sub_or_dub(raw_ep_sub)
+        if normalized in ("VF", "VOSTFR"):
+            return normalized
+    if ep_id.startswith("{"):
+        try:
+            parsed = json.loads(ep_id)
+            if isinstance(parsed, dict) and isinstance(parsed.get("lang"), str):
+                lang = parsed["lang"].strip().lower()
+                if lang.startswith(("vf", "dub")):
+                    return "VF"
+                if lang.startswith(("vostfr", "sub")):
+                    return "VOSTFR"
+        except ValueError:
+            pass
+    if default_version == "VOSTFR / VF":
+        has_vf = bool(re.search(r"(?<![a-z])(?:vf|dub)(?![a-z])", ep_title, re.IGNORECASE))
+        has_vo = bool(re.search(r"(?<![a-z])(?:vostfr|sub)(?![a-z])", ep_title, re.IGNORECASE))
+        if has_vf and not has_vo:
+            return "VF"
+        if has_vo and not has_vf:
+            return "VOSTFR"
+    return default_version
 
 
 def _parse_episode_number(raw: Any, fallback: int) -> int:
@@ -435,6 +468,7 @@ class SeanimeSource:
             ep_meta["anime_url"] = anime_url
             ep_refs.append(("episode", public_ep_url, ep_meta))
 
+            ep_version = _resolve_episode_version(ep, ep_id, ep_title, version)
             ep_thumb = str(ep.get("image") or ep.get("thumbnail") or "").strip() or None
             episodes.append(
                 Episode(
@@ -442,7 +476,7 @@ class SeanimeSource:
                     title=ep_title,
                     playerUrl=public_ep_url,
                     downloadPageUrl=public_ep_url,
-                    version=version,
+                    version=ep_version,
                     thumbnailUrl=ep_thumb,
                     nativeMetadata={
                         "seanimeId": ep_id,

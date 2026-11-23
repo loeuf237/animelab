@@ -125,8 +125,12 @@ class AniyomiContainerSource:
                 recipe.latest_request_path = "/page/1/"
             if recipe.latest_selector == "div.content article > div.poster":
                 recipe.latest_selector = "div.content article"
-            if recipe.episode_list_selector == "ul.episodios > li":
-                recipe.episode_list_selector = "ul.episodios > li, .episodiotitle a"
+            if recipe.episode_list_selector in (
+                "ul.episodios > li",
+                "ul.episodios > li, .episodiotitle a",
+                "ul.episodios > li, #seasons .episodiotitle a, .episodiotitle a, a[href*='/episodes/']",
+            ):
+                recipe.episode_list_selector = "ul.episodios > li, #seasons .episodiotitle a, .episodiotitle a"
         if recipe.pkg.endswith(".vostfree") and recipe.search_request_path == "/animes-vostfr/page/":
             recipe.search_request_path = "/index.php?do=search"
         for field in ("popular_request_path", "latest_request_path"):
@@ -431,12 +435,20 @@ class AniyomiContainerSource:
         episodes: List[Episode] = []
         ep_selector = self.recipe.episode_list_selector or "li.wp-manga-chapter, select.new_player_selector option, .episodes a, a[href*='episode']"
         ep_items = _safe_select(soup, ep_selector)
+        matched_ids = {id(el) for el in ep_items}
+        seen_hrefs: set[str] = set()
+        parsed_rows: List[tuple[Optional[int], int, Episode]] = []
+        base_version = "VF" if re.search(r"(?<![a-z])vf(?![a-z])", anime_url + " " + title, re.I) else "VOSTFR"
 
         ep_idx = 1
         for ep_el in ep_items:
+            if any(id(parent) in matched_ids for parent in ep_el.parents):
+                continue
+
             href = ""
-            ep_title = ep_el.get_text().strip()
+            ep_thumb = img_url
             if ep_el.name == "option":
+                ep_title = ep_el.get_text(" ", strip=True)
                 val = ep_el.get("value") or ""
                 # Si option a une url ou un index d'épisode
                 if val.startswith("http") or val.startswith("/"):
@@ -453,32 +465,81 @@ class AniyomiContainerSource:
                 else:
                     continue
             else:
-                a_tag = ep_el if ep_el.name == "a" else ep_el.select_one("a[href]")
+                title_a = ep_el.select_one(".episodiotitle a[href]")
+                a_tag = title_a or (ep_el if ep_el.name == "a" else ep_el.select_one("a[href]"))
                 if a_tag and a_tag.get("href"):
                     href = urljoin(anime_url, a_tag.get("href"))
+                ep_title = (title_a.get_text(" ", strip=True) if title_a else ep_el.get_text(" ", strip=True))
+                ep_thumb_el = ep_el.select_one(".imagen img, img[data-src], img[src]")
+                if ep_thumb_el:
+                    raw_ep_thumb = (
+                        ep_thumb_el.get("src")
+                        or ep_thumb_el.get("data-src")
+                        or ep_thumb_el.get("data-lazy-src")
+                        or ""
+                    )
+                    if raw_ep_thumb:
+                        ep_thumb = urljoin(anime_url, raw_ep_thumb)
 
             if not href:
                 continue
+            href_key = href.rstrip("/").lower()
+            if href_key in seen_hrefs:
+                continue
+            seen_hrefs.add(href_key)
 
-            # Numéro d'épisode extrait par regex
-            num_match = re.search(r"(?:ep|épisode|episode|ch)[\s\-_]*(\d+)", ep_title + " " + href, re.IGNORECASE)
-            ep_num = int(num_match.group(1)) if num_match else ep_idx
+            season: Optional[int] = None
+            ep_num: Optional[int] = None
+            num_el = ep_el.select_one(".numerando")
+            if num_el:
+                num_text = num_el.get_text(" ", strip=True)
+                pair = re.search(r"(\d+)\s*[-xX]\s*(\d+)", num_text)
+                if pair:
+                    season = int(pair.group(1))
+                    ep_num = int(pair.group(2))
+            if ep_num is None:
+                combined = f"{ep_title} {href}"
+                season_match = (
+                    re.search(r"(?i)(?:saison|season)[\s\-_]*(\d+)[\s\-_/]+(?:ep|[ée]pisode|episode)[\s\-_]*(\d+)", combined)
+                    or re.search(r"(?i)(?:^|[\s\-_/])S(\d{1,2})E(\d{1,4})(?:$|[\s\-_/])", combined)
+                    or re.search(r"(?:^|[\s\-_/])(\d{1,2})x(\d{1,4})(?:$|[\s\-_/])", href)
+                )
+                if season_match:
+                    season = int(season_match.group(1))
+                    ep_num = int(season_match.group(2))
+            if ep_num is None:
+                num_match = re.search(r"(?:ep|[ée]pisode|episode|ch)[\s\-_]*(\d+)", ep_title + " " + href, re.IGNORECASE)
+                ep_num = int(num_match.group(1)) if num_match else ep_idx
 
-            episodes.append(
-                Episode(
-                    number=ep_num,
-                    title=ep_title or f"Épisode {ep_num}",
-                    version="VF" if re.search(r"(?<![a-z])vf(?![a-z])", anime_url + " " + title, re.I) else "VOSTFR",
-                    downloadPageUrl=href,
-                    playerUrl=href,
-                    thumbnailUrl=img_url,
+            parsed_rows.append(
+                (
+                    season,
+                    ep_idx,
+                    Episode(
+                        number=ep_num,
+                        title=ep_title or f"Épisode {ep_num}",
+                        version=base_version,
+                        downloadPageUrl=href,
+                        playerUrl=href,
+                        thumbnailUrl=ep_thumb,
+                    ),
                 )
             )
             ep_idx += 1
 
-        episodes.sort(key=lambda ep: ep.number)
+        seasons_present = {s for s, _, _ in parsed_rows if s is not None}
+        has_multi_seasons = len(seasons_present) > 1 or any(s > 1 for s in seasons_present)
+        if has_multi_seasons:
+            for season, _, ep in parsed_rows:
+                if season is not None:
+                    ep.nativeMetadata["season"] = season
+                    if not re.search(rf"(?i)\b(?:s0*{season}|saison\s*{season}|season\s*{season})\b", ep.title):
+                        ep.title = f"S{season:02d}E{ep.number:02d} — {ep.title}"
 
-        version = "VF" if re.search(r"(?<![a-z])vf(?![a-z])", anime_url + " " + title, re.I) else "VOSTFR"
+        parsed_rows.sort(key=lambda row: (row[0] if row[0] is not None else 0, row[2].number, row[1]))
+        episodes = [row[2] for row in parsed_rows]
+
+        version = base_version
         interpreted = await self.data_runtime.episodes(anime_url, soup, version)
         if interpreted is not None:
             episodes = interpreted

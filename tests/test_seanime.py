@@ -1003,3 +1003,47 @@ async def test_detail_returns_502_on_seanime_error_and_non_seanime_stream_resolv
         assert "/api/media/extension-resource/" in apk_json["streamUrl"]
         assert apk_json["serverType"] == "ApkServer"
 
+
+@pytest.mark.asyncio
+async def test_seanime_detail_resolves_per_episode_version_from_json_id(tmp_path):
+    db_file = tmp_path / "seanime_ep_version.db"
+    init_db(db_file)
+
+    manifest = _make_manifest(
+        ext_id="anime-sama-like",
+        language="javascript",
+        payload="""
+        class Provider {
+          getSettings() { return { episodeServers: ['default'], supportsDub: true }; }
+          async search() {
+            return [{ id: 'op-kai10', title: 'One Piece: Kai - Saga 10', url: 'https://site.test/op', image: '', subOrDub: 'both' }];
+          }
+          async findEpisodes() {
+            return [
+              { id: JSON.stringify({ base: 'catalogue/op/kai10', lang: 'vostfr', index: 0 }), number: 1, title: 'Episode 1', url: 'https://site.test/op/vostfr#1' },
+              { id: JSON.stringify({ base: 'catalogue/op/kai10', lang: 'vf', index: 0 }), number: 1, title: 'Episode 1', url: 'https://site.test/op/vf#1' },
+            ];
+          }
+          async findEpisodeServer() { return { server: 'default', headers: {}, videoSources: [] }; }
+        }
+        """,
+    )
+    runtime = MiniRacerSeanimeRuntime()
+    service = SeanimeExtensionService(db_path=str(db_file), runtime=runtime)
+
+    async def fake_fetch_bytes(_url: str, _max_bytes: int) -> bytes:
+        return json.dumps(manifest).encode()
+
+    service._fetch_bytes = fake_fetch_bytes
+    await service.import_repository("https://repo.example.org/op_kai.json")
+    await service.install_extension("anime-sama-like", enable=True)
+
+    provider = service.get_source_by_id("seanime:anime-sama-like")
+    assert provider is not None
+    results = await provider.search_anime("one piece", dub=True)
+    assert len(results) == 1
+    assert results[0].version == "VOSTFR / VF"
+
+    detail = await provider.get_anime_detail(results[0].url)
+    assert [(ep.number, ep.version) for ep in detail.episodes] == [(1, "VOSTFR"), (1, "VF")]
+
