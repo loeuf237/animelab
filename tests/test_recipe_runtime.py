@@ -148,3 +148,126 @@ async def test_literal_arrays_preserve_missing_player_positions():
     assert [(e.number, e.playerUrl) for e in detail.episodes] == [
         (1, 'https://sendvid.com/one'), (2, 'https://sendvid.com/two'),
     ]
+
+
+@pytest.mark.asyncio
+async def test_animesama_inline_lien_bdd_and_oe_panneau_resolution():
+    recipe = SourceRecipe(
+        pkg="eu.kanade.tachiyomi.animeextension.fr.animesama",
+        name="Anime-Sama",
+        base_url="https://anime-sama.to",
+    )
+    container = AniyomiContainerSource(recipe)
+
+    catalogue_html = """
+    <html>
+      <body>
+        <h4 id="titreOeuvre">Kpop Demon Hunter</h4>
+        <img id="coverOeuvre" src="/s2/posters/kpop.jpg" />
+        <p>Les membres d'un groupe de K-Pop célèbre doivent concilier leur vie.</p>
+        <div class="oe-panneaux-grille">
+          <a class="oe-panneau" href="film/vostfr/">
+            <span class="oe-panneau-titre">Film</span>
+          </a>
+          <a class="oe-panneau oe-panneau-scan" href="scan/vf/">
+            <span class="oe-panneau-titre">Scans</span>
+          </a>
+        </div>
+        <script>
+          /* panneauAnime("Nom", "saison1/vostfr"); */
+        </script>
+      </body>
+    </html>
+    """
+    film_html = """
+    <html>
+      <body>
+        <h4 id="titreOeuvre">Kpop Demon Hunter</h4>
+        <script data-source="bdd">
+          var eps1 = ["lien:87070"];
+          var eps2 = ["lien:87071"];
+          var epsMeta = {"87070":["movearnpre.com",2],"87071":["ansembed.net"]};
+          var epsJeton = "token-initial";
+          var epsOrdreFinal = true;
+        </script>
+      </body>
+    </html>
+    """
+    refreshed_film_html = film_html.replace("token-initial", "token-fresh")
+
+    async def fake_fetch(url, *args, **kwargs):
+        if url.rstrip("/") == "https://anime-sama.to/catalogue/kpop-demon-hunter":
+            return catalogue_html
+        if url.rstrip("/") == "https://anime-sama.to/catalogue/kpop-demon-hunter/film/vostfr":
+            return refreshed_film_html if getattr(fake_fetch, "expired", False) else film_html
+        if "/api/lien.php" in url:
+            if "j=token-initial" in url:
+                fake_fetch.expired = True
+                return json.dumps({"erreur": "expire"})
+            if "j=token-fresh" in url and "l=87071" in url:
+                return json.dumps({"u": "https://ansembed.net/embed-z7afc32pdkcf.html"})
+            if "l=87070" in url:
+                return json.dumps({"u": "https://movearnpre.com/embed/dead.html"})
+        return ""
+
+    with patch.object(container, "_fetch_html", side_effect=fake_fetch):
+        detail = await container.get_anime_detail("https://anime-sama.to/catalogue/kpop-demon-hunter/")
+        assert detail is not None
+        assert detail.title == "Kpop Demon Hunter — Film"
+        assert len(detail.episodes) == 1
+        assert "l=87071" in detail.episodes[0].playerUrl.split("#", 1)[0]
+
+        sources = await container.get_episode_sources(detail.episodes[0].playerUrl)
+        assert len(sources) == 2
+        assert sources[0]["url"] == "https://ansembed.net/embed-z7afc32pdkcf.html"
+        assert sources[0]["server"] == "Vidmoly"
+
+
+@pytest.mark.asyncio
+async def test_onclick_episodes_and_single_film_fallbacks():
+    wiflix = AniyomiContainerSource(
+        SourceRecipe(
+            pkg="eu.kanade.tachiyomi.animeextension.fr.wiflix",
+            name="Wiflix",
+            base_url="https://flemmix.org",
+            episode_list_selector=".hostsblock div:has(a[onclick*=https])",
+        )
+    )
+    wiflix_html = """
+    <html>
+      <body>
+        <h1>Anime Wiflix</h1>
+        <div class="hostsblock">
+          <div class="ep1vf">
+            <a href="#" onclick="loadVideo('https://video.sibnet.ru/shell.php?videoid=999')">Épisode 1</a>
+            <a href="javascript:void(0)" onclick="loadVideo('https://sendvid.com/abc')">Mirror 2</a>
+          </div>
+        </div>
+      </body>
+    </html>
+    """
+    with patch.object(wiflix, "_fetch_html", new_callable=AsyncMock, return_value=wiflix_html):
+        detail = await wiflix.get_anime_detail("https://flemmix.org/anime-wiflix.html")
+        assert len(detail.episodes) == 1
+        assert detail.episodes[0].playerUrl.startswith("https://video.sibnet.ru/shell.php?videoid=999#players=")
+
+    vostfree = AniyomiContainerSource(
+        SourceRecipe(
+            pkg="eu.kanade.tachiyomi.animeextension.fr.vostfree",
+            name="Vostfree",
+            base_url="https://vostfree.ws",
+            episode_list_selector="select.new_player_selector option",
+        )
+    )
+    vostfree_film_html = """
+    <html>
+      <body>
+        <h1>Film Unique Vostfree</h1>
+        <div id="buttons_1"><div id="btn_1">Lecteur</div></div>
+      </body>
+    </html>
+    """
+    with patch.object(vostfree, "_fetch_html", new_callable=AsyncMock, return_value=vostfree_film_html):
+        film_detail = await vostfree.get_anime_detail("https://vostfree.ws/123-film.html")
+        assert len(film_detail.episodes) == 1
+        assert film_detail.episodes[0].playerUrl == "https://vostfree.ws/123-film.html?episode=1"

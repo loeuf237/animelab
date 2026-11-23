@@ -1,5 +1,5 @@
 // Vue SPA only. Changing the namespace also removes cached Jinja pages on upgrade.
-const CACHE_NAME = "animelab-cache-v0.1.7-seanime-1";
+const CACHE_NAME = "animelab-cache-v0.2.0-1";
 const PRECACHE_ASSETS = [
   "/offline.html",
   "/manifest.json",

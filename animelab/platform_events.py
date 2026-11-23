@@ -3,6 +3,7 @@ progress_handler = None
 completed_handler = None
 storage_status_handler = None
 storage_action_handler = None
+app_update_install_handler = None
 
 
 def progress(task):
@@ -17,6 +18,10 @@ def completed(task):
 
 def storage_status():
     return storage_status_handler() if storage_status_handler else None
+
+
+def install_app_update(path):
+    return app_update_install_handler(path) if app_update_install_handler else None
 
 
 def completed_paths(task):

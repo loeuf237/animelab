@@ -153,6 +153,9 @@
             :alt="tx(detail.anime.title)"
             @error="onCoverError"
           />
+          <div v-else class="tachiyomi-cover-placeholder" aria-hidden="true">
+            <span>{{ (detail.anime.title || 'A').slice(0, 2).toUpperCase() }}</span>
+          </div>
         </div>
 
         <div class="tachiyomi-meta">
@@ -1235,23 +1238,38 @@ async function markAll(watched: boolean) {
 .tachiyomi-hero {
   position: relative;
   border-radius: var(--radius-lg);
-  padding: 30px;
-  background-image: var(--hero-bg-img);
-  background-size: cover;
-  background-position: center 20%;
+  padding: 28px;
+  background-color: var(--panel);
+  background-image: none;
   display: flex;
-  gap: 28px;
-  align-items: flex-end;
+  gap: 26px;
+  align-items: center;
   box-shadow: var(--shadow);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong, var(--line));
   overflow: hidden;
 }
 
 .tachiyomi-hero::before {
   content: '';
   position: absolute;
+  inset: -24px;
+  background-image: var(--hero-bg-img, none);
+  background-size: cover;
+  background-position: center 25%;
+  background-repeat: no-repeat;
+  filter: blur(28px) saturate(1.18);
+  transform: scale(1.08);
+  opacity: var(--hero-backdrop-opacity, 0.5);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.tachiyomi-hero::after {
+  content: '';
+  position: absolute;
   inset: 0;
-  background: var(--hero-overlay-gradient);
+  background: var(--hero-radial-overlay), var(--hero-overlay-gradient);
+  pointer-events: none;
   z-index: 1;
 }
 
@@ -1262,18 +1280,35 @@ async function markAll(watched: boolean) {
 }
 
 .tachiyomi-cover {
-  width: 160px;
+  width: 150px;
   aspect-ratio: 2 / 3;
   border-radius: var(--radius);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7);
+  box-shadow: var(--hero-cover-shadow, 0 12px 28px rgba(0, 0, 0, 0.42));
+  border: 1px solid var(--line-strong, var(--line));
   object-fit: cover;
+  background: var(--surface);
+}
+
+.tachiyomi-cover-placeholder {
+  width: 150px;
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line-strong, var(--line));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--accent);
 }
 
 .tachiyomi-main-title {
   font-size: 26px;
   font-weight: 900;
   margin: 0 0 10px;
-  color: #fff;
+  color: var(--hero-title-color, var(--text));
+  text-shadow: var(--hero-title-shadow, none);
 }
 
 .tachiyomi-meta-line {
@@ -1281,8 +1316,14 @@ async function markAll(watched: boolean) {
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
+  color: var(--hero-meta-color, var(--muted));
   margin-top: 4px;
+}
+
+.tachiyomi-meta-icon {
+  color: var(--accent);
+  flex-shrink: 0;
 }
 
 .tachiyomi-actions-grid {

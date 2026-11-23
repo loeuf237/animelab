@@ -11,8 +11,7 @@ val optimizeApk = providers.gradleProperty("animelab.optimizeApk").orNull != "fa
 val packagingPython = System.getenv("ANIMAN_BUILD_PYTHON") ?: "python3"
 val optimizer = rootProject.file("../scripts/android_optimize.py")
 val isolatedValidation = providers.gradleProperty("animelab.isolatedValidation").orNull == "true"
-// Explicitly enabled for published betas; stable release builds keep the gate closed.
-val experimentalApkRuntime = providers.gradleProperty("animelab.experimentalApkRuntime").orNull == "true"
+val experimentalApkRuntime = providers.gradleProperty("animelab.experimentalApkRuntime").orNull != "false"
 val nativeTestFixture = tasks.register<Copy>("stageNativeTestFixture") {
     dependsOn(":extension-fixture:assembleApi17Debug")
     from(rootProject.file("extension-fixture/build/outputs/apk/api17/debug")) { include("*.apk") }
@@ -30,8 +29,8 @@ android {
         applicationId = "com.animan.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 226
-        versionName = "0.1.7"
+        versionCode = 227
+        versionName = "0.2.0"
         buildConfigField("String", "RELEASE_VERSION", "\"${System.getenv("RELEASE_TAG")?.removePrefix("android-v")?.removePrefix("v") ?: versionName}\"")
         manifestPlaceholders["appLabel"] = "@string/app_name"
 

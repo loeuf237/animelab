@@ -20,6 +20,7 @@ import kotlin.concurrent.thread
 /** Android's package installer owns shared APKs; recipes never count as installation. */
 internal object ExtensionPackages {
     private const val MAX_APK = 64L * 1024 * 1024
+    private const val MAX_SELF_APK = 512L * 1024 * 1024
     private const val LEGACY_STATUS = "android.content.pm.extra.LEGACY_STATUS"
     private const val SESSION_GONE_GRACE_MS = 15_000L
     private const val STALE_INSTALL_TIMEOUT_MS = 5L * 60_000L
@@ -31,19 +32,25 @@ internal object ExtensionPackages {
     private val pendingConfirmations = ConcurrentHashMap<String, Intent>()
     private fun store(context: Context) = context.getSharedPreferences("extension_package_operations", Context.MODE_PRIVATE)
 
-    private fun file(context: Context, path: String): File {
+    private fun file(context: Context, path: String, allowSelfUpdate: Boolean = false): File {
         val value = File(path).canonicalFile
         require(listOf(context.filesDir, context.cacheDir).any { value.path.startsWith(it.canonicalPath + File.separator) })
-        require(value.isFile && value.length() in 1..MAX_APK) { "APK missing or too large" }
+        val limit = if (allowSelfUpdate) MAX_SELF_APK else MAX_APK
+        require(value.isFile && value.length() in 1..limit) { "APK missing or too large" }
         return value
     }
 
     @Suppress("DEPRECATION")
-    private fun archive(context: Context, value: File): PackageInfo {
+    private fun archive(context: Context, value: File, allowSelfUpdate: Boolean = false): PackageInfo {
         val info = requireNotNull(context.packageManager.getPackageArchiveInfo(value.path,
             PackageManager.GET_META_DATA or PackageManager.GET_CONFIGURATIONS or PackageManager.GET_SIGNING_CERTIFICATES or PackageManager.GET_SIGNATURES)) { "Invalid APK" }
-        require(info.reqFeatures.orEmpty().any { it.name == "tachiyomi.animeextension" }) { "Not an anime extension" }
         requireNotNull(info.signingInfo) { "APK has no signatures" }
+        if (allowSelfUpdate && info.packageName == context.packageName) {
+            val installed = requireNotNull(installedInfo(context, context.packageName)) { "Host package unavailable" }
+            require(signer(info) == signer(installed)) { "APK signing certificate differs from existing installation" }
+        } else {
+            require(info.reqFeatures.orEmpty().any { it.name == "tachiyomi.animeextension" }) { "Not an anime extension" }
+        }
         return info
     }
 
@@ -51,9 +58,9 @@ internal object ExtensionPackages {
         return com.animan.extensions.APKSignatures.current(info)
     }
 
-    fun inspect(context: Context, path: String): JSONObject {
-        val value = file(context, path)
-        val info = archive(context, value)
+    fun inspect(context: Context, path: String, allowSelfUpdate: Boolean = false): JSONObject {
+        val value = file(context, path, allowSelfUpdate)
+        val info = archive(context, value, allowSelfUpdate)
         val digest = MessageDigest.getInstance("SHA-256")
         value.inputStream().use { input -> val buffer = ByteArray(65536); while (true) { val n=input.read(buffer); if (n<0) break; digest.update(buffer,0,n) } }
         return JSONObject().put("pkg", info.packageName).put("versionCode", info.longVersionCode.toString())
@@ -183,10 +190,13 @@ internal object ExtensionPackages {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE).intentSender
     }
 
-    @Synchronized fun install(context: Context, path: String, expectedPackage: String): JSONObject {
+    @Synchronized fun installSelfUpdate(context: Context, path: String): JSONObject =
+        install(context, path, context.packageName, allowSelfUpdate = true)
+
+    @Synchronized fun install(context: Context, path: String, expectedPackage: String, allowSelfUpdate: Boolean = false): JSONObject {
         reconcile(context)
-        val value = file(context, path)
-        val inspected = inspect(context, path)
+        val value = file(context, path, allowSelfUpdate)
+        val inspected = inspect(context, path, allowSelfUpdate)
         require(expectedPackage.isEmpty() || inspected.getString("pkg") == expectedPackage) { "APK package differs from repository" }
         val active=store(context).all.values.filterIsInstance<String>().map(::JSONObject)
             .filter { it.optString("state") in ACTIVE_STATES }
@@ -223,7 +233,8 @@ internal object ExtensionPackages {
         val operation = JSONObject().put("id", UUID.randomUUID().toString()).put("action", "install")
             .put("pkg", inspected.getString("pkg")).put("versionCode", inspected.getString("versionCode"))
             .put("signer", inspected.getString("signer")).put("sha256", inspected.getString("sha256"))
-            .put("path", value.path).put("beforeUpdateTime", beforeUpdateTime).put("state", "preparing")
+            .put("path", value.path).put("beforeUpdateTime", beforeUpdateTime)
+            .put("selfUpdate", allowSelfUpdate).put("state", "preparing")
         if (!context.packageManager.canRequestPackageInstalls()) {
             operation.put("state", "permission_required"); save(context, operation)
             context.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -237,9 +248,10 @@ internal object ExtensionPackages {
         store(context).getString(operation.getString("id"),null)?.let { saved ->
             if(JSONObject(saved).optString("state") !in setOf("preparing","permission_required")) return
         }
+        val allowSelfUpdate = operation.optBoolean("selfUpdate", false)
         // Reinspect after permission/settings UI; the staged file may have changed.
-        val value = file(context, operation.getString("path"))
-        require(inspect(context, value.path).getString("sha256") == operation.getString("sha256")) { "Staged APK changed" }
+        val value = file(context, operation.getString("path"), allowSelfUpdate)
+        require(inspect(context, value.path, allowSelfUpdate).getString("sha256") == operation.getString("sha256")) { "Staged APK changed" }
         val installer = context.packageManager.packageInstaller
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
         params.setAppPackageName(operation.getString("pkg"))

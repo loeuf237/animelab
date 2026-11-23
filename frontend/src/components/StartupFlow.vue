@@ -96,6 +96,26 @@
               </option>
             </select></label
           >
+          <div
+            v-if="
+              flow.screen === 'update' && flow.installStatus && flow.installStatus.state !== 'idle'
+            "
+            class="update-progress-box"
+            role="status"
+          >
+            <div class="update-progress-header">
+              <span>{{ tx(flow.installStatus.message || 'Installation en cours…') }}</span>
+              <span v-if="flow.installStatus.percent > 0">{{ flow.installStatus.percent }}%</span>
+            </div>
+            <div class="update-progress-track" aria-hidden="true">
+              <div
+                class="update-progress-fill"
+                :style="{
+                  width: `${Math.min(100, Math.max(0, flow.installStatus.percent || 0))}%`,
+                }"
+              ></div>
+            </div>
+          </div>
           <p v-if="flow.screen === 'update'" class="setup-fine-print">
             {{
               tx(
@@ -265,8 +285,28 @@
           </button>
         </template>
         <template v-else-if="flow.screen === 'update'">
-          <a
+          <button
+            v-if="flow.installStatus?.state === 'ready' && flow.installStatus?.restartRequired"
+            type="button"
             class="setup-primary"
+            :disabled="flow.installing"
+            @click="flow.applyInstalledUpdate()"
+          >
+            <Rocket />{{ tx('Lancer la nouvelle version') }}
+          </button>
+          <button
+            v-else-if="selectedAsset"
+            type="button"
+            class="setup-primary"
+            :disabled="flow.installing"
+            @click="startInAppInstall"
+          >
+            <Rocket />{{
+              tx(flow.installing ? 'Installation en cours…' : 'Télécharger et installer')
+            }}
+          </button>
+          <a
+            :class="selectedAsset ? 'setup-outlined' : 'setup-primary'"
             :href="selectedAsset || flow.update?.release?.url"
             target="_blank"
             rel="noopener noreferrer"
@@ -274,7 +314,7 @@
             ><Download />{{ tx('Télécharger') }}</a
           >
           <button class="setup-outlined" @click="flow.continueStartup()">
-            {{ tx(downloadStarted ? 'Continuer la configuration' : 'Pas maintenant') }}
+            {{ tx(downloadStarted ? 'Continuer' : 'Pas maintenant') }}
           </button>
         </template>
         <template v-else>
@@ -409,9 +449,17 @@ const releaseNotes = computed(() =>
       text: line.replace(/^#{1,6}\s+|^[-*]\s+/g, '').replace(/\*\*/g, ''),
     })),
 )
-watch(downloadLinks, (assets) => {
-  selectedAsset.value = assets[0]?.url || ''
-})
+watch(
+  downloadLinks,
+  (assets) => {
+    selectedAsset.value = assets[0]?.url || ''
+  },
+  { immediate: true },
+)
+async function startInAppInstall() {
+  downloadStarted.value = true
+  await flow.installUpdate(selectedAsset.value || undefined)
+}
 watch(
   () => flow.snapshot,
   (state) => {

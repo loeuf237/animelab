@@ -23,7 +23,12 @@ import type {
   VerificationResult,
 } from '@/types/api'
 import { language, tx } from '@/utils/locale'
-import type { AppPreferences, StartupSnapshot, UpdateCheck } from '@/types/startup'
+import type {
+  AppPreferences,
+  StartupSnapshot,
+  UpdateCheck,
+  UpdateInstallStatus,
+} from '@/types/startup'
 import type {
   AndroidExtensionState,
   NativeExtension,
@@ -175,6 +180,21 @@ export const api = {
   },
   checkApplicationUpdates(signal?: AbortSignal, refresh = false) {
     return request<UpdateCheck>('/api/app/updates' + (refresh ? '?refresh=true' : ''), { signal })
+  },
+  getUpdateInstallStatus(signal?: AbortSignal) {
+    return request<UpdateInstallStatus>('/api/app/updates/install', { signal })
+  },
+  installApplicationUpdate(url?: string) {
+    return request<UpdateInstallStatus>('/api/app/updates/install', {
+      method: 'POST',
+      body: JSON.stringify(url ? { url } : {}),
+    })
+  },
+  applyApplicationUpdate() {
+    return request<UpdateInstallStatus>('/api/app/updates/apply', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    })
   },
   saveDownloadDirectory(path: string) {
     return request<{ downloadDirectory: string }>('/api/app/directory', {

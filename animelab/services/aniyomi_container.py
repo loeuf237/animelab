@@ -435,6 +435,14 @@ class AniyomiContainerSource:
         episodes: List[Episode] = []
         ep_selector = self.recipe.episode_list_selector or "li.wp-manga-chapter, select.new_player_selector option, .episodes a, a[href*='episode']"
         ep_items = _safe_select(soup, ep_selector)
+        if not ep_items and (self.recipe.multisrc_theme == "madara" or "wp-manga-chapter" in ep_selector):
+            try:
+                ajax_html = await self._fetch_html(f"{anime_url.rstrip('/')}/ajax/chapters/", method="POST")
+                if ajax_html:
+                    ajax_soup = BeautifulSoup(ajax_html, "html.parser")
+                    ep_items = _safe_select(ajax_soup, ep_selector)
+            except Exception:
+                pass
         matched_ids = {id(el) for el in ep_items}
         seen_hrefs: set[str] = set()
         parsed_rows: List[tuple[Optional[int], int, Episode]] = []
@@ -467,8 +475,24 @@ class AniyomiContainerSource:
             else:
                 title_a = ep_el.select_one(".episodiotitle a[href]")
                 a_tag = title_a or (ep_el if ep_el.name == "a" else ep_el.select_one("a[href]"))
-                if a_tag and a_tag.get("href"):
-                    href = urljoin(anime_url, a_tag.get("href"))
+                raw_href = (a_tag.get("href") or "").strip() if a_tag else ""
+                if raw_href and not raw_href.startswith(("#", "javascript:")):
+                    href = urljoin(anime_url, raw_href)
+                else:
+                    onclick_urls: List[str] = []
+                    click_nodes = ([ep_el] if ep_el.get("onclick") else []) + ep_el.select("[onclick]")
+                    for click_el in click_nodes:
+                        for found in re.findall(r"https?://[^\s\"'<>)]+", click_el.get("onclick") or ""):
+                            cleaned = found.rstrip(";,")
+                            if cleaned not in onclick_urls:
+                                onclick_urls.append(cleaned)
+                    if onclick_urls:
+                        from urllib.parse import quote_plus
+                        href = (
+                            onclick_urls[0] + "#players=" + quote_plus(json.dumps(onclick_urls))
+                            if len(onclick_urls) > 1
+                            else onclick_urls[0]
+                        )
                 ep_title = (title_a.get_text(" ", strip=True) if title_a else ep_el.get_text(" ", strip=True))
                 ep_thumb_el = ep_el.select_one(".imagen img, img[data-src], img[src]")
                 if ep_thumb_el:
@@ -544,6 +568,37 @@ class AniyomiContainerSource:
         if interpreted is not None:
             episodes = interpreted
 
+        if not episodes:
+            has_vostfree_players = bool(soup.select("div[id^='buttons_'] div[id], div[id^='player_']"))
+            has_dooplay_players = bool(soup.select("#playeroptionsul li[data-post][data-nume]:not([data-nume='trailer'])"))
+            if has_vostfree_players:
+                from urllib.parse import parse_qsl, urlencode, urlunparse
+                parsed = urlparse(anime_url)
+                params = dict(parse_qsl(parsed.query))
+                params.setdefault("episode", "1")
+                ep_url = urlunparse(parsed._replace(query=urlencode(params)))
+                episodes = [
+                    Episode(
+                        number=1,
+                        title=title or "Épisode 1",
+                        version=version,
+                        downloadPageUrl=ep_url,
+                        playerUrl=ep_url,
+                        thumbnailUrl=img_url,
+                    )
+                ]
+            elif has_dooplay_players:
+                episodes = [
+                    Episode(
+                        number=1,
+                        title=title or "Épisode 1",
+                        version=version,
+                        downloadPageUrl=anime_url,
+                        playerUrl=anime_url,
+                        thumbnailUrl=img_url,
+                    )
+                ]
+
         return AnimeDetail(
             id=str(hash(anime_url))[-8:],
             title=title,
@@ -559,6 +614,48 @@ class AniyomiContainerSource:
     # -------------------------------------------------------------------------
     # Sources Vidéo & Hébergeurs
     # -------------------------------------------------------------------------
+
+    async def _resolve_player_url(self, link: str) -> str:
+        if not link or not is_safe_url(link):
+            return ""
+        parsed = urlparse(link)
+        if parsed.path.rstrip("/") != "/api/lien.php":
+            return link
+        from urllib.parse import parse_qs, urlencode
+        params = parse_qs(parsed.query)
+        lid = (params.get("l") or [""])[0].strip()
+        jeton = (params.get("j") or [""])[0].strip()
+        page = (params.get("page") or [""])[0].strip()
+        if not lid:
+            return ""
+        base_api = f"{parsed.scheme}://{parsed.netloc}/api/lien.php"
+
+        async def _call_lien_api(token_value: str) -> Dict[str, Any]:
+            if not token_value:
+                return {}
+            target = f"{base_api}?{urlencode({'j': token_value, 'l': lid})}"
+            raw = await self._fetch_html(target)
+            if not raw:
+                return {}
+            try:
+                payload = json.loads(raw)
+                return payload if isinstance(payload, dict) else {}
+            except ValueError:
+                return {}
+
+        if not jeton and page and is_safe_url(page):
+            page_html = await self._fetch_html(page)
+            jeton, _ = self.data_runtime.extract_lien_context(page_html)
+
+        data = await _call_lien_api(jeton)
+        if data.get("erreur") == "expire" and page and is_safe_url(page):
+            page_html = await self._fetch_html(page)
+            fresh_jeton, _ = self.data_runtime.extract_lien_context(page_html)
+            if fresh_jeton and fresh_jeton != jeton:
+                data = await _call_lien_api(fresh_jeton)
+
+        target_url = str(data.get("u") or "").strip()
+        return target_url if target_url.startswith(("http://", "https://")) and is_safe_url(target_url) else ""
 
     async def get_episode_sources(self, play_url: str) -> List[Dict[str, Any]]:
         if not is_safe_url(play_url):
@@ -576,9 +673,15 @@ class AniyomiContainerSource:
             for link in links:
                 if not isinstance(link, str) or not is_safe_url(link):
                     continue
-                extractor = extractor_registry.find_extractor(link)
-                results.append(self.data_runtime.stream(link, extractor.name if extractor else 'Player'))
+                resolved_link = await self._resolve_player_url(link)
+                if not resolved_link:
+                    continue
+                extractor = extractor_registry.find_extractor(resolved_link)
+                results.append(self.data_runtime.stream(resolved_link, extractor.name if extractor else 'Player'))
             return results
+        play_url = await self._resolve_player_url(play_url)
+        if not play_url:
+            return []
         interpreted = await self.data_runtime.players(play_url)
         if interpreted is not None:
             return interpreted

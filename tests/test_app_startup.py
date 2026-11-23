@@ -259,3 +259,113 @@ async def test_android_prefixed_release_tags_and_compact_github_feed_size(monkey
     assert result['status'] == 'available'
     assert result['release']['version'] == 'android-v0.1.7-beta.1'
     assert 'per_page=10' in str(calls[0].url)
+
+
+@pytest.mark.asyncio
+async def test_in_app_release_download_checksum_verification_and_install(installation, tmp_path, monkeypatch):
+    import hashlib
+    import io
+    import tarfile
+    from animelab import platform_events
+    from animelab.services.app_updates import app_updates
+
+    monkeypatch.setattr(settings, 'CACHE_DIR', str(tmp_path / 'cache'))
+    monkeypatch.setenv('ANIMELAB_RELEASE_VERSION', '0.1.7-beta.1')
+    monkeypatch.setattr('animelab.services.app_updates.is_safe_url_async', AsyncMock(return_value=True))
+
+    tar_buf = io.BytesIO()
+    with tarfile.open(fileobj=tar_buf, mode='w:gz') as tf:
+        info = tarfile.TarInfo('AnimeLab/AnimeLab')
+        payload = b'#!/bin/sh\necho AnimeLab\n'
+        info.size = len(payload)
+        info.mode = 0o755
+        tf.addfile(info, io.BytesIO(payload))
+    tar_bytes = tar_buf.getvalue()
+    tar_sha = hashlib.sha256(tar_bytes).hexdigest()
+    apk_bytes = b'PK\x03\x04fake-signed-animelab-apk'
+    apk_sha = hashlib.sha256(apk_bytes).hexdigest()
+    sums_text = f'{tar_sha}  AnimeLab-v0.2.0-Linux-x64.tar.gz\n{apk_sha}  AnimeLab-v0.2.0-Android-arm64.apk\n'
+
+    feed_payload = [
+        {
+            'tag_name': 'v0.2.0',
+            'html_url': 'https://github.com/loeuf237/animelab/releases/tag/v0.2.0',
+            'body': '# AnimeLab v0.2.0\n- In-app update installer',
+            'assets': [
+                {
+                    'name': 'AnimeLab-v0.2.0-Linux-x64.tar.gz',
+                    'browser_download_url': 'https://github.com/loeuf237/animelab/releases/download/v0.2.0/AnimeLab-v0.2.0-Linux-x64.tar.gz',
+                    'size': len(tar_bytes),
+                },
+                {
+                    'name': 'AnimeLab-v0.2.0-Android-arm64.apk',
+                    'browser_download_url': 'https://github.com/loeuf237/animelab/releases/download/v0.2.0/AnimeLab-v0.2.0-Android-arm64.apk',
+                    'size': len(apk_bytes),
+                },
+                {
+                    'name': 'SHA256SUMS.txt',
+                    'browser_download_url': 'https://github.com/loeuf237/animelab/releases/download/v0.2.0/SHA256SUMS.txt',
+                    'size': len(sums_text),
+                },
+            ],
+        }
+    ]
+
+    original_client = httpx.AsyncClient
+
+    def handler(request: httpx.Request):
+        url_str = str(request.url)
+        if 'api.github.com' in url_str:
+            return httpx.Response(200, json=feed_payload)
+        if url_str.endswith('AnimeLab-v0.2.0-Linux-x64.tar.gz'):
+            return httpx.Response(200, content=tar_bytes, headers={'Content-Length': str(len(tar_bytes))})
+        if url_str.endswith('AnimeLab-v0.2.0-Android-arm64.apk'):
+            return httpx.Response(200, content=apk_bytes, headers={'Content-Length': str(len(apk_bytes))})
+        if url_str.endswith('SHA256SUMS.txt'):
+            return httpx.Response(200, text=sums_text)
+        return httpx.Response(404)
+
+    monkeypatch.setattr(
+        'animelab.services.app_updates.httpx.AsyncClient',
+        lambda **kwargs: original_client(**({'transport': httpx.MockTransport(handler)} | kwargs)),
+    )
+    app_updates.cache.clear()
+    app_updates._install_task = None
+
+    # 1. Remote client cannot trigger installation
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app(), client=('192.0.2.10', 1)), base_url='http://test') as remote:
+        denied = await remote.post('/api/app/updates/install', json={})
+        assert denied.status_code == 403
+
+    # 2. Local client installs desktop archive and verifies extracted executable
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app(), client=('127.0.0.1', 1)), base_url='http://localhost') as local:
+        bad_url = await local.post('/api/app/updates/install', json={'url': 'https://evil.example/payload.tar.gz'})
+        assert bad_url.status_code == 400
+
+        res = await local.post(
+            '/api/app/updates/install',
+            json={'url': 'https://github.com/loeuf237/animelab/releases/download/v0.2.0/AnimeLab-v0.2.0-Linux-x64.tar.gz'},
+        )
+        assert res.status_code == 200
+        status = res.json()
+        assert status['state'] == 'ready'
+        assert status['percent'] == 100
+        assert status['restartRequired'] is True
+        assert status['executablePath'].endswith('AnimeLab')
+
+        # 3. Android APK install invokes native PackageInstaller hook
+        installed_apks = []
+        monkeypatch.setattr(
+            platform_events,
+            'app_update_install_handler',
+            lambda path: (installed_apks.append(path), {'state': 'waiting_user'})[1],
+        )
+        apk_res = await local.post(
+            '/api/app/updates/install',
+            json={'url': 'https://github.com/loeuf237/animelab/releases/download/v0.2.0/AnimeLab-v0.2.0-Android-arm64.apk'},
+        )
+        assert apk_res.status_code == 200
+        apk_status = apk_res.json()
+        assert apk_status['state'] == 'waiting_user'
+        assert len(installed_apks) == 1
+        assert installed_apks[0].endswith('AnimeLab-v0.2.0-Android-arm64.apk')

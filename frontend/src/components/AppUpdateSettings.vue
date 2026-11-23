@@ -29,14 +29,37 @@
       </button>
     </div>
     <p v-if="status" role="status">{{ tx(status) }}</p>
-    <button
-      v-if="flow.update?.status === 'available'"
-      class="btn btn-secondary"
-      @click="flow.screen = 'update'"
+    <div v-if="flow.update?.status === 'available'" class="update-actions" style="margin-top: 10px">
+      <button
+        v-if="flow.installStatus?.state === 'ready' && flow.installStatus?.restartRequired"
+        class="btn btn-primary"
+        :disabled="flow.installing"
+        @click="flow.applyInstalledUpdate()"
+      >
+        {{ tx('Lancer la nouvelle version') }}
+      </button>
+      <button
+        v-else
+        class="btn btn-primary"
+        :disabled="flow.installing"
+        @click="flow.installUpdate()"
+      >
+        {{ tx(flow.installing ? 'Installation en cours…' : 'Télécharger et installer') }}
+        {{ flow.update.release?.version }}
+      </button>
+      <button class="btn btn-secondary" @click="flow.screen = 'update'">
+        {{ tx('Voir la nouvelle version') }} {{ flow.update.release?.version }}
+      </button>
+    </div>
+    <p
+      v-if="flow.installStatus && flow.installStatus.state !== 'idle'"
+      role="status"
+      style="margin-top: 8px"
     >
-      {{ tx('Voir la nouvelle version') }} {{ flow.update.release?.version }}
-    </button>
-    <p v-if="error" role="alert">{{ error }}</p>
+      {{ tx(flow.installStatus.message || 'Installation en cours…') }}
+      <span v-if="flow.installStatus.percent > 0">({{ flow.installStatus.percent }}%)</span>
+    </p>
+    <p v-if="error || flow.error" role="alert">{{ tx(error || flow.error) }}</p>
   </section>
 </template>
 <script setup lang="ts">

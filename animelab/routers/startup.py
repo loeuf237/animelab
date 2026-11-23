@@ -33,6 +33,20 @@ class Directory(BaseModel):
     path: str = Field(min_length=1, max_length=4096)
 
 
+class UpdateInstallRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    url: str | None = Field(default=None, max_length=4096)
+
+
+def _public_install_status(status: dict, local: bool) -> dict:
+    result = dict(status)
+    if not local:
+        for key in ('filePath', 'installDir', 'executablePath'):
+            if result.get(key):
+                result[key] = anonymize_path(str(result[key]))
+    return result
+
+
 def visible_preferences(values):
     return {key: values[key] for key in Preferences.model_fields if key in values}
 
@@ -65,6 +79,37 @@ async def check_application_updates(refresh: bool = False):
     except TimeoutError:
         return {'status': 'offline', 'currentVersion': current_version(),
                 'channel': prefs['updateChannel'], 'release': None}
+
+
+@router.get('/updates/install')
+async def get_update_install_status(request: Request):
+    return _public_install_status(app_updates.install_status(), is_local(request))
+
+
+@router.post('/updates/install')
+async def start_update_install(request: Request, body: UpdateInstallRequest | None = None):
+    if not is_local(request):
+        raise HTTPException(403, 'Application updates cannot be installed from a remote client')
+    prefs = await asyncio.to_thread(app_preferences.load)
+    try:
+        status = await app_updates.start_install(
+            url=body.url if body else None,
+            channel=prefs['updateChannel'],
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return _public_install_status(status, True)
+
+
+@router.post('/updates/apply')
+async def apply_update_install(request: Request):
+    if not is_local(request):
+        raise HTTPException(403, 'Application updates cannot be launched from a remote client')
+    try:
+        status = await app_updates.apply_installed_update()
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return _public_install_status(status, True)
 
 
 @router.post('/directory')

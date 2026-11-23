@@ -31,7 +31,7 @@ on:
         default: false
       tag_name:
         description: Android release tag
-        default: android-v0.1.7-beta.4
+        default: android-v0.2.0
         required: true
       source_ref:
         description: Optional branch or SHA for a non-publishing test build
@@ -146,13 +146,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y llvm
           chmod +x gradlew
-          runtime_flags=()
-          if [[ "$RELEASE_TAG" == *-beta.* ]]; then
-            runtime_flags+=(-Panimelab.experimentalApkRuntime=true)
-            echo 'ANIMELAB_EXPERIMENTAL_APK_RUNTIME=true' >> "$GITHUB_ENV"
-          else
-            echo 'ANIMELAB_EXPERIMENTAL_APK_RUNTIME=false' >> "$GITHUB_ENV"
-          fi
+          runtime_flags=(-Panimelab.experimentalApkRuntime=true)
+          echo 'ANIMELAB_EXPERIMENTAL_APK_RUNTIME=true' >> "$GITHUB_ENV"
           if [ -n "$ANIMAN_ANDROID_KEYSTORE" ]; then
             ./gradlew :app:assembleRelease :app:assembleReleaseAndroidTest "${runtime_flags[@]}" --stacktrace
           else

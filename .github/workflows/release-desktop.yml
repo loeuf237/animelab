@@ -8,7 +8,7 @@ on:
       tag_name:
         description: Existing release tag
         required: true
-        default: v0.1.7-beta.4
+        default: v0.2.0
 
 permissions:
   contents: read
@@ -70,7 +70,12 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          choco install ffmpeg --version=7.1.1 --yes --no-progress
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            choco install ffmpeg --version=7.1.1 --yes --no-progress
+            if ($LASTEXITCODE -eq 0) { break }
+            if ($attempt -eq 3) { throw "Chocolatey ffmpeg install failed after 3 attempts" }
+            Start-Sleep -Seconds 10
+          }
           $ffmpeg = (Get-ChildItem C:\ProgramData\chocolatey\lib\ffmpeg -Recurse -Filter ffmpeg.exe | Select-Object -First 1).FullName
           $ffprobe = (Get-ChildItem C:\ProgramData\chocolatey\lib\ffmpeg -Recurse -Filter ffprobe.exe | Select-Object -First 1).FullName
           if (!$ffmpeg -or !$ffprobe) { throw "FFmpeg package is incomplete" }

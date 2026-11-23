@@ -3484,24 +3484,36 @@ html[data-theme='light'] .palette-preview-backdrop {
   position: relative;
   overflow: hidden;
   border-radius: 18px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong, var(--line));
   box-shadow: var(--shadow);
   display: flex;
   gap: 22px;
   margin-top: 8px;
   margin-bottom: 24px;
   padding: 24px;
-  background-image: var(--hero-overlay-gradient), var(--hero-bg-img, none);
-  background-position: center;
-  background-size: cover;
-  background-repeat: no-repeat;
+  background-color: var(--panel);
 }
 
 .tachiyomi-hero::before {
   content: '';
   position: absolute;
+  inset: -24px;
+  background-image: var(--hero-bg-img, none);
+  background-position: center 25%;
+  background-size: cover;
+  background-repeat: no-repeat;
+  filter: blur(28px) saturate(1.18);
+  transform: scale(1.08);
+  opacity: var(--hero-backdrop-opacity, 0.5);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.tachiyomi-hero::after {
+  content: '';
+  position: absolute;
   inset: 0;
-  background: var(--hero-radial-overlay);
+  background: var(--hero-radial-overlay), var(--hero-overlay-gradient);
   pointer-events: none;
   z-index: 1;
 }

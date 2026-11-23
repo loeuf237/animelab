@@ -53,6 +53,15 @@ class RecipeRuntime:
         tokens = r'''("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`)|/\*.*?\*/|//[^\r\n]*'''
         return re.sub(tokens, lambda match: match.group(1) or '', text, flags=re.S)
 
+    @classmethod
+    def script_text(cls, text):
+        if not text:
+            return ''
+        if '<script' in text.lower():
+            soup = BeautifulSoup(text, 'html.parser')
+            return '\n'.join(cls.uncomment(node.get_text()) for node in soup.select('script'))
+        return cls.uncomment(text)
+
     def section_root(self, url):
         config = self.plan.get('listing_expansion', {})
         parsed, base = urlparse(url), urlparse(self.source.base_url)
@@ -83,13 +92,23 @@ class RecipeRuntime:
         literal = r'''("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')'''
         pattern = r'\b' + re.escape(config['function']) + r'\s*\(\s*' + literal + r'\s*,\s*' + literal + r'\s*\)'
         import ast
-        seen, results = set(), []
+        candidates = []
         for name, path in re.findall(pattern, scripts):
             try:
-                label, path = ast.literal_eval(name), ast.literal_eval(path).replace(r'\/', '/')
+                candidates.append((ast.literal_eval(name), ast.literal_eval(path).replace(r'\/', '/')))
             except (ValueError, SyntaxError):
                 continue
-            if path.strip('/') in ('', 'url', 'undefined'):
+        for card in soup.select('a.oe-panneau[href]:not(.oe-panneau-scan)'):
+            raw_href = (card.get('href') or '').strip()
+            if not raw_href:
+                continue
+            title_node = card.select_one('.oe-panneau-titre')
+            card_label = title_node.get_text(' ', strip=True) if title_node else card.get_text(' ', strip=True)
+            candidates.append((card_label or raw_href.strip('/'), raw_href))
+        seen, results = set(), []
+        for label, path in candidates:
+            clean_segments = [seg.lower() for seg in path.split('/') if seg]
+            if path.strip('/') in ('', 'url', 'undefined') or 'scan' in clean_segments:
                 continue
             href = urljoin(root, path)
             # The section operation can only navigate below this catalogue entry.
@@ -229,17 +248,23 @@ class RecipeRuntime:
 
     async def section_detail(self, url):
         root = self.section_root(url)
-        if not root or root.rstrip('/') == url.rstrip('/'):
+        if not root:
             return None
         metadata, sections = await self.section_data(root)
-        path = urlparse(url).path.rstrip('/')
-        section = next((item for item in sections if urlparse(item.url).path.rstrip('/') == path), None)
-        if section is None:
-            # A language variant uses the same season metadata without opening another season.
-            parent = path.rsplit('/', 1)[0]
-            section = next((item for item in sections if urlparse(item.url).path.rstrip('/').rsplit('/', 1)[0] == parent), None)
-        if section is None:
-            return None
+        if root.rstrip('/') == url.rstrip('/'):
+            if not sections:
+                return None
+            section = sections[0]
+            url = section.url
+        else:
+            path = urlparse(url).path.rstrip('/')
+            section = next((item for item in sections if urlparse(item.url).path.rstrip('/') == path), None)
+            if section is None:
+                # A language variant uses the same season metadata without opening another season.
+                parent = path.rsplit('/', 1)[0]
+                section = next((item for item in sections if urlparse(item.url).path.rstrip('/').rsplit('/', 1)[0] == parent), None)
+            if section is None:
+                return None
         html = await self.source._fetch_html(url)
         version = self.section_version(url)
         episodes = await self.episodes(url, BeautifulSoup(html, 'html.parser'), version)
@@ -448,25 +473,59 @@ class RecipeRuntime:
                 result.append(Episode(number=n, title=f'Épisode {number}', playerUrl=href, downloadPageUrl=href, version=version))
             return sorted(result, key=lambda e: e.number)
         if kind == 'js_arrays':
-            arrays = self.arrays(str(soup), config)
+            active_text = str(soup)
+            active_url = url
+            arrays = self.arrays(active_text, config)
             directory = url if url.endswith('/') else url + '/'
             if not arrays:
-                paths = re.findall(config['pages_pattern'], str(soup))
+                paths = re.findall(config['pages_pattern'], self.script_text(active_text))
                 for path in paths:
-                    if path.strip('/') in ('', 'url'):
+                    clean_segments = [seg.lower() for seg in path.split('/') if seg]
+                    if path.strip('/') in ('', 'url', 'undefined') or 'scan' in clean_segments:
                         continue
                     sub = urljoin(directory, path.strip('/') + '/')
                     html = await self.source._fetch_html(sub)
                     arrays = self.arrays(html, config)
-                    if not arrays:
-                        arrays = self.arrays(await self.source._fetch_html(urljoin(sub, config['script_path'])), config)
                     if arrays:
+                        active_text, active_url = html, sub
+                        break
+                    script_text = await self.source._fetch_html(urljoin(sub, config['script_path']))
+                    arrays = self.arrays(script_text, config)
+                    if arrays:
+                        active_text, active_url = script_text, sub
                         break
                 if not arrays:
-                    arrays = self.arrays(await self.source._fetch_html(urljoin(directory, config['script_path'])), config)
+                    script_text = await self.source._fetch_html(urljoin(directory, config['script_path']))
+                    arrays = self.arrays(script_text, config)
+                    if arrays:
+                        active_text = script_text
+            token, meta = self.extract_lien_context(active_text)
             result = []
             for n in range(max((len(a) for a in arrays.values()), default=0)):
-                links = [urljoin(url, a[n]) for a in arrays.values() if n < len(a) and a[n]]
+                raw_items = [a[n] for a in arrays.values() if n < len(a) and a[n]]
+                ordered_items = sorted(
+                    raw_items,
+                    key=lambda item: (
+                        1
+                        if item.startswith('lien:')
+                        and isinstance(meta.get(item.split(':', 1)[1]), list)
+                        and len(meta[item.split(':', 1)[1]]) > 1
+                        and meta[item.split(':', 1)[1]][1] in (1, 2)
+                        else 0
+                    ),
+                )
+                links = []
+                for item in ordered_items:
+                    if item.startswith('lien:'):
+                        lid = item.split(':', 1)[1]
+                        params = {'l': lid, 'page': active_url}
+                        if token:
+                            params['j'] = token
+                        resolved = urljoin(active_url, '/api/lien.php?' + urlencode(params))
+                    else:
+                        resolved = urljoin(active_url, item)
+                    if resolved not in links:
+                        links.append(resolved)
                 if links:
                     href = links[0] + '#players=' + quote_plus(json.dumps(links)) if len(links) > 1 else links[0]
                     result.append(Episode(number=n+1, title=f'Épisode {n+1:02d}', playerUrl=href, downloadPageUrl=href, version=version))
@@ -504,11 +563,36 @@ class RecipeRuntime:
                     playerUrl=href, downloadPageUrl=href, version=config.get('version', version)))
         return sorted(results, key=lambda e: e.number)
 
-    @staticmethod
-    def arrays(text, config):
-        # Parse only literal URL arrays, never evaluate downloaded JavaScript.
+    @classmethod
+    def extract_lien_context(cls, text):
+        clean = cls.script_text(text or '')
+        token_match = re.search(r'\bvar\s+epsJeton\s*=\s*(["\'])([^"\']+)\1', clean)
+        token = token_match.group(2).strip() if token_match else ''
+        meta = {}
+        meta_match = re.search(r'\bvar\s+epsMeta\s*=\s*(\{.*?\})\s*;', clean, re.S)
+        if meta_match:
+            try:
+                parsed = json.loads(meta_match.group(1))
+                if isinstance(parsed, dict):
+                    meta = parsed
+            except ValueError:
+                pass
+        return token, meta
+
+    @classmethod
+    def arrays(cls, text, config):
+        # Parse only literal URL or lien:<id> arrays, never evaluate downloaded JavaScript.
+        clean = cls.script_text(text or '')
         result = {}
-        for name, body in re.findall(config['array_pattern'], text or '', re.S):
+        for name, body in re.findall(config['array_pattern'], clean, re.S):
             tokens = re.findall(r'''(["'])(.*?)\1|(\bnull\b)''', body, re.S)
-            result[name] = [value.replace(r'\/', '/') if value.replace(r'\/', '/').startswith(('http://', 'https://')) else '' for _, value, _ in tokens]
+            parsed = []
+            for _, value, _ in tokens:
+                val = value.replace(r'\/', '/').strip()
+                if val.startswith(('http://', 'https://')) or re.fullmatch(r'lien:[A-Za-z0-9_-]+', val):
+                    parsed.append(val)
+                else:
+                    parsed.append('')
+            if any(parsed):
+                result[name] = parsed
         return result

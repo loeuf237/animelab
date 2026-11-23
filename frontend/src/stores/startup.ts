@@ -4,7 +4,12 @@ import { api } from '@/api/client'
 import { palette, setAppearance, themeMode } from './appearance'
 import { readPreference, writePreference } from '@/utils/locale'
 import { applyStartupPlatform } from '@/utils/platform'
-import type { AppPreferences, StartupSnapshot, UpdateCheck } from '@/types/startup'
+import type {
+  AppPreferences,
+  StartupSnapshot,
+  UpdateCheck,
+  UpdateInstallStatus,
+} from '@/types/startup'
 
 export const useStartupStore = defineStore('startup', () => {
   const screen = ref<
@@ -12,10 +17,13 @@ export const useStartupStore = defineStore('startup', () => {
   >('loading')
   const snapshot = ref<StartupSnapshot | null>(null)
   const update = ref<UpdateCheck | null>(null)
+  const installStatus = ref<UpdateInstallStatus | null>(null)
+  const installing = ref(false)
   const error = ref('')
   const saving = ref(false)
   const checking = ref(false)
   let generation = 0
+  let pollTimer: ReturnType<typeof setTimeout> | null = null
   function continueStartup() {
     const state = snapshot.value
     screen.value = state?.preferences.onboardingCompleted
@@ -119,10 +127,65 @@ export const useStartupStore = defineStore('startup', () => {
       saving.value = false
     }
   }
+  async function pollInstallStatus() {
+    if (pollTimer) {
+      clearTimeout(pollTimer)
+      pollTimer = null
+    }
+    try {
+      const current = await api.getUpdateInstallStatus()
+      installStatus.value = current
+      if (['downloading', 'verifying', 'installing'].includes(current.state)) {
+        installing.value = true
+        pollTimer = setTimeout(() => {
+          void pollInstallStatus()
+        }, 650)
+      } else {
+        installing.value = false
+      }
+    } catch {
+      installing.value = false
+    }
+  }
+  async function installUpdate(url?: string) {
+    installing.value = true
+    error.value = ''
+    try {
+      const status = await api.installApplicationUpdate(url)
+      installStatus.value = status
+      if (['downloading', 'verifying', 'installing'].includes(status.state)) {
+        pollTimer = setTimeout(() => {
+          void pollInstallStatus()
+        }, 500)
+      } else {
+        installing.value = false
+      }
+    } catch (failure) {
+      installing.value = false
+      error.value =
+        failure instanceof Error
+          ? failure.message
+          : 'Impossible de télécharger ou d’installer la mise à jour.'
+    }
+  }
+  async function applyInstalledUpdate() {
+    installing.value = true
+    error.value = ''
+    try {
+      installStatus.value = await api.applyApplicationUpdate()
+    } catch (failure) {
+      error.value =
+        failure instanceof Error ? failure.message : 'Impossible de lancer la nouvelle version.'
+    } finally {
+      installing.value = false
+    }
+  }
   return {
     screen,
     snapshot,
     update,
+    installStatus,
+    installing,
     error,
     saving,
     checking,
@@ -133,5 +196,7 @@ export const useStartupStore = defineStore('startup', () => {
     save,
     finish,
     acknowledgeUpdate,
+    installUpdate,
+    applyInstalledUpdate,
   }
 })

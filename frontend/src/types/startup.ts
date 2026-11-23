@@ -37,3 +37,26 @@ export interface UpdateCheck {
   channel: 'stable' | 'beta'
   release: AppRelease | null
 }
+export interface UpdateInstallStatus {
+  state:
+    | 'idle'
+    | 'downloading'
+    | 'verifying'
+    | 'installing'
+    | 'permission_required'
+    | 'waiting_user'
+    | 'ready'
+    | 'completed'
+    | 'failed'
+  version: string | null
+  assetName: string | null
+  downloadedBytes: number
+  totalBytes: number
+  percent: number
+  filePath: string | null
+  installDir: string | null
+  executablePath: string | null
+  restartRequired: boolean
+  message: string | null
+  error: string | null
+}
