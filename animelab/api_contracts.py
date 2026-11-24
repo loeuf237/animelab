@@ -499,7 +499,7 @@ RESPONSES = {
     'launch_external_player': ExternalPlayerLaunchResponse,
     'list_extensions_api': ExtensionList, 'list_catalogues': CatalogueSources,
     'catalogue_filters': CatalogueFilters, 'browse_catalogue': CataloguePage,
-    'sessions': NetworkOptions, 'start': VerificationJob, 'complete': VerificationResult, 'recheck': VerificationResult,
+    'sessions': NetworkOptions, 'start': VerificationJob, 'open_webview': VerificationJob, 'complete': VerificationResult, 'recheck': VerificationResult,
     'get_translations': TranslationResponse, 'get_all_source_settings': SourcesSettings,
     'get_source_settings': SourceSettings, 'save_source_settings': SourceSettings,
     'check_favorite': FavoriteCheck, 'import_proxies': ProxyImport,

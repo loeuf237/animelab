@@ -1,4 +1,5 @@
 from animelab.services.source_http import source_http, VerificationRequired
+import html as html_lib
 import json
 import asyncio
 import logging
@@ -9,7 +10,7 @@ from bs4 import BeautifulSoup
 import httpx
 
 from animelab.config import settings
-from animelab.services.extension_observability import InvalidSelector, SelectorMismatch
+from animelab.services.extension_observability import APIOnlyExtensionError, InvalidSelector, SelectorMismatch
 from animelab.models.anime import AnimeResult, AnimeDetail, Episode
 from animelab.security import is_safe_url
 from animelab.services.aniyomi_dex_parser import SourceRecipe
@@ -51,8 +52,94 @@ def _clean_selector(sel: Optional[str]) -> str:
     # Nettoie les virgules orphelines ou espaces en fin de chaîne
     return sel.strip().rstrip(",; ").strip()
 
-def _safe_select(parent: Any, selector: str) -> List[Any]:
+
+def _translate_jsoup_selector(selector: str) -> str:
+    """Convertit les pseudo-sélecteurs Jsoup (:contains, :containsOwn) vers SoupSieve."""
     s = _clean_selector(selector)
+    if not s:
+        return ""
+    s = re.sub(r":containsOwn\(", ":-soup-contains-own(", s, flags=re.IGNORECASE)
+    s = re.sub(r":contains\(", ":-soup-contains(", s, flags=re.IGNORECASE)
+    s = re.sub(r":matches(?:Own)?\([^)]*\)", "", s, flags=re.IGNORECASE)
+    return _clean_selector(s)
+
+
+def _join_base_url(base_url: str, rel_path: str) -> str:
+    """Résout rel_path par rapport à base_url en conservant son éventuel préfixe de chemin (ex. /v1)."""
+    raw = (rel_path or "").strip()
+    if not raw:
+        return base_url
+    if raw.startswith(("http://", "https://", "//")):
+        return urljoin(base_url, raw)
+    parsed_base = urlparse(base_url or "")
+    base_path = parsed_base.path.rstrip("/")
+    if base_path and raw.startswith("/"):
+        if raw == base_path or raw.startswith(base_path + "/") or raw.startswith(base_path + "?"):
+            return urljoin(base_url, raw)
+        return urljoin(base_url.rstrip("/") + "/", raw.lstrip("/"))
+    return urljoin(base_url.rstrip("/") + "/" if base_path else base_url, raw)
+
+
+_HUB_NOISE_RE = re.compile(
+    r"^/(?:tip|tips|category|categories|genre|genres|tag|tags|author|page|feed|news|blog)/?$",
+    re.IGNORECASE,
+)
+
+
+def _is_single_segment_hub_url(href: str, base_url: str = "") -> bool:
+    path = (urlparse(href).path or "/").rstrip("/") or "/"
+    base_path = (urlparse(base_url).path or "").rstrip("/") if base_url else ""
+    if base_path and (path == base_path or path.startswith(base_path + "/")):
+        path = path[len(base_path):] or "/"
+    return bool(_HUB_NOISE_RE.match(path))
+
+
+def _same_registrable_domain(base_url: str, href: str) -> bool:
+    base_host = (urlparse(base_url).hostname or "").lower()
+    href_host = (urlparse(href).hostname or "").lower()
+    if not base_host or not href_host or base_host == href_host:
+        return True
+    base_apex = ".".join(base_host.split(".")[-2:])
+    href_apex = ".".join(href_host.split(".")[-2:])
+    return base_apex == href_apex and bool(base_apex)
+
+
+def _expand_popover_episodes(ep_items: List[Any], soup: Optional[BeautifulSoup] = None) -> List[Any]:
+    """Développe les listes d'épisodes embarquées dans Bootstrap data-content (ex. #episodeLists)."""
+    expanded: List[Any] = []
+    seen_popover_ids: set[int] = set()
+    for node in ep_items:
+        raw_dc = node.get("data-content") if hasattr(node, "get") else None
+        if raw_dc and ("<a" in raw_dc or "&lt;a" in raw_dc):
+            seen_popover_ids.add(id(node))
+            dc_soup = BeautifulSoup(html_lib.unescape(raw_dc), "html.parser")
+            links = dc_soup.select("a[href]")
+            if links:
+                expanded.extend(links)
+                continue
+        expanded.append(node)
+
+    has_real_href = any(
+        (
+            (n.get("href") if n.name == "a" else (n.select_one("a[href]").get("href") if hasattr(n, "select_one") and n.select_one("a[href]") else ""))
+            not in ("", "#")
+        )
+        for n in expanded
+    )
+    if not has_real_href and soup is not None:
+        for pop in soup.select("#episodeLists[data-content], [data-toggle='popover'][data-content]"):
+            if id(pop) in seen_popover_ids:
+                continue
+            raw_dc = pop.get("data-content") or ""
+            if "<a" in raw_dc or "&lt;a" in raw_dc:
+                links = BeautifulSoup(html_lib.unescape(raw_dc), "html.parser").select("a[href]")
+                if links:
+                    expanded.extend(links)
+    return expanded
+
+
+def _safe_select(parent: Any, selector: str) -> List[Any]:
+    s = _translate_jsoup_selector(selector)
     if s.startswith("api:"):
         raise NotImplementedError("This APK operation needs a supported data recipe; API markers are not CSS selectors")
     if not s:
@@ -66,7 +153,7 @@ def _safe_select(parent: Any, selector: str) -> List[Any]:
         valid: List[Any] = []
         any_valid = False
         for part in s.split(","):
-            p = _clean_selector(part)
+            p = _translate_jsoup_selector(part)
             if p:
                 try:
                     elements = parent.select(p)
@@ -189,14 +276,42 @@ class AniyomiContainerSource:
 
         return await self._search_anime_html(clean_q)
 
+    def _require_desktop_supported(self) -> None:
+        if self.recipe.runtime.get("api_only_apk"):
+            raise APIOnlyExtensionError(
+                "Cette extension Aniyomi utilise une API JSON/GraphQL compilée ; son exécution native est prise en charge sur Android."
+            )
+
+    async def _fetch_listing_html(self, rel_path: str) -> str:
+        target_url = _join_base_url(self.base_url, rel_path)
+        try:
+            return await self._fetch_html(target_url)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404 and "/page/1" in rel_path:
+                stripped = re.sub(r"/page/1/?", "/", rel_path, count=1)
+                if stripped != rel_path:
+                    fallback_url = _join_base_url(self.base_url, stripped)
+                    return await self._fetch_html(fallback_url)
+            raise
+
+    def _filter_noisy_cards(self, results: List[AnimeResult]) -> List[AnimeResult]:
+        if not results:
+            return results
+        non_hub = [r for r in results if not _is_single_segment_hub_url(r.url, self.base_url)]
+        same_domain = [r for r in non_hub if _same_registrable_domain(self.base_url, r.url)]
+        if same_domain:
+            return same_domain
+        return non_hub
+
     async def _search_anime_html(self, clean_q: str) -> List[AnimeResult]:
+        self._require_desktop_supported()
         logger.info("[container:%s] Recherche: '%s'", self.name, clean_q)
         results: List[AnimeResult] = []
 
         method = self.recipe.search_method or "GET"
         post_data = None
         if method == "POST":
-            target_url = urljoin(self.base_url, self.recipe.search_request_path or "/index.php?do=search")
+            target_url = _join_base_url(self.base_url, self.recipe.search_request_path or "/index.php?do=search")
             post_data = {
                 "do": "search",
                 "subaction": "search",
@@ -208,14 +323,16 @@ class AniyomiContainerSource:
                 self.recipe.search_query_param or "story": clean_q,
             }
         else:
-            path_tmpl = self.recipe.search_request_path or f"/?{self.recipe.search_query_param or 's'}={{query}}"
+            path_tmpl = (self.recipe.search_request_path or f"/?{self.recipe.search_query_param or 's'}={{query}}").replace("{page}", "1")
             if "{query}" in path_tmpl:
                 rel_path = path_tmpl.replace("{query}", quote_plus(clean_q))
+            elif path_tmpl.endswith("="):
+                rel_path = f"{path_tmpl}{quote_plus(clean_q)}"
             else:
                 sep = "&" if "?" in path_tmpl else "?"
                 param = self.recipe.search_query_param or "s"
                 rel_path = f"{path_tmpl}{sep}{param}={quote_plus(clean_q)}"
-            target_url = urljoin(self.base_url, rel_path)
+            target_url = _join_base_url(self.base_url, rel_path)
 
         html = await self._fetch_html(target_url, method=method, data=post_data)
         if not html:
@@ -245,7 +362,7 @@ class AniyomiContainerSource:
             if not link_el or not link_el.get("href"):
                 continue
 
-            href = urljoin(self.base_url, link_el.get("href"))
+            href = _join_base_url(self.base_url, link_el.get("href"))
             if any(part in href for part in self.recipe.runtime.get("exclude_urls", [])):
                 continue
             if href in seen_hrefs:
@@ -257,7 +374,7 @@ class AniyomiContainerSource:
             if img_el:
                 raw_img = img_el.get("src") or img_el.get("data-src") or img_el.get("data-lazy-src", "")
                 if raw_img:
-                    img_url = urljoin(self.base_url, raw_img)
+                    img_url = _join_base_url(self.base_url, raw_img)
 
             title = _item_title(it, link_el, self.recipe.item_title_selector or
                                 'h2, h3, .title, .movie-title, .card-title', img_el)
@@ -276,8 +393,9 @@ class AniyomiContainerSource:
                     )
                 )
 
-        logger.info("[container:%s] Trouvé %d résultat(s)", self.name, len(results))
-        return await self.data_runtime.expand_listing(results)
+        filtered = self._filter_noisy_cards(results)
+        logger.info("[container:%s] Trouvé %d résultat(s)", self.name, len(filtered))
+        return await self.data_runtime.expand_listing(filtered)
 
     # -------------------------------------------------------------------------
     # Dernières sorties
@@ -300,7 +418,7 @@ class AniyomiContainerSource:
             link_el = _safe_select_one(it, self.recipe.item_link_selector or "a[href]") or (it if it.name == "a" else None)
             if not link_el or not link_el.get("href"):
                 continue
-            href = urljoin(self.base_url, link_el.get("href"))
+            href = _join_base_url(self.base_url, link_el.get("href"))
             if any(part in href for part in self.recipe.runtime.get("exclude_urls", [])):
                 continue
             if href in seen_hrefs:
@@ -309,7 +427,7 @@ class AniyomiContainerSource:
             img_el = _safe_select_one(it, self.recipe.item_thumb_selector or "img[src], img[data-src]")
             title = _item_title(it, link_el, self.recipe.item_title_selector or
                                 'h2, h3, .title, .movie-title', img_el)
-            img_url = urljoin(self.base_url, img_el.get("data-src") or img_el.get("data-lazy-src") or img_el.get("src", "")) if img_el else ""
+            img_url = _join_base_url(self.base_url, img_el.get("data-src") or img_el.get("data-lazy-src") or img_el.get("src", "")) if img_el else ""
 
             if title:
                 results.append(
@@ -324,12 +442,12 @@ class AniyomiContainerSource:
                         source=self.source_id,
                     )
                 )
-        return results
+        return self._filter_noisy_cards(results)
 
     async def _latest_html(self) -> List[AnimeResult]:
-        rel_path = self.recipe.latest_request_path or self.recipe.popular_request_path or "/"
-        target_url = urljoin(self.base_url, rel_path.replace("{page}", "1"))
-        html = await self._fetch_html(target_url)
+        self._require_desktop_supported()
+        rel_path = (self.recipe.latest_request_path or self.recipe.popular_request_path or "/").replace("{page}", "1")
+        html = await self._fetch_listing_html(rel_path)
         if not html:
             return []
 
@@ -357,9 +475,9 @@ class AniyomiContainerSource:
         return await self._popular_html(page=page)
 
     async def _popular_html(self, page: int = 1) -> List[AnimeResult]:
+        self._require_desktop_supported()
         rel_path = (self.recipe.popular_request_path or self.recipe.latest_request_path or "/").replace("{page}", str(page))
-        target_url = urljoin(self.base_url, rel_path)
-        html = await self._fetch_html(target_url)
+        html = await self._fetch_listing_html(rel_path)
         if not html:
             return []
 
@@ -378,11 +496,12 @@ class AniyomiContainerSource:
         return await self._custom_feed_html(feed_id, page=page)
 
     async def _custom_feed_html(self, feed_id: str, page: int = 1) -> List[AnimeResult]:
+        self._require_desktop_supported()
         feed = next((f for f in (self.recipe.custom_feeds or []) if f.get("id") == feed_id), None)
         if not feed:
             return await self.get_popular_anime(page=page)
         rel_path = (feed.get("path") or "/").replace("{page}", str(page))
-        target_url = urljoin(self.base_url, rel_path)
+        target_url = _join_base_url(self.base_url, rel_path)
         html = await self._fetch_html(target_url)
         if not html:
             return []
@@ -406,6 +525,7 @@ class AniyomiContainerSource:
             if section is not None:
                 return section
 
+        self._require_desktop_supported()
         html = await self._fetch_html(anime_url)
         if not html:
             return None
@@ -426,7 +546,7 @@ class AniyomiContainerSource:
         if img_el:
             img_src = img_el.get("content") if img_el.name == "meta" else (img_el.get("src") or img_el.get("data-src"))
             if img_src:
-                img_url = urljoin(self.base_url, img_src)
+                img_url = _join_base_url(self.base_url, img_src)
 
         # Genres
         genres = [g.get_text().strip() for g in _safe_select(soup, self.recipe.details_genre_selector or ".genre a, .genres a, a[href*='/genre/']") if g.get_text().strip()]
@@ -443,6 +563,7 @@ class AniyomiContainerSource:
                     ep_items = _safe_select(ajax_soup, ep_selector)
             except Exception:
                 pass
+        ep_items = _expand_popover_episodes(ep_items, soup)
         matched_ids = {id(el) for el in ep_items}
         seen_hrefs: set[str] = set()
         parsed_rows: List[tuple[Optional[int], int, Episode]] = []
@@ -460,7 +581,7 @@ class AniyomiContainerSource:
                 val = ep_el.get("value") or ""
                 # Si option a une url ou un index d'épisode
                 if val.startswith("http") or val.startswith("/"):
-                    href = urljoin(self.base_url, val)
+                    href = _join_base_url(self.base_url, val)
                 elif "vostfree" in self.pkg:
                     match = re.search(r"\d+", ep_title)
                     if not match and ep_title.casefold() != "film":
@@ -477,7 +598,7 @@ class AniyomiContainerSource:
                 a_tag = title_a or (ep_el if ep_el.name == "a" else ep_el.select_one("a[href]"))
                 raw_href = (a_tag.get("href") or "").strip() if a_tag else ""
                 if raw_href and not raw_href.startswith(("#", "javascript:")):
-                    href = urljoin(anime_url, raw_href)
+                    href = _join_base_url(self.base_url, raw_href) if raw_href.startswith("/") else urljoin(anime_url, raw_href)
                 else:
                     onclick_urls: List[str] = []
                     click_nodes = ([ep_el] if ep_el.get("onclick") else []) + ep_el.select("[onclick]")
@@ -686,6 +807,8 @@ class AniyomiContainerSource:
         if interpreted is not None:
             return interpreted
 
+        self._require_desktop_supported()
+
         # 2. Si l'URL de lecture est déjà un lien d'intégration vidéo direct via le hub d'extracteurs
         matched_ext = extractor_registry.find_extractor(play_url)
         if matched_ext:
@@ -712,7 +835,7 @@ class AniyomiContainerSource:
             if player.get("data-nume") == "trailer":
                 continue
             from urllib.parse import urlencode
-            endpoint = urljoin(self.base_url, f"/wp-json/dooplayer/v1/post/{player['data-post']}")
+            endpoint = _join_base_url(self.base_url, f"/wp-json/dooplayer/v1/post/{player['data-post']}")
             payload = await self._fetch_html(endpoint + "?" + urlencode({"type": player.get("data-type", "tv"), "source": player["data-nume"]}))
             try:
                 embed = json.loads(payload).get("embed_url", "")
@@ -744,7 +867,7 @@ class AniyomiContainerSource:
             film_id = parse_qs(urlparse(shortlink.get("href", "") if shortlink else "").query).get("p", [""])[0]
             if film_id:
                 for server in soup.select(".list-server select option[value]"):
-                    endpoint = urljoin(self.base_url, "/ajax-get-link-stream/") + "?" + urlencode({"server": server["value"], "filmId": film_id})
+                    endpoint = _join_base_url(self.base_url, "/ajax-get-link-stream/") + "?" + urlencode({"server": server["value"], "filmId": film_id})
                     raw = await self._fetch_html(endpoint)
                     try:
                         raw = json.loads(raw)

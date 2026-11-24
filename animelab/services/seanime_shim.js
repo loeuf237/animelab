@@ -6,6 +6,7 @@
 
   var MAX_LOGS = 200;
   var _logs = [];
+  var _lastVerification = null;
 
   function pushLog(level, args) {
     if (_logs.length >= MAX_LOGS) return;
@@ -1884,6 +1885,15 @@
   function normalizeHeadersInput(rawHeaders) {
     var out = {};
     if (!rawHeaders || typeof rawHeaders !== 'object') return out;
+    if (Array.isArray(rawHeaders)) {
+      for (var j = 0; j < rawHeaders.length; j++) {
+        var pair = rawHeaders[j];
+        if (Array.isArray(pair) && pair.length >= 2 && pair[0] != null && pair[1] != null) {
+          out[String(pair[0])] = String(pair[1]);
+        }
+      }
+      return out;
+    }
     if (typeof rawHeaders.forEach === 'function') {
       rawHeaders.forEach(function (value, key) {
         if (key != null && value != null) out[String(key)] = String(value);
@@ -1971,6 +1981,12 @@
     var rawResp = await global.__seanimeHostFetch(JSON.stringify(req));
     var data = typeof rawResp === 'string' ? JSON.parse(rawResp) : rawResp;
     if (!data || data.error) {
+      if (data && data.verificationRequired) {
+        _lastVerification = {
+          url: String(data.verificationUrl || req.url),
+          error: String(data.error || 'Verification required'),
+        };
+      }
       throw new Error((data && data.error) || 'Network request failed');
     }
     var bodyTextCache = typeof data.bodyText === 'string' ? data.bodyText : null;
@@ -2032,6 +2048,7 @@
 
   global.__seanimeInvoke = async function (methodName, argsJson, userConfigJson, defaultsJson, storeJson) {
     _logs = [];
+    _lastVerification = null;
     _userConfig = userConfigJson ? JSON.parse(userConfigJson) : {};
     _configDefaults = defaultsJson ? JSON.parse(defaultsJson) : {};
     if (storeJson) {
@@ -2051,20 +2068,30 @@
       }
       var args = argsJson ? JSON.parse(argsJson) : [];
       var result = await Promise.resolve(fn.apply(instance, args));
-      return JSON.stringify({
+      var okPayload = {
         ok: true,
         result: result === undefined ? null : result,
         store: _storeData,
         logs: _logs,
-      });
+      };
+      if (_lastVerification) {
+        okPayload.verificationRequired = true;
+        okPayload.verificationUrl = _lastVerification.url;
+      }
+      return JSON.stringify(okPayload);
     } catch (err) {
-      return JSON.stringify({
+      var errPayload = {
         ok: false,
         error: err && err.message ? String(err.message) : String(err),
         stack: err && err.stack ? String(err.stack) : '',
         store: _storeData,
         logs: _logs,
-      });
+      };
+      if (_lastVerification) {
+        errPayload.verificationRequired = true;
+        errPayload.verificationUrl = _lastVerification.url;
+      }
+      return JSON.stringify(errPayload);
     }
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

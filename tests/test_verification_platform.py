@@ -289,3 +289,91 @@ async def test_closed_desktop_webview_reuses_scoped_capture_without_touching_des
     result = await browser.complete(job['id'])
     assert result['sessionImported'] and result['accessVerified'] is False
     assert [c.value for c in state.cookies] == ['captured']
+
+
+@pytest.mark.asyncio
+async def test_auto_mode_prefers_webview_and_open_url_disables_auto_close(service, monkeypatch):
+    from fastapi import FastAPI
+    from animelab.routers.network import router
+
+    browser, state = service
+    seen_calls = []
+    closed_flag = False
+
+    def opener(url, *, auto_close=True):
+        seen_calls.append((url, auto_close))
+        return type(
+            'Win',
+            (),
+            {
+                'is_closed': lambda self: closed_flag,
+                'get_cookie_records': lambda self: [
+                    {'name': 'cf_clearance', 'value': 'v1', 'domain': 'source.example', 'path': '/', 'secure': True, 'httpOnly': True}
+                ],
+                'destroy': lambda self: None,
+            },
+        )()
+
+    browser.webview_opener = opener
+    monkeypatch.setattr('animelab.services.browser_verification.is_safe_url', lambda url: True)
+    job = await browser.start('source.example', mode='auto')
+    assert job['mode'] == 'webview'
+    assert seen_calls == [(state.blocked_url, True)]
+    await browser.complete(job['id'])
+
+    with pytest.raises(ValueError, match='Domaine non reconnu'):
+        await browser.open_url('https://untrusted.example/anime')
+
+    opened = await browser.open_url('https://source.example/browse')
+    assert opened['mode'] == 'webview'
+    assert seen_calls[-1] == ('https://source.example/browse', False)
+    assert browser.jobs[opened['id']]['autoClose'] is False
+    await browser.synchronize(browser.jobs[opened['id']])
+    closed_flag = True
+    res = await browser.complete(opened['id'])
+    assert res['sessionImported'] is True
+
+    app = FastAPI()
+    app.include_router(router)
+    monkeypatch.setattr('animelab.routers.network.browser_verification', browser)
+    local_transport = httpx.ASGITransport(app, client=('127.0.0.1', 50000))
+    async with httpx.AsyncClient(transport=local_transport, base_url='http://local') as client:
+        ok_resp = await client.post('/api/network/webview/open', json={'url': 'https://source.example/v2'})
+        assert ok_resp.status_code == 200
+        assert ok_resp.json()['mode'] == 'webview'
+        await browser.complete(ok_resp.json()['id'])
+        bad_resp = await client.post('/api/network/webview/open', json={'url': 'https://evil.example/'})
+        assert bad_resp.status_code == 400
+    remote_transport = httpx.ASGITransport(app, client=('198.51.100.10', 50000))
+    async with httpx.AsyncClient(transport=remote_transport, base_url='http://remote') as client:
+        assert (await client.post('/api/network/webview/open', json={'url': 'https://source.example/'})).status_code == 403
+
+
+def test_linux_gtk_verification_window_ipc_captures_http_only_cookies(tmp_path):
+    import sys
+    import json
+    from animelab.desktop.window import LinuxGtkVerificationWindow
+
+    fake_script = tmp_path / 'fake_webview.py'
+    fake_script.write_text(
+        "import json, sys\n"
+        "cfg = json.loads(sys.stdin.readline())\n"
+        "print(json.dumps({'event': 'ready', 'userAgent': 'FakeWebKit/1.0'}), flush=True)\n"
+        "for line in sys.stdin:\n"
+        "    cmd = json.loads(line)\n"
+        "    if cmd.get('cmd') == 'get_cookies':\n"
+        "        print(json.dumps({'event': 'cookies', 'req_id': cmd.get('req_id'), 'cookies': [{'name': 'cf_clearance', 'value': 'gtk-ok', 'domain': '.source.example', 'path': '/', 'secure': True, 'httpOnly': True}]}), flush=True)\n"
+        "    elif cmd.get('cmd') == 'close':\n"
+        "        print(json.dumps({'event': 'closed'}), flush=True)\n"
+        "        break\n",
+        encoding='utf-8',
+    )
+    win = LinuxGtkVerificationWindow('https://source.example/', sys.executable, fake_script, auto_close=True)
+    try:
+        assert win.wait_ready(timeout=4.0) == 'FakeWebKit/1.0'
+        records = win.get_cookie_records(timeout=4.0)
+        assert records and records[0]['name'] == 'cf_clearance' and records[0]['httpOnly'] is True
+        win.destroy()
+        assert win.is_closed() is True
+    finally:
+        win.destroy()

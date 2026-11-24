@@ -199,3 +199,65 @@ async def test_installed_chrome_cookie_exchange_with_local_server(tmp_path, monk
         transport.close()
         server.shutdown()
         server.server_close()
+
+
+@pytest.mark.asyncio
+async def test_compact_chromium_app_args_and_auto_close_detection(tmp_path, monkeypatch):
+    import importlib
+    from animelab.services.verification_platform import ChromiumVerification
+
+    platform_mod = importlib.import_module('animelab.services.verification_platform')
+    browser_mod = importlib.import_module('animelab.services.browser_verification')
+    transport = SourceHTTPService(storage=tmp_path / 'cookies', min_interval=0)
+    service = BrowserVerificationService(transport)
+    state = transport.state('https://source.example/episode')
+    state.blocked_url = 'https://source.example/episode'
+
+    launched_args = []
+    proc = MagicMock()
+    proc.poll.return_value = None
+    proc.wait.return_value = 0
+
+    def fake_popen(args, **kwargs):
+        launched_args.append(list(args))
+        return proc
+
+    service._cdp = AsyncMock(side_effect=lambda job, cmd, params=None: (
+        {'userAgent': 'Chrome/130'} if cmd == 'Browser.getVersion'
+        else {'targetInfos': [{'targetId': 't1', 'type': 'page', 'url': 'about:blank'}]} if cmd == 'Target.getTargets'
+        else {'cookies': []}
+    ))
+    navigated = []
+
+    async def fake_nav(job, target_id, url):
+        navigated.append((target_id, url))
+        return True
+
+    service._cdp_navigate = fake_nav
+    monkeypatch.setattr(service, 'installed_browsers', lambda: [{'name': 'chrome', 'path': '/fake/chrome'}])
+    monkeypatch.setattr(browser_mod, 'is_safe_url', lambda url: True)
+    monkeypatch.setattr(platform_mod.subprocess, 'Popen', fake_popen)
+    monkeypatch.setenv('DISPLAY', ':0')
+    monkeypatch.setattr(service.configuration, 'snapshot', lambda: {'chromiumPath': '', 'headless': False})
+
+    started = await service.start('source.example', mode='browser')
+    assert '--app=about:blank' in launched_args[0]
+    assert '--window-size=920,740' in launched_args[0]
+    assert '--new-window' not in launched_args[0]
+    assert navigated == [('t1', 'https://source.example/episode')]
+
+    job = service.jobs[started['id']]
+    job['created'] = time.monotonic() - 5.0
+    job['capturedCookies'] = [{'name': 'cf_clearance', 'value': 'fresh', 'domain': '.source.example', 'path': '/'}]
+
+    # First tick sees challenge title -> does not auto-close
+    service._cdp = AsyncMock(return_value={'targetInfos': [{'targetId': 't1', 'type': 'page', 'url': 'https://source.example/episode', 'title': 'Just a moment...'}]})
+    assert await ChromiumVerification.ready_to_auto_close(service, job) is False
+
+    # Two consecutive clean non-challenge ticks with cf_clearance -> auto-closes
+    service._cdp = AsyncMock(return_value={'targetInfos': [{'targetId': 't1', 'type': 'page', 'url': 'https://source.example/episode', 'title': 'Anime Catalogue'}]})
+    assert await ChromiumVerification.ready_to_auto_close(service, job) is False
+    assert await ChromiumVerification.ready_to_auto_close(service, job) is True
+
+    await service.close()
+    transport.close()

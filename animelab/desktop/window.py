@@ -7,6 +7,7 @@ import shutil
 import sys
 import threading
 import subprocess
+import uuid
 from urllib.parse import urlsplit
 
 
@@ -205,16 +206,24 @@ def _find_system_gtk_python() -> str | None:
     return None
 
 
-def _linux_gtk_script_path() -> Path:
-    direct = Path(__file__).with_name('linux_gtk_window.py')
+def _linux_script_path(name: str) -> Path:
+    direct = Path(__file__).with_name(name)
     if direct.is_file():
         return direct
     meipass = getattr(sys, '_MEIPASS', None)
     if meipass:
-        bundled = Path(meipass) / 'animelab' / 'desktop' / 'linux_gtk_window.py'
+        bundled = Path(meipass) / 'animelab' / 'desktop' / name
         if bundled.is_file():
             return bundled
     return direct
+
+
+def _linux_gtk_script_path() -> Path:
+    return _linux_script_path('linux_gtk_window.py')
+
+
+def _linux_verification_script_path() -> Path:
+    return _linux_script_path('linux_verification_webview.py')
 
 
 def _open_linux_gtk_subprocess(url=None, control_url=None, workdir=None, probe=False) -> None:
@@ -273,6 +282,232 @@ def _open_linux_gtk_subprocess(url=None, control_url=None, workdir=None, probe=F
         or not (workdir_path / 'shown').exists()
     ):
         raise RuntimeError('Native window did not render the release probe')
+
+
+class _WindowEvents:
+    def __init__(self) -> None:
+        self.closed = threading.Event()
+
+
+class LinuxGtkVerificationWindow:
+    """Handle to an isolated GTK3 + WebKit2GTK verification window subprocess."""
+
+    def __init__(
+        self,
+        url: str,
+        system_python: str,
+        script: Path,
+        *,
+        cookies: list[dict] | None = None,
+        auto_close: bool = True,
+    ) -> None:
+        self.url = url
+        self.events = _WindowEvents()
+        self._lock = threading.Lock()
+        self._latest_cookies: list[dict] = []
+        self._user_agent = ''
+        self._ready_event = threading.Event()
+        self._pending_cookie_reqs: dict[str, threading.Event] = {}
+
+        config = {
+            'url': url,
+            'cookies': list(cookies or []),
+            'initial_dark': _initial_theme_dark(),
+            'icon': window_icon(),
+            'auto_close': bool(auto_close),
+            'width': 920,
+            'height': 740,
+        }
+        self._proc = subprocess.Popen(
+            [system_python, '-E', '-s', str(script)],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            env=_clean_system_python_env(),
+        )
+        if self._proc.stdin is not None:
+            self._proc.stdin.write((json.dumps(config, ensure_ascii=False) + '\n').encode('utf-8'))
+            self._proc.stdin.flush()
+        self._reader = threading.Thread(target=self._read_stdout, daemon=True)
+        self._reader.start()
+
+    def _read_stdout(self) -> None:
+        stdout = self._proc.stdout
+        try:
+            if stdout is not None:
+                for raw_line in stdout:
+                    line = raw_line.decode('utf-8', errors='replace').strip()
+                    if not line:
+                        continue
+                    try:
+                        msg = json.loads(line)
+                    except Exception:
+                        continue
+                    event = msg.get('event')
+                    if event == 'ready':
+                        self._user_agent = str(msg.get('userAgent') or '')
+                        self._ready_event.set()
+                    elif event == 'cookies':
+                        records = list(msg.get('cookies') or [])
+                        req_id = msg.get('req_id')
+                        with self._lock:
+                            self._latest_cookies = records
+                            waiter = self._pending_cookie_reqs.pop(req_id, None) if req_id else None
+                        if waiter is not None:
+                            waiter.set()
+                    elif event == 'closed':
+                        self.events.closed.set()
+        finally:
+            self._ready_event.set()
+            self.events.closed.set()
+            with self._lock:
+                waiters = list(self._pending_cookie_reqs.values())
+                self._pending_cookie_reqs.clear()
+            for waiter in waiters:
+                waiter.set()
+
+    def wait_ready(self, timeout: float = 5.0) -> str:
+        self._ready_event.wait(timeout)
+        return self._user_agent
+
+    def _send_command(self, payload: dict) -> bool:
+        if self.is_closed() or self._proc.stdin is None:
+            return False
+        try:
+            with self._lock:
+                self._proc.stdin.write((json.dumps(payload, ensure_ascii=False) + '\n').encode('utf-8'))
+                self._proc.stdin.flush()
+            return True
+        except Exception:
+            return False
+
+    def get_cookie_records(self, timeout: float = 4.0) -> list[dict]:
+        if self.is_closed():
+            with self._lock:
+                return list(self._latest_cookies)
+        req_id = uuid.uuid4().hex
+        waiter = threading.Event()
+        with self._lock:
+            self._pending_cookie_reqs[req_id] = waiter
+        if not self._send_command({'cmd': 'get_cookies', 'req_id': req_id}):
+            with self._lock:
+                self._pending_cookie_reqs.pop(req_id, None)
+                return list(self._latest_cookies)
+        waiter.wait(timeout)
+        with self._lock:
+            self._pending_cookie_reqs.pop(req_id, None)
+            return list(self._latest_cookies)
+
+    def set_cookies(self, cookies: list[dict]) -> None:
+        self._send_command({'cmd': 'set_cookies', 'cookies': list(cookies or [])})
+
+    def is_closed(self) -> bool:
+        return self.events.closed.is_set() or (self._proc.poll() is not None)
+
+    def destroy(self) -> None:
+        self._send_command({'cmd': 'close'})
+        if self._proc.poll() is None:
+            try:
+                self._proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                self._proc.terminate()
+                try:
+                    self._proc.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    self._proc.kill()
+                    self._proc.wait(timeout=2)
+        self.events.closed.set()
+
+
+class LinuxGtkVerificationOpener:
+    """Callable webview_opener backed by isolated GTK3 + WebKit2GTK subprocess windows."""
+
+    def __init__(self, system_python: str, script: Path) -> None:
+        self._system_python = system_python
+        self._script = script
+        self._seeds: dict[str, list[dict]] = {}
+        self._cached_ua: str | None = None
+
+    def seed_cookies(self, url: str, cookies: list[dict]) -> None:
+        self._seeds[url] = list(cookies or [])
+
+    def user_agent(self) -> str:
+        if self._cached_ua:
+            return self._cached_ua
+        probe = (
+            "import gi\n"
+            "gi.require_version('Gtk', '3.0')\n"
+            "try:\n"
+            "    gi.require_version('WebKit2', '4.1')\n"
+            "except ValueError:\n"
+            "    gi.require_version('WebKit2', '4.0')\n"
+            "from gi.repository import WebKit2\n"
+            "print(WebKit2.Settings().get_user_agent() or '')\n"
+        )
+        try:
+            proc = subprocess.run(
+                [self._system_python, '-E', '-s', '-c', probe],
+                env=_clean_system_python_env(),
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                timeout=4,
+            )
+            if proc.returncode == 0 and proc.stdout.strip():
+                self._cached_ua = proc.stdout.strip().splitlines()[-1]
+                return self._cached_ua
+        except Exception:
+            pass
+        from animelab.services.source_http import source_http
+
+        return source_http.default_user_agent
+
+    def __call__(self, url: str, *, auto_close: bool = True) -> LinuxGtkVerificationWindow:
+        cookies = self._seeds.pop(url, [])
+        win = LinuxGtkVerificationWindow(
+            url,
+            self._system_python,
+            self._script,
+            cookies=cookies,
+            auto_close=auto_close,
+        )
+        ua = win.wait_ready(timeout=4.0)
+        if ua:
+            self._cached_ua = ua
+        return win
+
+
+def install_linux_webview_opener(service) -> bool:
+    """Register the isolated GTK3/WebKit2GTK verification opener on desktop Linux."""
+    if not sys.platform.startswith('linux'):
+        return False
+    if os.getenv('ANIMELAB_ANDROID') == '1' or os.getenv('PYTEST_CURRENT_TEST'):
+        return False
+    if not (os.getenv('DISPLAY') or os.getenv('WAYLAND_DISPLAY')):
+        return False
+    if getattr(service, 'webview_opener', None) is not None:
+        return False
+    script = _linux_verification_script_path()
+    if not script.is_file():
+        return False
+    system_python = _find_system_gtk_python()
+    if not system_python:
+        try:
+            proc = subprocess.run(
+                [sys.executable, '-E', '-s', '-c', _LINUX_GTK_PROBE_CODE],
+                env=_clean_system_python_env(),
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                timeout=5,
+            )
+            if proc.returncode == 0:
+                system_python = sys.executable
+        except Exception:
+            system_python = None
+    if not system_python:
+        return False
+    service.webview_opener = LinuxGtkVerificationOpener(system_python, script)
+    return True
 
 
 def _open_pywebview_window(url=None, control_url=None, workdir=None, probe=False, *, gui: str):
@@ -345,8 +580,10 @@ def _open_pywebview_window(url=None, control_url=None, workdir=None, probe=False
     )
     from animelab.services.browser_verification import browser_verification
     if not probe:
-        opener = lambda target: webview.create_window(
-            'AnimeLab — Site verification', target, width=900, height=700)
+        def opener(target, *, auto_close=True):
+            return webview.create_window(
+                'AnimeLab — Site verification', target, width=920, height=740
+            )
         opener.user_agent = lambda: window.evaluate_js('navigator.userAgent')
         browser_verification.webview_opener = opener
     try:

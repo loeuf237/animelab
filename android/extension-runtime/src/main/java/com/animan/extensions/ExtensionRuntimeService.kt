@@ -9,7 +9,9 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.os.Binder
 import android.os.IBinder
+import android.util.Log
 import dalvik.system.PathClassLoader
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import eu.kanade.tachiyomi.animesource.*
 import eu.kanade.tachiyomi.animesource.model.*
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
@@ -33,7 +35,9 @@ class ExtensionRuntimeService : Service() {
     private val errors = ConcurrentHashMap<String, String>()
     private val trust by lazy { getSharedPreferences("extension_trust", MODE_PRIVATE) }
     private val codec = ExtensionCodec
+    private lateinit var networkHelper: NetworkHelper
 
+    @Suppress("OPT_IN_USAGE")
     override fun onCreate() {
         super.onCreate()
         // The UI and this process must never contend for WebView's default
@@ -45,13 +49,14 @@ class ExtensionRuntimeService : Service() {
             }
         }
         val app = application
+        networkHelper = NetworkHelper(app)
         Injekt.importModule(object : InjektModule {
             override fun InjektRegistrar.registerInjectables() {
                 addSingleton<Application>(app)
                 addSingleton<android.content.Context>(app)
-                addSingleton(NetworkHelper(app))
+                addSingleton(networkHelper)
                 addSingleton(JavaScriptEngine(app))
-                addSingleton(Json { ignoreUnknownKeys = true; isLenient = true })
+                addSingleton(Json { ignoreUnknownKeys = true; isLenient = true; explicitNulls = false })
             }
         })
     }
@@ -98,6 +103,7 @@ class ExtensionRuntimeService : Service() {
                 .apply { if (code=="verification_required") put("url",networkError.target) }.toString()
         } else {
         val code = ExtensionOperationPolicy.failureCode(error)
+        Log.w("ExtensionRuntime", "Operation failed ($code): ${error.javaClass.simpleName}")
         // Remote exceptions can contain URLs/credentials; export only a stable code/type.
         JSONObject().put("ok", false).put("code", code).put("type", error.javaClass.simpleName).toString()
         }
@@ -176,7 +182,9 @@ class ExtensionRuntimeService : Service() {
         val loader = object : PathClassLoader(application.sourceDir, application.nativeLibraryDir, javaClass.classLoader) {
             override fun loadClass(name: String, resolve: Boolean): Class<*> {
                 val shared = listOf("java.", "android.", "androidx.", "kotlin.", "kotlinx.", "rx.", "okhttp3.", "okio.",
-                    "uy.kohesive.injekt.", "eu.kanade.tachiyomi.animesource.", "eu.kanade.tachiyomi.network.")
+                    "app.cash.quickjs.", "org.jsoup.", "uy.kohesive.injekt.",
+                    "eu.kanade.tachiyomi.animesource.", "eu.kanade.tachiyomi.network.",
+                    "eu.kanade.tachiyomi.util.", "tachiyomi.core.", "mihon.core.")
                 if (shared.any(name::startsWith)) return super.loadClass(name, resolve)
                 return synchronized(this) {
                     findLoadedClass(name) ?: try { findClass(name) } catch (_: ClassNotFoundException) { super.loadClass(name, resolve) }
@@ -205,6 +213,21 @@ class ExtensionRuntimeService : Service() {
             trust.all.keys.filter { it.startsWith("$pkg:") }.forEach { editor.remove(it) }
             editor.commit(); loaded.remove(pkg)
             return JSONObject().put("trusted",false)
+        }
+        if (operation == "clear_cookies") {
+            val payload = request.optJSONObject("payload") ?: JSONObject()
+            val domain = payload.optString("domain", "").trim().lowercase()
+            var removed = 0
+            if (::networkHelper.isInitialized) {
+                if (domain.isNotEmpty() && domain.matches(Regex("^[a-z0-9.-]+$"))) {
+                    "https://$domain/".toHttpUrlOrNull()?.let { httpUrl ->
+                        removed = networkHelper.cookieJar.remove(httpUrl)
+                    }
+                } else {
+                    networkHelper.cookieJar.removeAll()
+                }
+            }
+            return JSONObject().put("cleared", removed)
         }
         val info = packageInfo(request.getString("pkg"))
         require(isExtension(info)) { "This is not an anime extension" }
@@ -240,8 +263,41 @@ class ExtensionRuntimeService : Service() {
             }
             "detail" -> {
                 val input = animeInput()
-                val result = source.getAnimeEpisodeUpdate(input, emptyList(), true, true)
-                JSONObject().put("anime", codec.anime(result.anime, input)).put("episodes", JSONArray(result.episodes.map(codec::episode)))
+                if (input.fetch_type == FetchType.Seasons) {
+                    val result = source.getAnimeSeasonUpdate(input, emptyList(), true, true)
+                    JSONObject().put("anime", codec.anime(result.anime, input))
+                        .put("episodes", JSONArray())
+                        .put("seasons", JSONArray(result.seasons.map(codec::anime)))
+                } else {
+                    var episodeError: Throwable? = null
+                    val episodeResult = try {
+                        source.getAnimeEpisodeUpdate(input, emptyList(), true, true)
+                    } catch (err: UnsupportedOperationException) {
+                        episodeError = err; null
+                    } catch (err: NotImplementedError) {
+                        episodeError = err; null
+                    }
+                    if (episodeResult == null || (episodeResult.anime.fetch_type == FetchType.Seasons && episodeResult.episodes.isEmpty())) {
+                        val seasonResult = try {
+                            source.getAnimeSeasonUpdate(input, emptyList(), true, true)
+                        } catch (_: Throwable) {
+                            if (episodeError != null) throw episodeError
+                            null
+                        }
+                        if (seasonResult != null) {
+                            JSONObject().put("anime", codec.anime(seasonResult.anime, input))
+                                .put("episodes", JSONArray())
+                                .put("seasons", JSONArray(seasonResult.seasons.map(codec::anime)))
+                        } else {
+                            val resolved = requireNotNull(episodeResult)
+                            JSONObject().put("anime", codec.anime(resolved.anime, input))
+                                .put("episodes", JSONArray(resolved.episodes.map(codec::episode)))
+                        }
+                    } else {
+                        JSONObject().put("anime", codec.anime(episodeResult.anime, input))
+                            .put("episodes", JSONArray(episodeResult.episodes.map(codec::episode)))
+                    }
+                }
             }
             "seasons" -> {
                 val input = animeInput()
@@ -255,7 +311,15 @@ class ExtensionRuntimeService : Service() {
             "hosters" -> {
                 val episode = codec.episode(payload)
                 val hosts = if (api(info) < 16) listOf(Hoster(videoList=source.getVideoList(episode)))
-                    else source.getHosterList(episode)
+                else try {
+                    source.getHosterList(episode)
+                } catch (_: UnsupportedOperationException) {
+                    listOf(Hoster(videoList=source.getVideoList(episode)))
+                } catch (_: NotImplementedError) {
+                    listOf(Hoster(videoList=source.getVideoList(episode)))
+                } catch (_: IllegalStateException) {
+                    listOf(Hoster(videoList=source.getVideoList(episode)))
+                }
                 JSONArray(hosts.map(codec::hoster))
             }
             "videos" -> {

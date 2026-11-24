@@ -1392,5 +1392,9 @@
   "Épisode téléchargé supprimé.": "Downloaded episode deleted.",
   "Impossible de supprimer l’épisode téléchargé.": "Unable to delete downloaded episode.",
   "Configuration individualisée pour chaque source (VoirAnime, AnimePahe, French-Manga, French-Stream).": "Individual settings for each source (VoirAnime, AnimePahe, French-Manga, French-Stream).",
-  "Films, séries et animés VF / VOSTFR liés à French-Manga, avec mise à jour automatique du miroir depuis fstream.net.": "Movies, TV series, and anime in VF / VOSTFR linked with French-Manga, with automatic mirror updates from fstream.net."
+  "Films, séries et animés VF / VOSTFR liés à French-Manga, avec mise à jour automatique du miroir depuis fstream.net.": "Movies, TV series, and anime in VF / VOSTFR linked with French-Manga, with automatic mirror updates from fstream.net.",
+  "Vérifier dans la WebView": "Verify in WebView",
+  "Ouvrir en WebView": "Open in WebView",
+  "Fenêtre de vérification ouverte — fermez ou cliquez sur « J’ai terminé la vérification » une fois l’accès débloqué.": "Verification window open — close it or click \"I have completed verification\" once access is restored.",
+  "Impossible d’ouvrir cette URL dans la WebView.": "Unable to open this URL in WebView."
 }

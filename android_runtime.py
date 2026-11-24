@@ -13,10 +13,17 @@ from urllib.parse import urlparse
 _loop = None
 
 
-def seanime_fetch(payload):
+def seanime_fetch(payload, extension_id=""):
     """Execute one Seanime fetch() call through Python's SSRF-protected transport."""
-    from animelab.services.seanime_runtime import host_fetch_json_sync
+    from animelab.services.seanime_runtime import (
+        AndroidSeanimeRuntime,
+        host_fetch_json_sync,
+        seanime_runtime,
+    )
 
+    backend = seanime_runtime.backend
+    if isinstance(backend, AndroidSeanimeRuntime):
+        return backend.fetch_sync(str(payload or "{}"), extension_id=str(extension_id or ""))
     return host_fetch_json_sync(str(payload or "{}"))
 
 
@@ -36,8 +43,26 @@ def extension_http(payload):
             raise ValueError('Unsupported HTTP method')
         milliseconds = int(data.get('readTimeoutMillis',30000))
         timeout = 30 if milliseconds<=0 else min(30,max(.1,milliseconds/1000))
+        req_headers = dict(data.get('headers') or [])
+        state = source_http.state(data['url'])
+        with state.condition:
+            managed_clearance = {
+                c.name for c in state.cookies
+                if c.name in ('cf_clearance', '__cf_bm', '__ddg2_', 'ddg_clearance') and not c.is_expired()
+            }
+        if managed_clearance:
+            for h_key in [k for k in req_headers if str(k).lower() == 'cookie']:
+                kept = []
+                for part in str(req_headers[h_key]).split(';'):
+                    name = part.split('=', 1)[0].strip()
+                    if name and name not in managed_clearance:
+                        kept.append(part.strip())
+                if kept:
+                    req_headers[h_key] = '; '.join(kept)
+                else:
+                    del req_headers[h_key]
         async with source_http.async_client(timeout=timeout, follow_redirects=data.get('followRedirects',True) is True) as client:
-            response = await client.request(method, data['url'], headers=dict(data.get('headers') or []),
+            response = await client.request(method, data['url'], headers=req_headers,
                                             content=body or None, max_response_bytes=8_000_000,
                                             _follow_ssl_redirects=data.get('followSslRedirects',True) is True)
             return {'status':response.status_code, 'url':str(response.url),
@@ -79,10 +104,14 @@ class VerificationWindow:
             headers.append(cookie.OutputString())
         bridge.setCookies(url, json.dumps(headers))
 
-    def __init__(self, url, bridge):
+    def __init__(self, url, bridge, auto_close=True):
         self.url, self.bridge = url, bridge
         self.metadata = {(item["domain"], item["path"], item["name"]): item for item in self._seeds.pop(url, [])}
-        self.bridge.open(url, str(self.bridge.userAgent()))
+        ua = str(self.bridge.userAgent())
+        try:
+            self.bridge.open(url, ua, bool(auto_close))
+        except (TypeError, AttributeError):
+            self.bridge.open(url, ua)
 
     def set_cookies(self, cookies):
         self._write_cookies(self.url, cookies, self.bridge)
@@ -181,7 +210,7 @@ def start(data_dir, cache_dir, port, token, test_mode=False):
     from animelab.services.download_manager import download_manager
     run.app.add_middleware(AndroidSessionMiddleware, token=token)
     run.browser_verification.platform = "android"
-    opener = lambda url: VerificationWindow(url, verification)
+    opener = lambda url, auto_close=True: VerificationWindow(url, verification, auto_close=auto_close)
     opener.seed_cookies = lambda url, cookies: VerificationWindow.seed_cookies(url, cookies, verification)
     opener.user_agent = lambda: str(verification.userAgent())
     run.browser_verification.webview_opener = opener

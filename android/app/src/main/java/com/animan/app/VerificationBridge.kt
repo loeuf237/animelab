@@ -1,47 +1,114 @@
 package com.animan.app
 
 import android.content.Intent
+import android.os.Looper
 import android.webkit.CookieManager
 import android.webkit.WebSettings
 import org.json.JSONArray
-import java.util.concurrent.atomic.AtomicReference
+import java.net.URI
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 object VerificationBridge {
-    @JvmStatic fun userAgent(): String {
-        val ready = CountDownLatch(1)
-        val result = AtomicReference<String?>(null)
-        EngineHost.main.post {
-            try { result.set(WebSettings.getDefaultUserAgent(EngineHost.context)) }
-            finally { ready.countDown() }
+    const val EXTRA_AUTO_CLOSE = "auto_close"
+
+    private fun <T> runOnMainSync(timeoutError: String, block: () -> T): T {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            return block()
         }
-        check(ready.await(5, TimeUnit.SECONDS)) { "WebView did not provide its user agent" }
-        return checkNotNull(result.get()) { "WebView user agent unavailable" }
-    }
-    @Volatile var activity: VerificationActivity? = null
-    @Volatile private var openedUrl: String? = null
-    @JvmStatic fun open(url: String, userAgent: String) {
-        openedUrl = url
+        val ready = CountDownLatch(1)
+        val result = AtomicReference<T?>(null)
+        val failure = AtomicReference<Throwable?>(null)
         EngineHost.main.post {
             try {
-                EngineHost.context.startActivity(Intent(EngineHost.context, VerificationActivity::class.java)
-                    .putExtra("url", url).putExtra("user_agent", userAgent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            } catch (_: Exception) { didClose(url) }
+                result.set(block())
+            } catch (err: Throwable) {
+                failure.set(err)
+            } finally {
+                ready.countDown()
+            }
         }
+        check(ready.await(5, TimeUnit.SECONDS)) { timeoutError }
+        failure.get()?.let { throw it }
+        @Suppress("UNCHECKED_CAST")
+        return result.get() as T
     }
-    @JvmStatic fun isOpen(url: String): Boolean = openedUrl == url
-    fun didClose(url: String) { if (openedUrl == url) openedUrl = null }
-    @JvmStatic fun cookies(url: String): String {
-        val ready = CountDownLatch(1)
-        var result = ""
+
+    @JvmStatic fun userAgent(): String =
+        runOnMainSync("WebView did not provide its user agent") {
+            val raw = WebSettings.getDefaultUserAgent(EngineHost.context)
+            raw.replace("; wv)", ")").replace("Version/4.0 ", "")
+        }
+
+    @Volatile var activity: VerificationActivity? = null
+    @Volatile private var openedUrl: String? = null
+    private val currentUrlRef = AtomicReference("")
+
+    @JvmStatic fun updateCurrentUrl(url: String) {
+        if (url.isNotBlank()) currentUrlRef.set(url)
+    }
+
+    @JvmStatic fun open(url: String, userAgent: String) {
+        open(url, userAgent, true)
+    }
+
+    @JvmStatic fun open(url: String, userAgent: String, autoClose: Boolean) {
+        openedUrl = url
+        currentUrlRef.set(url)
         EngineHost.main.post {
-            try { result = CookieManager.getInstance().getCookie(url) ?: "" }
-            finally { ready.countDown() }
+            try {
+                EngineHost.context.startActivity(
+                    Intent(EngineHost.context, VerificationActivity::class.java)
+                        .putExtra("url", url)
+                        .putExtra("user_agent", userAgent)
+                        .putExtra(EXTRA_AUTO_CLOSE, autoClose)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            } catch (_: Exception) {
+                didClose(url)
+            }
         }
-        check(ready.await(5, TimeUnit.SECONDS)) { "CookieManager did not respond" }
-        return result
     }
+
+    @JvmStatic fun isOpen(url: String): Boolean = openedUrl == url
+
+    fun didClose(url: String) {
+        if (openedUrl == url) openedUrl = null
+    }
+
+    private fun apexUrl(targetUrl: String): String? =
+        try {
+            val host = URI(targetUrl).host?.lowercase() ?: ""
+            val labels = host.split(".").filter { it.isNotBlank() }
+            if (labels.size >= 2) "https://${labels.takeLast(2).joinToString(".")}/" else null
+        } catch (_: Exception) {
+            null
+        }
+
+    @JvmStatic fun cookies(url: String): String {
+        val current = currentUrlRef.get()
+        return runOnMainSync("CookieManager did not respond") {
+            val manager = CookieManager.getInstance()
+            manager.flush()
+            val urls = linkedSetOf<String>()
+            apexUrl(url)?.let { urls.add(it) }
+            if (current.isNotBlank()) urls.add(current)
+            urls.add(url)
+            val merged = LinkedHashMap<String, String>()
+            for (candidate in urls) {
+                val raw = manager.getCookie(candidate) ?: continue
+                for (segment in raw.split(";")) {
+                    val trimmed = segment.trim()
+                    if (trimmed.isEmpty()) continue
+                    val name = trimmed.substringBefore("=").trim()
+                    if (name.isNotEmpty()) merged[name] = trimmed
+                }
+            }
+            merged.values.joinToString("; ")
+        }
+    }
+
     /** Applied before source navigation; callbacks finish before Python continues. */
     @JvmStatic fun setCookies(url: String, headersJson: String) {
         val ready = CountDownLatch(1)
@@ -57,22 +124,30 @@ object VerificationBridge {
                     manager.setCookie(url, headers.getString(index)) { accepted ->
                         if (!accepted) failure.set(IllegalStateException("WebView refused a source cookie"))
                         remaining -= 1
-                        if (remaining == 0) { manager.flush(); ready.countDown() }
+                        if (remaining == 0) {
+                            manager.flush()
+                            ready.countDown()
+                        }
                     }
                 }
-            } catch (error: Exception) { failure.set(error); ready.countDown() }
+            } catch (error: Exception) {
+                failure.set(error)
+                ready.countDown()
+            }
         }
         check(ready.await(5, TimeUnit.SECONDS)) { "CookieManager did not finish updating cookies" }
         failure.get()?.let { throw it }
     }
+
     @JvmStatic fun close(url: String) {
-        val ready = CountDownLatch(1)
-        EngineHost.main.post {
-            try {
-                activity?.let { if (it.verificationUrl == url) { it.shutdownBrowser(); it.finish() } }
-                didClose(url)
-            } finally { ready.countDown() }
+        runOnMainSync("Verification browser did not stop") {
+            activity?.let {
+                if (it.verificationUrl == url) {
+                    it.shutdownBrowser()
+                    it.finish()
+                }
+            }
+            didClose(url)
         }
-        check(ready.await(5, TimeUnit.SECONDS)) { "Verification browser did not stop" }
     }
 }

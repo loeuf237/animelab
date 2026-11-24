@@ -109,6 +109,25 @@ async def confirm_operation(operation):
     return json.loads(str(await asyncio.to_thread(_bridge.confirmOperation, operation)))
 
 
+async def clear_cookies(domain: str = '') -> int:
+    """Clear isolated APK CookieJar entries for *domain* (or all domains) after verification."""
+    if not available():
+        return 0
+    try:
+        op = uuid.uuid4().hex
+        request = {
+            'operationId': op,
+            'pkg': '',
+            'operation': 'clear_cookies',
+            'sourceId': '',
+            'payload': {'domain': (domain or '').strip().lower()},
+        }
+        result = unpack(await asyncio.to_thread(_bridge.invoke, json.dumps(request, ensure_ascii=False)))
+        return int((result or {}).get('cleared', 0))
+    except Exception:
+        return 0
+
+
 class AndroidAPKSource:
     """A real source instance enumerated by the original APK's factory."""
     runtime = 'android-apk'
@@ -185,27 +204,68 @@ class AndroidAPKSource:
         return (await self.catalogue('popular', page=page))['results']
 
     async def get_anime_detail(self, url):
-        result = await self.call('detail', self._input('anime',url,{'url': url, 'title': url}))
+        anime_input = self._input('anime', url, {'url': url, 'title': url})
+        result = await self.call('detail', anime_input)
         item = result['anime']
         version = self._version(item.get('title'), item.get('url'))
+        raw_episodes = list(result.get('episodes') or [])
+        seasons_list = list(result.get('seasons') or [])
+        if not raw_episodes and str(item.get('fetch_type') or '').upper() == 'SEASONS' and not seasons_list:
+            season_payload = await self.call('seasons', item)
+            item = season_payload.get('anime') or item
+            seasons_list = list(season_payload.get('seasons') or [])
+
         episodes = []
         references = []
-        for index, row in enumerate(result['episodes'], 1):
-            absolute = urljoin(self.base_url + '/', row['url'])
-            references.append(('episode',absolute,row))
-            number = row.get('episode_number', -1)
-            # Preserve fractional upstream numbers in nativeMetadata; existing
-            # queue numbering remains an integer display/order field.
-            episodes.append(Episode(number=int(number) if number >= 0 and float(number).is_integer() else index,
-                                    title=row['name'], playerUrl=absolute, downloadPageUrl=absolute,
-                                    version=self._version(row['name'], row['url'], row.get('scanlator')) or version,
-                                    synopsis=row.get('summary'), thumbnailUrl=row.get('preview_url'), nativeMetadata=public_metadata(row)))
+        if not raw_episodes and seasons_list:
+            max_seasons = seasons_list[:24]
+            multi_seasons = len(max_seasons) > 1
+            for s_idx, season_item in enumerate(max_seasons, 1):
+                season_url = urljoin(self.base_url + '/', season_item.get('url') or '')
+                if not season_url:
+                    continue
+                season_title = (season_item.get('title') or '').strip()
+                season_num = season_item.get('season_number', -1)
+                season_num_int = int(season_num) if isinstance(season_num, (int, float)) and season_num > 0 and float(season_num).is_integer() else s_idx
+                sub_detail = await self.call('detail', {**season_item, 'fetch_type': 'Episodes'})
+                for row in (sub_detail.get('episodes') or []):
+                    absolute = urljoin(self.base_url + '/', row['url'])
+                    enriched_row = dict(row)
+                    meta_row = public_metadata(enriched_row)
+                    if multi_seasons or season_num_int > 1:
+                        meta_row['season'] = season_num_int
+                    references.append(('episode', absolute, enriched_row))
+                    number = row.get('episode_number', -1)
+                    ep_name = row['name']
+                    if multi_seasons and season_title:
+                        ep_name = f"{season_title} — {ep_name}"
+                    episodes.append(Episode(
+                        number=int(number) if number >= 0 and float(number).is_integer() else len(episodes) + 1,
+                        title=ep_name,
+                        playerUrl=absolute,
+                        downloadPageUrl=absolute,
+                        version=self._version(ep_name, row['url'], row.get('scanlator')) or version,
+                        synopsis=row.get('summary'),
+                        thumbnailUrl=row.get('preview_url'),
+                        nativeMetadata=meta_row,
+                    ))
+        else:
+            for index, row in enumerate(raw_episodes, 1):
+                absolute = urljoin(self.base_url + '/', row['url'])
+                references.append(('episode', absolute, row))
+                number = row.get('episode_number', -1)
+                # Preserve fractional upstream numbers in nativeMetadata; existing
+                # queue numbering remains an integer display/order field.
+                episodes.append(Episode(number=int(number) if number >= 0 and float(number).is_integer() else index,
+                                        title=row['name'], playerUrl=absolute, downloadPageUrl=absolute,
+                                        version=self._version(row['name'], row['url'], row.get('scanlator')) or version,
+                                        synopsis=row.get('summary'), thumbnailUrl=row.get('preview_url'), nativeMetadata=public_metadata(row)))
         if self._references is not None:
-            self._references.remember_many([('anime',url,item),*references])
+            self._references.remember_many([('anime', url, item), *references])
         self._animes[url] = item
-        self._episodes.update({absolute:row for _,absolute,row in references})
+        self._episodes.update({absolute: row for _, absolute, row in references})
         if len(self._episodes) > 5000:
-            self._episodes = {absolute:row for _,absolute,row in references}
+            self._episodes = {absolute: row for _, absolute, row in references}
         return AnimeDetail(title=item['title'], synopsis=item.get('description'), imageUrl=item.get('thumbnail_url') or '',
                            bannerUrl=item.get('background_url'), url=url, source=self.source_id, episodes=episodes, version=version,
                            studio=item.get('author') or item.get('artist'),

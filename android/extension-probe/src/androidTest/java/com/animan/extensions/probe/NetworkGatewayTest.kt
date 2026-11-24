@@ -137,4 +137,39 @@ class NetworkGatewayTest {
             assertTrue(requests.last().getString("url").startsWith("https://second.fixture.invalid/"))
         } finally { NetworkHelper.gateway=before }
     }
+
+    @Test fun network_interceptors_execute_without_sockets() {
+        val requests = mutableListOf<JSONObject>()
+        val before = NetworkHelper.gateway
+        NetworkHelper.gateway = object : IExtensionHttp.Stub() {
+            override fun request(payload: String): ParcelFileDescriptor {
+                val input = JSONObject(payload)
+                requests.add(input)
+                val result = JSONObject().put("url", input.getString("url")).put("status", 200)
+                    .put("headers", JSONArray())
+                    .put("contentType", "application/json")
+                    .put("body", Base64.encodeToString("{\"ok\":true}".toByteArray(), Base64.NO_WRAP))
+                val pipe = ParcelFileDescriptor.createPipe()
+                ParcelFileDescriptor.AutoCloseOutputStream(pipe[1]).use { it.write(result.toString().toByteArray()) }
+                return pipe[0]
+            }
+        }
+        try {
+            val helper = NetworkHelper(InstrumentationRegistry.getInstrumentation().targetContext)
+            val client = helper.client.newBuilder().cookieJar(CookieJar.NO_COOKIES)
+                .addNetworkInterceptor { chain ->
+                    val req = chain.request().newBuilder().header("X-Net-Interceptor", "active").build()
+                    chain.proceed(req).newBuilder().header("X-Net-Handled", "yes").build()
+                }.build()
+            client.newCall(Request.Builder().url("https://api.fixture.invalid/graphql").build()).execute().use { response ->
+                assertEquals(200, response.code)
+                assertEquals("yes", response.header("X-Net-Handled"))
+                assertEquals("{\"ok\":true}", response.body.string())
+            }
+            val headers = requests.single().getJSONArray("headers")
+            assertTrue((0 until headers.length()).any {
+                headers.getJSONArray(it).let { p -> p.getString(0) == "X-Net-Interceptor" && p.getString(1) == "active" }
+            })
+        } finally { NetworkHelper.gateway = before }
+    }
 }

@@ -81,14 +81,77 @@ class BrowserVerificationService:
                 "platform": self.platform, "clientLocal": client_local,
                 "modes": self.modes(client_local=client_local), "sessions": sessions}
 
-    async def start(self, domain, browser=None, mode="browser"):
+    def _known_source_domains(self) -> set[str]:
+        with self.transport._lock:
+            known = {d.lower() for d in self.transport._domains.keys()}
+        try:
+            from animelab.services.source_registry import SourceRegistry
+
+            for entry in SourceRegistry().all():
+                host = (urlparse(entry.base_url or '').hostname or '').lower()
+                if host:
+                    known.add(host)
+        except Exception:
+            pass
+        return known
+
+    def _is_known_domain(self, host: str) -> bool:
+        clean = (host or '').strip().lower()
+        if not clean:
+            return False
+        known = self._known_source_domains()
+        if clean in known:
+            return True
+        clean_apex = '.'.join(clean.split('.')[-2:])
+        for item in known:
+            item_apex = '.'.join(item.split('.')[-2:])
+            if clean_apex == item_apex and bool(item_apex):
+                return True
+        return False
+
+    def _resolve_mode(self, state, mode: str | None) -> str:
+        clean = (mode or "auto").strip().lower()
+        if clean != "auto":
+            return clean
+        available = {item["id"] for item in self.modes(state) if item["available"]}
+        if "webview" in available:
+            return "webview"
+        return "browser"
+
+    async def open_url(self, url: str, *, browser=None, mode: str = "auto"):
+        clean_url = (url or "").strip()
+        if not clean_url.startswith(("http://", "https://")) or not await asyncio.to_thread(is_safe_url, clean_url):
+            raise ValueError("URL de WebView non autorisée")
+        host = (urlparse(clean_url).hostname or "").lower()
+        if not self._is_known_domain(host):
+            raise ValueError("Domaine non reconnu par une source installée")
+        return await self.start(
+            host,
+            browser=browser,
+            mode=mode,
+            auto_close=False,
+            url=clean_url,
+            allow_unblocked=True,
+        )
+
+    async def start(
+        self,
+        domain,
+        browser=None,
+        mode="auto",
+        *,
+        auto_close: bool = True,
+        url: str | None = None,
+        allow_unblocked: bool = False,
+    ):
         domain = domain.strip().lower()
-        state = self.transport.state("https://" + domain)
-        if not state.blocked_url:
+        state = self.transport.state(url or ("https://" + domain))
+        if not state.blocked_url and not allow_unblocked:
             raise ValueError("Aucune vérification en attente pour ce domaine")
-        url = state.blocked_url
-        if not await asyncio.to_thread(is_safe_url, url):
+        target_url = url or state.blocked_url
+        if not target_url or not await asyncio.to_thread(is_safe_url, target_url):
             raise ValueError("URL de vérification non autorisée")
+        mode = self._resolve_mode(state, mode)
         supported = next((item for item in self.modes(state) if item["id"] == mode and item["available"]), None)
         if not supported or mode == "manual":
             from animelab.api_errors import APIProblem
@@ -106,8 +169,9 @@ class BrowserVerificationService:
                 raise ValueError("Fermez une vérification avant d’en ouvrir une autre")
             if mode=='webview' and any(job['mode']=='webview' for job in self.jobs.values()):
                 raise ValueError('Fermez la WebView actuelle avant d’en ouvrir une autre.')
-            job = {"id": uuid.uuid4().hex, "domain": domain, "url": url, "created": time.monotonic(),
-                   "mode": mode, "process": None, "window": None}
+            job = {"id": uuid.uuid4().hex, "domain": domain, "url": target_url, "created": time.monotonic(),
+                   "mode": mode, "autoClose": bool(auto_close), "process": None, "window": None}
+            url = target_url
             mechanism = self.mechanisms[mode]
             job["routeProxy"] = state.proxy
             job["routeGeneration"] = state.generation
@@ -142,7 +206,7 @@ class BrowserVerificationService:
             raise
         self.transport.release_webview(job['url'],job['id'])
 
-    async def _cdp(self, job, command, params=None):
+    async def _cdp_endpoint(self, job):
         process = job["process"]
         if process.poll() is not None:
             raise ValueError("Le navigateur de vérification a été fermé")
@@ -160,7 +224,40 @@ class BrowserVerificationService:
         port = int(lines[0])
         if not 0 < port < 65536 or not lines[1].startswith("/devtools/browser/"):
             raise ValueError("Point de connexion navigateur invalide")
-        async with websockets.connect(f"ws://127.0.0.1:{port}{lines[1]}", proxy=None, open_timeout=5) as ws:
+        return port, lines[1]
+
+    async def _cdp_navigate(self, job, target_id, url):
+        port, path = await self._cdp_endpoint(job)
+        async with websockets.connect(f"ws://127.0.0.1:{port}{path}", proxy=None, open_timeout=5) as ws:
+            await ws.send(json.dumps({
+                "id": 1,
+                "method": "Target.attachToTarget",
+                "params": {"targetId": target_id, "flatten": True},
+            }))
+            session_id = None
+            async with asyncio.timeout(8):
+                while True:
+                    msg = json.loads(await ws.recv())
+                    if msg.get("id") == 1:
+                        session_id = (msg.get("result") or {}).get("sessionId")
+                        break
+            if not session_id:
+                return False
+            await ws.send(json.dumps({
+                "id": 2,
+                "sessionId": session_id,
+                "method": "Page.navigate",
+                "params": {"url": url},
+            }))
+            async with asyncio.timeout(8):
+                while True:
+                    msg = json.loads(await ws.recv())
+                    if msg.get("id") == 2:
+                        return "error" not in msg
+
+    async def _cdp(self, job, command, params=None):
+        port, path = await self._cdp_endpoint(job)
+        async with websockets.connect(f"ws://127.0.0.1:{port}{path}", proxy=None, open_timeout=5) as ws:
             await ws.send(json.dumps({"id": 1, "method": command, "params": params or {}}))
             async with asyncio.timeout(8):
                 while True:
@@ -234,6 +331,11 @@ class BrowserVerificationService:
         result = {"success": True, "domain": job["domain"], "sessionImported": True, "accessVerified": False}
         if self.verified_callback:
             result['resumed'] = self.verified_callback(job['domain'])
+        try:
+            from animelab.services import android_extensions
+            await android_extensions.clear_cookies(job['domain'])
+        except Exception:
+            pass
         self.completed[job_id] = {'created': time.monotonic(), 'result': result}
         await self.cancel(job_id)
         return result
@@ -271,7 +373,8 @@ class BrowserVerificationService:
                         process=job.get('process')
                         if ((closed is not None and await asyncio.to_thread(closed)) or
                                 (job['mode'] == 'webview' and WebViewVerification.desktop_closed(job)) or
-                                (process is not None and process.poll() is not None)):
+                                (process is not None and process.poll() is not None) or
+                                (job['mode'] == 'browser' and await ChromiumVerification.ready_to_auto_close(self, job))):
                             await self._complete(job_id)
                         job['error'] = ''
                     except VerificationRequired:

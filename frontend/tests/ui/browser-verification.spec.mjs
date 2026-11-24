@@ -67,6 +67,7 @@ test('a returned WebView session retries once without claiming verified access',
       return route.fulfill({
         json: {
           platform: 'android',
+          clientLocal: true,
           webviewAvailable: true,
           browsers: [],
           modes: [{ id: 'webview', available: true, capturesCookies: true, reason: null }],
@@ -76,6 +77,10 @@ test('a returned WebView session retries once without claiming verified access',
     if (path === '/api/network/verification')
       return route.fulfill({
         json: { id: 'webview-test', domain: 'example.test', mode: 'webview' },
+      })
+    if (path === '/api/network/webview/open')
+      return route.fulfill({
+        json: { id: 'webview-manual', domain: 'aniyomi-long.test', mode: 'webview' },
       })
     if (path.endsWith('/complete')) {
       completed = true
@@ -95,10 +100,8 @@ test('a returned WebView session retries once without claiming verified access',
   })
   await page.goto('/app/sources/aniyomi-long?mode=catalogue')
   await expect(page.getByRole('button', { name: 'Changer de proxy et réessayer' })).toHaveCount(0)
-  await page.getByText('Modes de vérification disponibles', { exact: true }).click()
-  await page
-    .getByRole('button', { name: 'Ouvrir une fenêtre de vérification', exact: true })
-    .click()
+  await expect(page.getByRole('button', { name: 'Ouvrir en WebView', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Vérifier dans la WebView', exact: true }).click()
   await page.getByRole('button', { name: 'J’ai terminé la vérification', exact: true }).click()
   const notice = page.locator('.verification-notice')
   await expect(notice).toContainText('Session WebView récupérée')

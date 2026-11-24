@@ -16,9 +16,9 @@ internal class GatewayInterceptor(private val transport: (Interceptor.Chain) -> 
         val client=call.client
         val index=client.interceptors.indexOfFirst { it===this }
         check(index>=0)
-        // A network interceptor requires a real TLS/connection context. Do not silently skip it.
-        if(client.networkInterceptors.isNotEmpty()) throw UnsupportedOperationException("Network interceptors require a native connection adapter")
-        val remaining=client.interceptors.drop(index+1)+Interceptor { transport(it) }
+        // Route network interceptors through the same RealInterceptorChain before
+        // delegating HTTP transport to the Python gateway so extensions remain socket-free.
+        val remaining=client.interceptors.drop(index+1)+client.networkInterceptors+Interceptor { transport(it) }
         // Use OkHttp's chain rather than a partial wrapper: withReadTimeout,
         // withCookieJar and the other chain options must retain the broker.
         val rerouted=RealInterceptorChain(

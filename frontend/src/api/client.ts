@@ -314,10 +314,16 @@ export const api = {
       body: JSON.stringify({ domain }),
     })
   },
-  startNetworkVerification(domain: string, browser: string, mode: VerificationMode) {
+  startNetworkVerification(domain: string, browser: string, mode: VerificationMode | 'auto') {
     return request<VerificationJob>('/api/network/verification', {
       method: 'POST',
       body: JSON.stringify({ domain, browser, mode }),
+    })
+  },
+  openWebView(url: string, browser = '', mode: VerificationMode | 'auto' = 'auto') {
+    return request<VerificationJob>('/api/network/webview/open', {
+      method: 'POST',
+      body: JSON.stringify({ url, browser, mode }),
     })
   },
   completeNetworkVerification(id: string) {

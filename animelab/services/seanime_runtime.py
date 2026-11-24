@@ -292,6 +292,8 @@ def host_fetch_json_sync(req_json_str: str) -> str:
         request_kwargs: dict[str, Any] = {"headers": headers, "timeout": timeout}
         if content is not None:
             request_kwargs["content"] = content
+        if method in ("GET", "HEAD"):
+            request_kwargs["max_response_bytes"] = _MAX_FETCH_BYTES
 
         with source_http.client(
             follow_redirects=follow_redirects,
@@ -310,28 +312,16 @@ def host_fetch_json_sync(req_json_str: str) -> str:
         return json.dumps({"error": str(exc)})
 
 
-class MiniRacerSeanimeRuntime:
-    """Isolated V8 runtime backed by ``py_mini_racer``."""
+class _BaseSeanimeRuntime:
+    """Shared store, GET response cache, and invocation payload validation helpers."""
 
-    def __init__(self, *, client_factory: Callable[..., Any] | None = None) -> None:
-        self._client_factory = client_factory
+    def __init__(self) -> None:
         self._stores: dict[str, dict[str, Any]] = {}
         self._lock = threading.RLock()
         self._get_cache: OrderedDict[tuple[Any, ...], tuple[float, str]] = OrderedDict()
-        self._inflight_gets: dict[tuple[int, tuple[Any, ...]], asyncio.Task[str]] = {}
         self._get_cache_ttl = 45.0
         self._get_cache_max_entries = 64
         self._get_cache_max_bytes = 2 * 1024 * 1024
-
-    def is_available(self) -> bool:
-        try:
-            import py_mini_racer  # noqa: F401
-            return True
-        except Exception:
-            return False
-
-    def engine_name(self) -> str:
-        return "mini-racer" if self.is_available() else "unavailable"
 
     def clear_http_cache(self, extension_id: str | None = None) -> None:
         with self._lock:
@@ -353,6 +343,121 @@ class MiniRacerSeanimeRuntime:
     def set_store(self, extension_id: str, data: dict[str, Any]) -> None:
         with self._lock:
             self._stores[extension_id] = dict(data)
+
+    @staticmethod
+    def _build_get_cache_key(extension_id: str, req_json: str) -> tuple[Any, ...] | None:
+        try:
+            req_obj = json.loads(req_json) if req_json else {}
+        except Exception:
+            return None
+        if not isinstance(req_obj, dict):
+            return None
+        req_method = str(req_obj.get("method") or "GET").upper()
+        req_url = str(req_obj.get("url") or "").strip()
+        raw_headers = req_obj.get("headers") or {}
+        has_auth = isinstance(raw_headers, dict) and any(
+            str(k).lower() == "authorization" for k in raw_headers
+        )
+        if req_method != "GET" or not req_url or has_auth:
+            return None
+        norm_headers = tuple(
+            sorted(
+                (str(k).lower(), str(v))
+                for k, v in (raw_headers.items() if isinstance(raw_headers, dict) else ())
+                if k is not None and v is not None
+            )
+        )
+        redirect_mode = str(req_obj.get("redirect") or "follow").lower()
+        return (extension_id, req_url, norm_headers, redirect_mode)
+
+    def _get_cached_response(self, cache_key: tuple[Any, ...]) -> str | None:
+        now = time.monotonic()
+        with self._lock:
+            entry = self._get_cache.get(cache_key)
+            if entry is None:
+                return None
+            ts, payload = entry
+            if (now - ts) >= self._get_cache_ttl:
+                self._get_cache.pop(cache_key, None)
+                return None
+            self._get_cache.move_to_end(cache_key)
+            return payload
+
+    def _put_cached_response(self, cache_key: tuple[Any, ...], raw_json: str) -> None:
+        try:
+            parsed = json.loads(raw_json)
+        except Exception:
+            return
+        if not isinstance(parsed, dict) or parsed.get("error"):
+            return
+        if int(parsed.get("status") or 0) != 200:
+            return
+        if int(parsed.get("contentLength") or 0) > self._get_cache_max_bytes:
+            return
+        with self._lock:
+            self._get_cache[cache_key] = (time.monotonic(), raw_json)
+            self._get_cache.move_to_end(cache_key)
+            while len(self._get_cache) > self._get_cache_max_entries:
+                self._get_cache.popitem(last=False)
+
+    def _finalize_invocation_payload(
+        self,
+        extension_id: str,
+        method: str,
+        payload: Any,
+        *,
+        verification_error: VerificationRequired | None = None,
+        default_error: str = "Erreur d'exécution Seanime",
+    ) -> tuple[Any, dict[str, Any], list[str]]:
+        if not isinstance(payload, dict):
+            raise SeanimeRuntimeError("Réponse invalide du moteur Seanime")
+
+        new_store = dict(payload.get("store") or {})
+        self.set_store(extension_id, new_store)
+        logs = [str(item) for item in (payload.get("logs") or [])]
+
+        if verification_error is None and payload.get("verificationRequired") and payload.get("verificationUrl"):
+            verification_error = VerificationRequired(str(payload["verificationUrl"]))
+
+        result = payload.get("result")
+        empty_result = (
+            result is None
+            or result == []
+            or (isinstance(result, dict) and method == "findEpisodeServer" and not result.get("videoSources"))
+        )
+
+        if not payload.get("ok"):
+            if verification_error is not None:
+                raise verification_error
+            raise SeanimeRuntimeError(
+                str(payload.get("error") or default_error),
+                logs=logs,
+                stack=str(payload.get("stack") or ""),
+            )
+
+        if verification_error is not None and empty_result:
+            raise verification_error
+
+        return result, new_store, logs
+
+
+class MiniRacerSeanimeRuntime(_BaseSeanimeRuntime):
+    """Isolated V8 runtime backed by ``py_mini_racer``."""
+
+    def __init__(self, *, client_factory: Callable[..., Any] | None = None) -> None:
+        super().__init__()
+        self._client_factory = client_factory
+        self._inflight_gets: dict[tuple[int, tuple[Any, ...]], asyncio.Task[str]] = {}
+
+    def is_available(self) -> bool:
+        try:
+            import py_mini_racer  # noqa: F401
+            return True
+        except Exception:
+            return False
+
+    def engine_name(self) -> str:
+        return "mini-racer" if self.is_available() else "unavailable"
 
     def validate_syntax(
         self,
@@ -385,36 +490,6 @@ class MiniRacerSeanimeRuntime:
         except Exception as exc:
             logger.debug("Seanime syntax validation failed for %s: %s", extension_id, exc)
             return False, str(exc)
-
-    def _get_cached_response(self, cache_key: tuple[Any, ...]) -> str | None:
-        now = time.monotonic()
-        with self._lock:
-            entry = self._get_cache.get(cache_key)
-            if entry is None:
-                return None
-            ts, payload = entry
-            if (now - ts) >= self._get_cache_ttl:
-                self._get_cache.pop(cache_key, None)
-                return None
-            self._get_cache.move_to_end(cache_key)
-            return payload
-
-    def _put_cached_response(self, cache_key: tuple[Any, ...], raw_json: str) -> None:
-        try:
-            parsed = json.loads(raw_json)
-        except Exception:
-            return
-        if not isinstance(parsed, dict) or parsed.get("error"):
-            return
-        if int(parsed.get("status") or 0) != 200:
-            return
-        if int(parsed.get("contentLength") or 0) > self._get_cache_max_bytes:
-            return
-        with self._lock:
-            self._get_cache[cache_key] = (time.monotonic(), raw_json)
-            self._get_cache.move_to_end(cache_key)
-            while len(self._get_cache) > self._get_cache_max_entries:
-                self._get_cache.popitem(last=False)
 
     async def invoke(
         self,
@@ -455,30 +530,11 @@ class MiniRacerSeanimeRuntime:
 
             cache_key: tuple[Any, ...] | None = None
             if self._client_factory is None:
-                try:
-                    req_obj = json.loads(req_json) if req_json else {}
-                except Exception:
-                    req_obj = None
-                if isinstance(req_obj, dict):
-                    req_method = str(req_obj.get("method") or "GET").upper()
-                    req_url = str(req_obj.get("url") or "").strip()
-                    raw_headers = req_obj.get("headers") or {}
-                    has_auth = isinstance(raw_headers, dict) and any(
-                        str(k).lower() == "authorization" for k in raw_headers
-                    )
-                    if req_method == "GET" and req_url and not has_auth:
-                        norm_headers = tuple(
-                            sorted(
-                                (str(k).lower(), str(v))
-                                for k, v in (raw_headers.items() if isinstance(raw_headers, dict) else ())
-                                if k is not None and v is not None
-                            )
-                        )
-                        redirect_mode = str(req_obj.get("redirect") or "follow").lower()
-                        cache_key = (extension_id, req_url, norm_headers, redirect_mode)
-                        cached = self._get_cached_response(cache_key)
-                        if cached is not None:
-                            return cached
+                cache_key = self._build_get_cache_key(extension_id, req_json)
+                if cache_key is not None:
+                    cached = self._get_cached_response(cache_key)
+                    if cached is not None:
+                        return cached
 
             if cache_key is None:
                 return await host_fetch_json(
@@ -515,7 +571,6 @@ class MiniRacerSeanimeRuntime:
                     _capture_verification(
                         VerificationRequired(
                             parsed_out.get("verificationUrl") or cache_key[1],
-                            parsed_out.get("error") or None,
                         )
                     )
             except Exception:
@@ -546,42 +601,21 @@ class MiniRacerSeanimeRuntime:
                     raise SeanimeRuntimeError(f"Délai d'exécution Seanime dépassé ({timeout:.0f}s)") from exc
 
         payload = json.loads(raw_result) if isinstance(raw_result, str) else raw_result
-        if not isinstance(payload, dict):
-            raise SeanimeRuntimeError("Réponse invalide du moteur Seanime")
-
-        new_store = dict(payload.get("store") or {})
-        self.set_store(extension_id, new_store)
-        logs = [str(item) for item in (payload.get("logs") or [])]
-
-        result = payload.get("result")
-        empty_result = (
-            result is None
-            or result == []
-            or (isinstance(result, dict) and method == "findEpisodeServer" and not result.get("videoSources"))
+        return self._finalize_invocation_payload(
+            extension_id,
+            method,
+            payload,
+            verification_error=verification_error,
+            default_error="Erreur d'exécution Seanime",
         )
 
-        if not payload.get("ok"):
-            if verification_error is not None:
-                raise verification_error
-            raise SeanimeRuntimeError(
-                str(payload.get("error") or "Erreur d'exécution Seanime"),
-                logs=logs,
-                stack=str(payload.get("stack") or ""),
-            )
 
-        if verification_error is not None and empty_result:
-            raise verification_error
-
-        return result, new_store, logs
-
-
-class AndroidSeanimeRuntime:
+class AndroidSeanimeRuntime(_BaseSeanimeRuntime):
     """Offscreen WebView V8 bridge used when running inside the Android APK."""
 
     def __init__(self, bridge: Any) -> None:
+        super().__init__()
         self._bridge = bridge
-        self._stores: dict[str, dict[str, Any]] = {}
-        self._lock = threading.RLock()
 
     def is_available(self) -> bool:
         try:
@@ -592,20 +626,17 @@ class AndroidSeanimeRuntime:
     def engine_name(self) -> str:
         return "android-webview"
 
-    def clear_http_cache(self, extension_id: str | None = None) -> None:
-        return
-
-    def clear_store(self, extension_id: str) -> None:
-        with self._lock:
-            self._stores.pop(extension_id, None)
-
-    def get_store(self, extension_id: str) -> dict[str, Any]:
-        with self._lock:
-            return dict(self._stores.get(extension_id) or {})
-
-    def set_store(self, extension_id: str, data: dict[str, Any]) -> None:
-        with self._lock:
-            self._stores[extension_id] = dict(data)
+    def fetch_sync(self, req_json: str, *, extension_id: str = "") -> str:
+        """Serve cached GET responses or perform SSRF-safe sync HTTP via ``source_http``."""
+        cache_key = self._build_get_cache_key(extension_id, req_json)
+        if cache_key is not None:
+            cached = self._get_cached_response(cache_key)
+            if cached is not None:
+                return cached
+        raw_out = host_fetch_json_sync(req_json)
+        if cache_key is not None:
+            self._put_cached_response(cache_key, raw_out)
+        return raw_out
 
     def validate_syntax(
         self,
@@ -647,6 +678,7 @@ class AndroidSeanimeRuntime:
         initial_store = dict(store) if store is not None else self.get_store(extension_id)
         request_payload = json.dumps(
             {
+                "extensionId": extension_id,
                 "shim": load_shim_source(),
                 "code": prepared,
                 "method": method,
@@ -659,20 +691,12 @@ class AndroidSeanimeRuntime:
         )
         raw_result = await asyncio.to_thread(self._bridge.invoke, request_payload)
         payload = json.loads(str(raw_result))
-        if not isinstance(payload, dict):
-            raise SeanimeRuntimeError("Réponse invalide de WebView Seanime")
-
-        new_store = dict(payload.get("store") or {})
-        self.set_store(extension_id, new_store)
-        logs = [str(item) for item in (payload.get("logs") or [])]
-
-        if not payload.get("ok"):
-            raise SeanimeRuntimeError(
-                str(payload.get("error") or "Erreur WebView Seanime"),
-                logs=logs,
-                stack=str(payload.get("stack") or ""),
-            )
-        return payload.get("result"), new_store, logs
+        return self._finalize_invocation_payload(
+            extension_id,
+            method,
+            payload,
+            default_error="Erreur WebView Seanime",
+        )
 
 
 class SeanimeRuntimeFacade:

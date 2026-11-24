@@ -285,6 +285,22 @@
           </div>
           <span>{{ tx('Source Web') }}</span>
         </a>
+
+        <button
+          v-if="detail.anime.url && verification.canOpenWebView"
+          type="button"
+          class="tachiyomi-action-card"
+          :disabled="verification.busy || !!verification.job"
+          @click="verification.openWebView(detail.anime.url)"
+        >
+          <div class="tachiyomi-action-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="16" rx="2" />
+              <line x1="3" y1="9" x2="21" y2="9" />
+            </svg>
+          </div>
+          <span>{{ tx('Ouvrir en WebView') }}</span>
+        </button>
       </section>
 
       <!-- Synopsis -->
@@ -808,9 +824,11 @@ import { canFallbackToImageProxy, proxyImageUrl, resolveImageUrl } from '@/utils
 import type { Episode, OutputProfile } from '@/types'
 import OutputProfilePicker from '@/components/OutputProfilePicker.vue'
 import VerificationPrompt from '@/components/VerificationPrompt.vue'
+import { useVerificationStore } from '@/stores/verification'
 
 const searchContext = useSearchContext()
 const notifications = useNotifications()
+const verification = useVerificationStore()
 const router = useRouter()
 const route = useRoute()
 const animeStore = useAnimeStore()
@@ -1182,6 +1200,7 @@ watch(
 )
 
 onMounted(() => {
+  void verification.refresh()
   void playerStore.loadExternalPlayerConfig()
   fetchDetail()
 })

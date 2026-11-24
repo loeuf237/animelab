@@ -71,7 +71,13 @@ async def clear_imported_proxies(request: Request):
 class StartVerification(BaseModel):
     domain: str = Field(pattern=r"^[A-Za-z0-9.-]+$", max_length=253)
     browser: str | None = None
-    mode: str = "browser"
+    mode: str = "auto"
+
+
+class OpenWebView(BaseModel):
+    url: str = Field(min_length=8, max_length=2048)
+    browser: str | None = None
+    mode: str = "auto"
 
 
 @router.post("/proxy-pool/rotate")
@@ -133,6 +139,15 @@ async def start(body: StartVerification, request: Request):
     verification_only(request)
     try:
         return await browser_verification.start(body.domain, body.browser, body.mode)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.post("/webview/open")
+async def open_webview(body: OpenWebView, request: Request):
+    local_only(request)
+    try:
+        return await browser_verification.open_url(body.url, browser=body.browser, mode=body.mode)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 

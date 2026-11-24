@@ -97,9 +97,20 @@
           <h1>{{ tx(currentSource?.name || 'Catalogue') }}</h1>
           <p>{{ tx(currentSource ? host(currentSource.baseUrl) : sourceId) }}</p>
         </div>
-        <button class="btn btn-secondary" :disabled="loading" @click="refreshCatalogue">
-          {{ tx('Actualiser') }}
-        </button>
+        <div class="source-heading-actions">
+          <button
+            v-if="currentSource?.baseUrl && verification.canOpenWebView"
+            type="button"
+            class="btn btn-secondary"
+            :disabled="verification.busy || !!verification.job"
+            @click="verification.openWebView(currentSource.baseUrl)"
+          >
+            {{ tx('Ouvrir en WebView') }}
+          </button>
+          <button class="btn btn-secondary" :disabled="loading" @click="refreshCatalogue">
+            {{ tx('Actualiser') }}
+          </button>
+        </div>
       </header>
       <p v-if="listError" role="alert">{{ tx(listError) }}</p>
       <template v-if="currentSource?.isEnabled">
@@ -667,6 +678,7 @@ watch(
   },
 )
 onMounted(async () => {
+  void verification.refresh()
   await loadSources()
   await readRoute()
 })
@@ -733,6 +745,7 @@ select:focus {
   outline-offset: 1px;
 }
 .source-heading,
+.source-heading-actions,
 .source-identity,
 .catalogue-result-heading {
   display: flex;
@@ -740,6 +753,9 @@ select:focus {
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
+}
+.source-heading-actions {
+  gap: 10px;
 }
 .source-heading h1 {
   margin: 0 0 8px;

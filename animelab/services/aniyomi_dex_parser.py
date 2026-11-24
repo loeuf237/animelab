@@ -122,12 +122,37 @@ def _is_valid_base_url(candidate: str) -> bool:
     return len(parts) >= 2 and all(len(p) >= 2 and not p.startswith("-") for p in parts)
 
 
+def _has_balanced_braces(text: str) -> bool:
+    return text.count("{") == text.count("}")
+
+
+def _is_usable_path_fragment(candidate: str) -> bool:
+    s = candidate.strip()
+    if not s or s in ("&", "?", "/#", "/"):
+        return False
+    if "://" in s or "{{" in s or not _has_balanced_braces(s):
+        return False
+    if any(ch.isspace() for ch in s):
+        return False
+    return True
+
+
 def _reconstruct_request_path(m_strs: List[str]) -> str:
     """Reconstruit fidèlement le chemin HTTP à partir des constantes de popularAnimeRequest / latestUpdatesRequest."""
-    paths = [s for s in m_strs if s.startswith("/") or s.startswith("?") or "page=" in s or "m_orderby=" in s or "status=" in s]
+    raw_paths = [
+        s.strip() for s in m_strs
+        if isinstance(s, str) and (
+            s.startswith("/") or s.startswith("?") or s.startswith("&")
+            or "page=" in s or "m_orderby=" in s or "status=" in s
+        )
+    ]
+    if not raw_paths:
+        return ""
+    paths = [p for p in raw_paths if (p == "/" or _is_usable_path_fragment(p)) and not p.startswith("&")]
+    amp_extras = [p for p in raw_paths if p.startswith("&") and len(p) > 1 and _is_usable_path_fragment(p) and not p.endswith("=")]
     if not paths:
         return ""
-    joined = "".join(paths)
+
     # Cas multi-fragments avec numéro de page intercalé : ex ['/filter-advance/page/', '/'] ou ['/page/', '/?m_orderby=views']
     if len(paths) >= 2 and paths[0].endswith("/page/"):
         suffix = paths[1]
@@ -138,19 +163,84 @@ def _reconstruct_request_path(m_strs: List[str]) -> str:
             return f"{paths[0]}1/{q}"
         if suffix.startswith("/"):
             return f"{paths[0]}1{suffix}"
+
     for p in paths:
-        if p.endswith("?page=") or p.endswith("&page="):
-            return p + "1"
-    # Choisir le fragment le plus informatif (pas juste '/')
-    non_root = [p for p in paths if p not in ("/", "/#")]
+        if p.endswith(("?page=", "&page=")):
+            res = p + "1"
+            for extra in amp_extras:
+                if extra not in res:
+                    res += extra
+            return res
+
+    # Choisir le fragment le plus informatif (jamais un fragment commençant par '&' ni un '/' nu)
+    non_root = [p for p in paths if p not in ("/", "/#", "?")]
     if non_root:
         best = non_root[0]
         if best.endswith("/page/"):
             best = best + "1/"
-        elif best.endswith("?page="):
+        elif best.endswith(("?page=", "&page=")):
             best = best + "1"
+        if "?" in best:
+            for extra in amp_extras:
+                if extra not in best:
+                    best += extra
         return best
     return "/"
+
+
+def _reconstruct_search_path(m_strs: List[str], existing_param: str = "") -> tuple[str, str]:
+    """Reconstruit le chemin de recherche et le paramètre requête depuis searchAnimeRequest."""
+    query_param = existing_param
+    candidates: List[str] = []
+    has_page_prefix = False
+    for raw in m_strs:
+        if not isinstance(raw, str):
+            continue
+        s = raw.strip()
+        if s in ("s", "keyword", "story", "q", "query", "search", "title", "k", "term"):
+            query_param = s
+            continue
+        if s.endswith("/page/") and not any(ch.isspace() for ch in s):
+            has_page_prefix = True
+        if (s.startswith("/") or ("?" in s and not s.startswith("&") and "://" not in s)) and _is_usable_path_fragment(s):
+            candidates.append(s)
+
+    if not candidates:
+        return "", query_param
+
+    # Préférer les chemins qui contiennent un paramètre GET ou un segment /search/, plutôt qu'un préfixe nu /page/
+    scored = sorted(
+        candidates,
+        key=lambda p: (
+            "?" in p and "=" in p,
+            "?" in p,
+            "search" in p.lower() or "filter" in p.lower(),
+            not p.endswith("/page/"),
+            len(p),
+        ),
+        reverse=True,
+    )
+    chosen = scored[0]
+    if chosen.startswith("/?") and has_page_prefix and "/page/" not in chosen:
+        chosen = f"/page/1/{chosen.lstrip('/')}"
+    elif chosen.endswith("/page/"):
+        chosen = chosen + "1/"
+    if chosen.endswith("="):
+        chosen = chosen + "{query}"
+    elif (
+        "?" not in chosen
+        and "{query}" not in chosen
+        and not query_param
+        and (chosen.endswith("/search/") or chosen.endswith("/search/title/") or ("/search/" in chosen and chosen.endswith("/")))
+    ):
+        chosen = chosen + "{query}"
+
+    if not query_param:
+        m_param = re.search(r"[?&]([a-zA-Z0-9_-]+)=\{query\}", chosen)
+        if m_param:
+            query_param = m_param.group(1)
+
+    return chosen, query_param
 
 
 class AniyomiDexParser:
@@ -318,12 +408,15 @@ class AniyomiDexParser:
             "multisrc/datalifeengine",
         )
         source_classes: List[str] = []
+        extends_parsed_source = False
         for c_type in class_Hierarchy:
             cur = c_type
             visited = set()
             while cur and cur not in visited:
                 visited.add(cur)
                 parent = class_Hierarchy.get(cur, "")
+                if "ParsedAnimeHttpSource" in parent or "multisrc/" in parent:
+                    extends_parsed_source = True
                 if any(marker in parent for marker in source_base_markers):
                     source_classes.append(c_type)
                     break
@@ -389,20 +482,34 @@ class AniyomiDexParser:
                 if reconstructed:
                     recipe.latest_request_path = reconstructed
             elif "searchAnimeRequest" in m_name:
-                for s in m_strs:
-                    if s.startswith("/") or "?" in s:
-                        if not recipe.search_request_path or len(s) > len(recipe.search_request_path):
-                            recipe.search_request_path = s
-                    elif s in ("s", "keyword", "story", "q", "query", "search", "title"):
-                        recipe.search_query_param = s
-                    if "POST" in m_strs or "FormBody" in m_strs or "do=search" in "".join(m_strs):
-                        recipe.search_method = "POST"
+                search_path, detected_param = _reconstruct_search_path(m_strs)
+                if search_path and (not recipe.search_request_path or len(search_path) >= len(recipe.search_request_path)):
+                    recipe.search_request_path = search_path
+                if detected_param:
+                    recipe.search_query_param = detected_param
+                if "POST" in m_strs or "FormBody" in m_strs or "do=search" in "".join(m_strs):
+                    recipe.search_method = "POST"
 
         # Extraction des sélecteurs depuis *AnimeParse si *AnimeSelector n'est pas utilisé
+        def _is_non_card_selector(sc: str) -> bool:
+            low = sc.lower()
+            if sc.startswith(("link[", "meta[", "head", "script", "style")):
+                return True
+            if re.search(
+                r"(?:^|[.#\s>])(?:next|prev|previous|pagination|pager|page-numbers|wp-pagenavi|breadcrumb|nav-links)(?:$|[\s.#:\[])",
+                low,
+            ):
+                return True
+            if re.fullmatch(r"(?:a|li|span|div)[.#](?:next|prev|footer|header|menu|nav)", low):
+                return True
+            return False
+
         def _extract_css_from_parse(m_strs: List[str]) -> str:
             cands = []
             for s in m_strs:
                 sc = s.strip()
+                if not sc or _is_non_card_selector(sc):
+                    continue
                 if any(sc.startswith(p) for p in ("div.", "ul.", "li.", "article", "#", ".")):
                     if " " in sc or "." in sc or "#" in sc or ">" in sc:
                         cands.append(sc)
@@ -425,10 +532,34 @@ class AniyomiDexParser:
         for method in ("popularAnimeFromElement", "latestUpdatesFromElement", "searchAnimeFromElement"):
             values = method_strings_map.get(method, [])
             for value in values:
-                if any(token in value for token in ("title", "h2", "h3")) and not value.startswith("http"):
+                low = value.lower()
+                if (
+                    not value.startswith(("http", "//", "(", "[", "/"))
+                    and "href" not in low
+                    and len(value) <= 60
+                    and re.search(r"(?:title|\bh[1-4]\b|\.name\b|\.tt\b|anime-title|film-name|serie-title|entry-title)", low)
+                ):
                     recipe.item_title_selector = recipe.item_title_selector or value
-                elif "img" in value and not value.startswith("http"):
+                elif "img" in low and not value.startswith(("http", "//")):
                     recipe.item_thumb_selector = recipe.item_thumb_selector or value
+
+        dex_has_selectors = any(
+            bool(getattr(recipe, f))
+            for f in ("popular_selector", "latest_selector", "search_selector", "episode_list_selector")
+        )
+        if source_classes and not extends_parsed_source and not dex_has_selectors:
+            method_tokens = " ".join(
+                s.lower() for m_strs in method_strings_map.values() for s in m_strs if isinstance(s, str)
+            )
+            has_api_marker = any(
+                tok in method_tokens
+                for tok in ("graphql", "application/json", "/api/", "query {", "mutation ", "bearer ")
+            ) or any(
+                s == "parseAs" or s.startswith(("Lkotlinx/serialization/", "Lcom/google/gson/"))
+                for s in strings
+            )
+            if has_api_marker:
+                recipe.runtime["_dex_direct_api"] = True
 
         # Literal label/path pairs in source constructors (e.g. DLE genres).
         # Restrict extraction to the source hierarchy, never bundled extractors.
@@ -1000,6 +1131,18 @@ class AniyomiDexParser:
                 ]
 
         compile_operations(recipe)
+
+        dex_direct_api = bool(recipe.runtime.pop("_dex_direct_api", False))
+        has_runtime_handler = any(
+            k in recipe.runtime for k in ("catalogue", "search", "listing_expansion", "episodes", "players")
+        )
+        has_selectors = any(
+            bool(getattr(recipe, f))
+            for f in ("popular_selector", "latest_selector", "search_selector", "episode_list_selector")
+        )
+        if dex_direct_api and not recipe.multisrc_theme and not has_runtime_handler and not has_selectors:
+            recipe.runtime["api_only_apk"] = True
+            return
 
         # Détection générique depuis raw_strings si encore incomplet
         if not recipe.search_selector or not recipe.popular_selector:

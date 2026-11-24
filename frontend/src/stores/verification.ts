@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, watch, onScopeDispose } from 'vue'
+import { ref, computed, watch, onScopeDispose } from 'vue'
 import { api, ApiError } from '@/api/client'
 import type { NetworkSession, NetworkOptions, VerificationMode, VerificationJob } from '@/types/api'
 import type { SourceChallenge } from '@/types'
@@ -29,6 +29,17 @@ export const useVerificationStore = defineStore('verification', () => {
   function modes(domain: string) {
     return sessions.value.find((s) => s.domain === domain)?.modes || options.value?.modes || []
   }
+  function preferredMode(domain: string): VerificationMode | null {
+    const list = modes(domain)
+    const webview = list.find((m) => m.id === 'webview' && m.available)
+    if (webview) return 'webview'
+    const browserMode = list.find((m) => m.id === 'browser' && m.available)
+    if (browserMode) return 'browser'
+    return null
+  }
+  const canOpenWebView = computed(() =>
+    Boolean(options.value?.clientLocal && (webviewAvailable.value || browsers.value.length > 0)),
+  )
   const job = ref<VerificationJob | null>(null)
   const busy = ref(false)
   const error = ref('')
@@ -75,7 +86,7 @@ export const useVerificationStore = defineStore('verification', () => {
       refreshing = null
     }
   }
-  async function start(domain: string, mode: VerificationMode = 'browser') {
+  async function start(domain: string, mode: VerificationMode | 'auto' = 'auto') {
     if (busy.value || job.value) return
     busy.value = true
     error.value = ''
@@ -84,6 +95,20 @@ export const useVerificationStore = defineStore('verification', () => {
       job.value = await api.startNetworkVerification(domain, browser.value, mode)
     } catch (exc) {
       error.value = exc instanceof Error ? exc.message : 'Impossible d’ouvrir la vérification.'
+    } finally {
+      busy.value = false
+    }
+  }
+  async function openWebView(url: string) {
+    if (!url || busy.value || job.value) return
+    busy.value = true
+    error.value = ''
+    notice.value = ''
+    try {
+      job.value = await api.openWebView(url, browser.value, 'auto')
+    } catch (exc) {
+      error.value =
+        exc instanceof Error ? exc.message : 'Impossible d’ouvrir cette URL dans la WebView.'
     } finally {
       busy.value = false
     }
@@ -190,6 +215,8 @@ export const useVerificationStore = defineStore('verification', () => {
   return {
     options,
     modes,
+    preferredMode,
+    canOpenWebView,
     sessions,
     browsers,
     browser,
@@ -202,6 +229,7 @@ export const useVerificationStore = defineStore('verification', () => {
     clearPending,
     refresh,
     start,
+    openWebView,
     complete,
     cancel,
     retry,

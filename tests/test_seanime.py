@@ -1089,3 +1089,133 @@ async def test_seanime_fetch_bytes_retries_with_app_user_agent_on_403(tmp_path, 
     assert calls[1][2]["headers"] == {"User-Agent": expected_ua}
 
 
+@pytest.mark.asyncio
+async def test_android_seanime_runtime_executes_caches_and_propagates_verification(monkeypatch):
+    from animelab.services.seanime_runtime import (
+        AndroidSeanimeRuntime,
+        SeanimeRuntimeFacade,
+        host_fetch_json_sync,
+    )
+    from animelab.services.source_http import VerificationRequired
+
+    recorded_invokes: list[dict[str, object]] = []
+
+    class FakeAndroidBridge:
+        @staticmethod
+        def isAvailable() -> bool:
+            return True
+
+        @staticmethod
+        def validateSyntax(_shim: str, code: str) -> str:
+            return "ok" if "class Provider" in code else "error:SyntaxError"
+
+        @staticmethod
+        def invoke(payload_json: str) -> str:
+            req = json.loads(payload_json)
+            recorded_invokes.append(req)
+            if req["method"] == "blockedCaught":
+                return json.dumps({
+                    "ok": True,
+                    "result": [],
+                    "store": {"tried": True},
+                    "logs": ["[warn] challenge"],
+                    "verificationRequired": True,
+                    "verificationUrl": "https://blocked.example/search",
+                })
+            if req["method"] == "blockedError":
+                return json.dumps({
+                    "ok": False,
+                    "error": "Vérification nécessaire",
+                    "store": {},
+                    "logs": [],
+                    "verificationRequired": True,
+                    "verificationUrl": "https://blocked.example/watch",
+                })
+            return json.dumps({
+                "ok": True,
+                "result": [{"id": "a1", "title": "Android Ext Result", "url": "https://ext.example/a1"}],
+                "store": {"cached": True},
+                "logs": ["[info] ok"],
+            })
+
+    facade = SeanimeRuntimeFacade()
+    facade.configure_android(FakeAndroidBridge)
+    assert facade.is_available() is True
+    assert facade.engine_name() == "android-webview"
+
+    ok, err = facade.validate_syntax("class Provider {}", language="javascript")
+    assert ok is True and err is None
+    bad_ok, bad_err = facade.validate_syntax("const x = 1;", language="javascript")
+    assert bad_ok is False and "SyntaxError" in (bad_err or "")
+
+    res, store, logs = await facade.invoke(
+        extension_id="demo-android",
+        source="class Provider { async search() { return []; } }",
+        language="javascript",
+        method="search",
+        args=[{"query": "test"}],
+    )
+    assert res[0]["title"] == "Android Ext Result"
+    assert store == {"cached": True}
+    assert facade.get_store("demo-android") == {"cached": True}
+    assert logs == ["[info] ok"]
+    assert recorded_invokes[0]["extensionId"] == "demo-android"
+
+    with pytest.raises(VerificationRequired) as caught:
+        await facade.invoke(
+            extension_id="demo-android",
+            source="class Provider {}",
+            language="javascript",
+            method="blockedCaught",
+        )
+    assert caught.value.url == "https://blocked.example/search"
+
+    with pytest.raises(VerificationRequired) as errored:
+        await facade.invoke(
+            extension_id="demo-android",
+            source="class Provider {}",
+            language="javascript",
+            method="blockedError",
+        )
+    assert errored.value.url == "https://blocked.example/watch"
+
+    # fetch_sync caches 200 GET responses per extensionId and enforces max_response_bytes
+    runtime = facade.backend
+    assert isinstance(runtime, AndroidSeanimeRuntime)
+    fetch_calls = []
+
+    def fake_sync_fetch(req_json_str: str) -> str:
+        fetch_calls.append(req_json_str)
+        return json.dumps({"status": 200, "bodyText": "cached-body", "contentLength": 11, "headers": {}, "rawHeaders": {}, "cookies": {}})
+
+    monkeypatch.setattr("animelab.services.seanime_runtime.host_fetch_json_sync", fake_sync_fetch)
+    req_payload = json.dumps({"url": "https://ext.example/api", "method": "GET"})
+    first = runtime.fetch_sync(req_payload, extension_id="demo-android")
+    second = runtime.fetch_sync(req_payload, extension_id="demo-android")
+    assert first == second and len(fetch_calls) == 1
+    runtime.clear_http_cache("demo-android")
+    runtime.fetch_sync(req_payload, extension_id="demo-android")
+    assert len(fetch_calls) == 2
+
+    # host_fetch_json_sync passes max_response_bytes on GET
+    monkeypatch.undo()
+    seen_kwargs: list[dict[str, object]] = []
+
+    class FakeSyncClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_a):
+            return False
+
+        def request(self, method, url, **kwargs):
+            seen_kwargs.append(kwargs)
+            return httpx.Response(200, text="ok", request=httpx.Request(method, url))
+
+    monkeypatch.setattr("animelab.services.seanime_runtime.is_safe_url", lambda _u, **_kw: True)
+    monkeypatch.setattr("animelab.services.seanime_runtime.source_http.client", lambda **_kw: FakeSyncClient())
+    sync_out = json.loads(host_fetch_json_sync(json.dumps({"url": "https://ext.example/page", "method": "GET"})))
+    assert sync_out["status"] == 200
+    assert seen_kwargs[0]["max_response_bytes"] == 16 * 1024 * 1024
+
+

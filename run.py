@@ -48,6 +48,8 @@ async def lifespan(app: FastAPI):
     logger.info("Starting AnimeLab Python v%s...", __version__)
     source_http.start()
     browser_verification.verified_callback = download_manager.resume_verified_domain
+    from animelab.desktop.window import install_linux_webview_opener
+    installed_linux_webview = install_linux_webview_opener(browser_verification)
     # 1. Initialize SQLite database
     init_db()
     from animelab.services.app_preferences import restore_download_directory
@@ -84,6 +86,8 @@ async def lifespan(app: FastAPI):
     logger.info("Stopping AnimeLab...")
     source_http.rotation_callback = None
     browser_verification.verified_callback = None
+    if installed_linux_webview:
+        browser_verification.webview_opener = None
     watchdog_service.stop()
     await download_manager.shutdown()
     for t in bg_tasks:

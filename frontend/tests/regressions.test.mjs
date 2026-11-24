@@ -200,6 +200,7 @@ test('the actual detail view queues only the checked VF episode', async () => {
       ),
       '@/utils/episodes': episodeUtilsUrl,
       '@/stores/notifications': inline('export const useNotifications=()=>({notify:()=>{}});'),
+      '@/stores/verification': inline('export const useVerificationStore=()=>({refresh:()=>{}});'),
       '@/stores/searchContext': inline('export const useSearchContext=()=>({restore:()=>{}});'),
       vue: inline(
         `export {ref,computed} from '${import.meta.resolve('vue')}'; export const onMounted=()=>{}; export const onUnmounted=()=>{}; export const watch=()=>{};`,
@@ -299,6 +300,7 @@ test('duplicate episode rows receive distinct row keys and toggling one selects 
       ),
       '@/utils/episodes': episodeUtilsUrl,
       '@/stores/notifications': inline('export const useNotifications=()=>({notify:()=>{}});'),
+      '@/stores/verification': inline('export const useVerificationStore=()=>({refresh:()=>{}});'),
       '@/stores/searchContext': inline('export const useSearchContext=()=>({restore:()=>{}});'),
       vue: inline(
         `export {ref,computed} from '${import.meta.resolve('vue')}'; export const onMounted=()=>{}; export const onUnmounted=()=>{}; export const watch=()=>{};`,
@@ -611,6 +613,7 @@ test('already downloaded episodes are excluded from selection and re-download pr
       ),
       '@/utils/episodes': episodeUtilsUrl,
       '@/stores/notifications': inline('export const useNotifications=()=>({notify:()=>{}});'),
+      '@/stores/verification': inline('export const useVerificationStore=()=>({refresh:()=>{}});'),
       '@/stores/searchContext': inline('export const useSearchContext=()=>({restore:()=>{}});'),
       vue: inline(
         `export {ref,computed} from '${import.meta.resolve('vue')}'; export const onMounted=()=>{}; export const onUnmounted=()=>{}; export const watch=()=>{};`,

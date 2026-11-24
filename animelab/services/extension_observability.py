@@ -16,6 +16,10 @@ class InvalidSelector(ValueError):
     pass
 
 
+class APIOnlyExtensionError(NotImplementedError):
+    pass
+
+
 HEALTH_MESSAGES = {
     'healthy':'Source opérationnelle.',
     'empty':'La source a répondu sans contenu exploitable.',
@@ -41,8 +45,9 @@ def classify(error):
     if isinstance(error,(InvalidSelector,SelectorMismatch)): return 'selector_error',type(error).__name__
     if isinstance(error,httpx.HTTPStatusError): return ('rate_limited','rate_limited') if error.response.status_code==429 else ('http_error','upstream_http_error')
     if isinstance(error,(httpx.RequestError,TimeoutError)): return 'network_error','source_unreachable'
-    if isinstance(error,(json.JSONDecodeError,ValidationError,ValueError,KeyError,TypeError)): return 'parse_error','unexpected_payload'
-    if isinstance(error,NotImplementedError): return 'unsupported','operation_unsupported'
+    if isinstance(error, (json.JSONDecodeError, ValidationError, ValueError, KeyError, TypeError)): return 'parse_error', 'unexpected_payload'
+    if isinstance(error, APIOnlyExtensionError): return 'unsupported', 'api_only_apk'
+    if isinstance(error, NotImplementedError): return 'unsupported', 'operation_unsupported'
     return 'internal_error','source_failure'
 
 

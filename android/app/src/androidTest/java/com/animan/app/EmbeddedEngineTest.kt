@@ -275,6 +275,37 @@ class EmbeddedEngineTest {
             if (includeMedia) checkedKeys.addAll(listOf("direct_resume", "aes128_hls", "subtitle_mux", "storage_export", "decode_verification"))
             for (key in checkedKeys) assertTrue(key, report.getBoolean(key))
             assertEquals(200, request("/api/download/status").first)
+            assertTrue("SeanimeJsBridge must be available on Android", SeanimeJsBridge.isAvailable())
+            val seanimeShim = Python.getInstance()
+                .getModule("animelab.services.seanime_runtime")
+                .callAttr("load_shim_source")
+                .toString()
+            val sampleProvider = """
+                class Provider {
+                  getSettings() { return { episodeServers: ['default'], supportsDub: false }; }
+                  async search(opts) {
+                    ${'$'}store.set('lastQuery', opts.query);
+                    return [{ id: 'demo-1', title: 'Probe ' + opts.query, url: 'https://seanime.invalid/1' }];
+                  }
+                }
+            """.trimIndent()
+            assertEquals("ok", SeanimeJsBridge.validateSyntax(seanimeShim, sampleProvider))
+            val invokePayload = JSONObject()
+                .put("extensionId", "android-probe")
+                .put("shim", seanimeShim)
+                .put("code", sampleProvider)
+                .put("method", "search")
+                .put("argsJson", "[{\"query\":\"Naruto\"}]")
+                .put("userConfigJson", "{}")
+                .put("defaultsJson", "{}")
+                .put("storeJson", "{}")
+                .put("timeoutMs", 15000)
+                .toString()
+            val seanimeResult = JSONObject(SeanimeJsBridge.invoke(invokePayload))
+            assertTrue("SeanimeJsBridge.invoke failed: $seanimeResult", seanimeResult.getBoolean("ok"))
+            assertEquals("Probe Naruto", seanimeResult.getJSONArray("result").getJSONObject(0).getString("title"))
+            assertEquals("Naruto", seanimeResult.getJSONObject("store").getString("lastQuery"))
+            report.put("seanime_webview", true)
             println("ANIMAN_ANDROID_PROBE=" + report.toString())
             val instrumentation = InstrumentationRegistry.getInstrumentation()
             val image = instrumentation.uiAutomation.takeScreenshot()

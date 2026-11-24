@@ -13,23 +13,14 @@
       }}
     </p>
     <div v-for="challenge in unique" :key="challenge.domain" class="verification-actions">
-      <a
-        class="verification-site-link"
-        :href="siteUrl(challenge)"
-        target="_blank"
-        rel="noopener noreferrer"
-        >{{ tx('Ouvrir dans un nouvel onglet')
-        }}<template v-if="currentBrowser.name"> ({{ currentBrowser.name }})</template> :
-        {{ siteUrl(challenge) }}</a
-      >
-      <button
-        class="btn btn-secondary"
-        :disabled="verification.busy"
-        @click="verification.retry(challenge.domain)"
-      >
-        {{ tx('Je suis revenu, réessayer') }}
-      </button>
       <template v-if="verification.job?.domain === challenge.domain">
+        <p class="verification-pending-hint">
+          {{
+            tx(
+              'Fenêtre de vérification ouverte — fermez ou cliquez sur « J’ai terminé la vérification » une fois l’accès débloqué.',
+            )
+          }}
+        </p>
         <button
           class="btn btn-primary"
           :disabled="verification.busy"
@@ -45,55 +36,92 @@
           {{ tx('Fermer la fenêtre') }}
         </button>
       </template>
-      <details v-else class="managed-verification">
-        <summary>{{ tx('Modes de vérification disponibles') }}</summary>
-        <div class="verification-actions">
-          <template
-            v-for="mode in verification.modes(challenge.domain).filter((m) => m.id !== 'manual')"
-            :key="mode.id"
-          >
-            <div class="verification-mode">
-              <strong>{{
-                tx(
-                  mode.id === 'browser'
-                    ? 'Navigateur installé sur le serveur'
-                    : 'WebView de l’application',
-                )
-              }}</strong>
-              <span v-if="!mode.available">{{ tx(modeReason(mode.reason)) }}</span>
-              <template v-else>
-                <select
-                  v-if="mode.id === 'browser'"
-                  v-model="verification.browser"
-                  :aria-label="tx('Navigateur installé pour la vérification')"
-                >
-                  <option v-for="item in verification.browsers" :key="item.name" :value="item.name">
-                    {{ item.name }}
-                  </option>
-                </select>
-                <button
-                  class="btn btn-primary"
-                  :disabled="verification.busy || !!verification.job"
-                  @click="
-                    verification.start(
-                      challenge.domain,
-                      mode.id === 'webview' ? 'webview' : 'browser',
-                    )
-                  "
-                >
-                  {{
-                    tx(
-                      mode.headless
-                        ? 'Démarrer la vérification sans fenêtre'
-                        : 'Ouvrir une fenêtre de vérification',
-                    )
-                  }}
-                </button>
-              </template>
-            </div>
-          </template>
-        </div>
-      </details>
+      <template v-else>
+        <button
+          v-if="verification.preferredMode(challenge.domain)"
+          class="btn btn-primary"
+          :disabled="verification.busy || !!verification.job"
+          @click="
+            verification.start(
+              challenge.domain,
+              verification.preferredMode(challenge.domain) || 'auto',
+            )
+          "
+        >
+          {{ tx(primaryLabel(challenge.domain)) }}
+        </button>
+        <button
+          class="btn btn-secondary"
+          :disabled="verification.busy"
+          @click="verification.retry(challenge.domain)"
+        >
+          {{ tx('Je suis revenu, réessayer') }}
+        </button>
+        <a
+          class="verification-site-link"
+          :href="siteUrl(challenge)"
+          target="_blank"
+          rel="noopener noreferrer"
+          >{{ tx('Ouvrir dans un nouvel onglet')
+          }}<template v-if="currentBrowser.name"> ({{ currentBrowser.name }})</template> :
+          {{ siteUrl(challenge) }}</a
+        >
+        <details class="managed-verification">
+          <summary>{{ tx('Modes de vérification disponibles') }}</summary>
+          <div class="verification-actions">
+            <template
+              v-for="mode in verification.modes(challenge.domain).filter((m) => m.id !== 'manual')"
+              :key="mode.id"
+            >
+              <div class="verification-mode">
+                <strong>{{
+                  tx(
+                    mode.id === 'browser'
+                      ? 'Navigateur installé sur le serveur'
+                      : 'WebView de l’application',
+                  )
+                }}</strong>
+                <span v-if="!mode.available">{{ tx(modeReason(mode.reason)) }}</span>
+                <template v-else>
+                  <select
+                    v-if="mode.id === 'browser'"
+                    v-model="verification.browser"
+                    :aria-label="tx('Navigateur installé pour la vérification')"
+                  >
+                    <option
+                      v-for="item in verification.browsers"
+                      :key="item.name"
+                      :value="item.name"
+                    >
+                      {{ item.name }}
+                    </option>
+                  </select>
+                  <button
+                    class="btn btn-secondary"
+                    :disabled="verification.busy || !!verification.job"
+                    @click="
+                      verification.start(
+                        challenge.domain,
+                        mode.id === 'webview' ? 'webview' : 'browser',
+                      )
+                    "
+                  >
+                    {{
+                      tx(
+                        mode.headless
+                          ? 'Démarrer la vérification sans fenêtre'
+                          : mode.id === 'webview'
+                            ? 'Vérifier dans la WebView'
+                            : 'Ouvrir une fenêtre de vérification',
+                      )
+                    }}
+                  </button>
+                </template>
+              </div>
+            </template>
+          </div>
+        </details>
+      </template>
     </div>
 
     <p v-if="verification.error" role="alert">{{ tx(verification.error) }}</p>
@@ -115,6 +143,13 @@ import { detectBrowser } from '@/utils/browser'
 const currentBrowser = detectBrowser(navigator.userAgent)
 const props = defineProps<{ challenges: SourceChallenge[] }>()
 const verification = useVerificationStore()
+function primaryLabel(domain: string) {
+  const mode = verification.preferredMode(domain)
+  if (mode === 'webview') return 'Vérifier dans la WebView'
+  const cap = verification.modes(domain).find((m) => m.id === 'browser')
+  if (cap?.headless) return 'Démarrer la vérification sans fenêtre'
+  return 'Ouvrir une fenêtre de vérification'
+}
 function modeReason(reason: VerificationCapability['reason']) {
   const reasons = {
     client_remote:
