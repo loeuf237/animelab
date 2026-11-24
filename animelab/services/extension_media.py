@@ -72,7 +72,7 @@ class ExtensionMedia:
         parsed = urlsplit(url)
         return parsed.scheme, parsed.hostname, parsed.port or (443 if parsed.scheme == 'https' else 80)
 
-    def playlist(self, text, resource, final_url):
+    def playlist(self, text, resource, final_url, *, query_suffix=''):
         if not text.lstrip().startswith('#EXTM3U'):
             raise ValueError('Playlist HLS invalide.')
         if '#EXT-X-CONTENT-STEERING:' in text:
@@ -82,7 +82,8 @@ class ExtensionMedia:
             headers = resource.headers
             if self.origin(absolute) != self.origin(resource.url):
                 headers = {k: v for k, v in headers.items() if k.lower() not in ('authorization', 'cookie', 'origin')}
-            return self.issue(absolute, headers, expires=resource.expires)
+            url = self.issue(absolute, headers, expires=resource.expires)
+            return f'{url}{query_suffix}' if query_suffix else url
         lines = []
         for line in text.splitlines():
             if line.startswith('#'):

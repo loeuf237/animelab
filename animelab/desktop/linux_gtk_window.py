@@ -88,7 +88,8 @@ def build_bridge_script(expected_origin: str) -> str:
       platform_info: function () {{ return invoke('platform_info'); }},
       set_title: function (title) {{ return invoke('set_title', title); }},
       set_theme: function (theme) {{ return invoke('set_theme', theme); }},
-      choose_download_directory: function () {{ return invoke('choose_download_directory'); }}
+      choose_download_directory: function () {{ return invoke('choose_download_directory'); }},
+      choose_external_player: function () {{ return invoke('choose_external_player'); }}
     }}
   }};
 
@@ -278,6 +279,41 @@ def run_window(config: dict) -> None:
             dialog.destroy()
         return selected
 
+    def choose_external_player() -> str | None:
+        selected = None
+        if hasattr(Gtk, 'FileChooserNative'):
+            try:
+                dialog = Gtk.FileChooserNative.new(
+                    'AnimeLab',
+                    win,
+                    Gtk.FileChooserAction.OPEN,
+                    '_Open',
+                    '_Cancel',
+                )
+                if dialog.run() == Gtk.ResponseType.ACCEPT:
+                    selected = dialog.get_filename()
+                dialog.destroy()
+                return selected
+            except Exception:
+                selected = None
+        dialog = Gtk.FileChooserDialog(
+            title='AnimeLab',
+            parent=win,
+            action=Gtk.FileChooserAction.OPEN,
+        )
+        dialog.add_buttons(
+            Gtk.STOCK_CANCEL,
+            Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_OPEN,
+            Gtk.ResponseType.ACCEPT,
+        )
+        try:
+            if dialog.run() == Gtk.ResponseType.ACCEPT:
+                selected = dialog.get_filename()
+        finally:
+            dialog.destroy()
+        return selected
+
     def resolve_bridge_call(req_id: int, ok: bool, value: object) -> None:
         script = (
             'window.__animelabBridgeResolve && '
@@ -327,6 +363,8 @@ def run_window(config: dict) -> None:
                     resolve_bridge_call(req_id, True, True)
                 elif method == 'choose_download_directory':
                     resolve_bridge_call(req_id, True, choose_download_directory())
+                elif method == 'choose_external_player':
+                    resolve_bridge_call(req_id, True, choose_external_player())
                 else:
                     resolve_bridge_call(req_id, False, f'Unsupported desktop action: {method}')
             except Exception as exc:

@@ -86,6 +86,13 @@ class DesktopBridge:
         selected = self._window.create_file_dialog(webview.FOLDER_DIALOG)
         return selected[0] if selected else None
 
+    def choose_external_player(self):
+        self._require_local_origin()
+        import webview
+
+        selected = self._window.create_file_dialog(webview.OPEN_DIALOG)
+        return selected[0] if selected else None
+
     def platform_info(self):
         self._require_local_origin()
         os_name = 'windows' if sys.platform == 'win32' else 'macos' if sys.platform == 'darwin' else 'linux'

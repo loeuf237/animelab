@@ -161,6 +161,7 @@ export interface DownloadTask {
   exportedAt?: string | null
   id: number | string
   animeName: string
+  animeUrl?: string | null
   episodeNumber: number | string
   fileName: string
   version?: string

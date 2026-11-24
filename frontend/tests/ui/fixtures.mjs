@@ -61,7 +61,23 @@ export const tasks = [
 }))
 export async function mockApp(
   page,
-  { lang = 'fr', theme = 'dark', taskList = tasks, origin = 'http://127.0.0.1:5179' } = {},
+  {
+    lang = 'fr',
+    theme = 'dark',
+    taskList = tasks,
+    origin = 'http://127.0.0.1:5179',
+    externalPlayerSettings = {
+      available: true,
+      platform: 'desktop',
+      clientLocal: true,
+      preset: 'none',
+      customPath: '',
+      preferExternal: false,
+      configured: false,
+      resolvedPath: null,
+      detected: [{ id: 'mpv', label: 'mpv', path: '/usr/bin/mpv' }],
+    },
+  } = {},
 ) {
   const requests = []
   await page.addInitScript(
@@ -199,6 +215,33 @@ export async function mockApp(
         break
       case '/api/network/proxy-pool':
         data = { automatic: false, entries: [], providers: [] }
+        break
+      case '/api/media/external-player/settings':
+        if (route.request().method() === 'POST') {
+          const posted = route.request().postDataJSON() || {}
+          data = {
+            ...externalPlayerSettings,
+            ...posted,
+            configured: Boolean(posted.preset && posted.preset !== 'none'),
+            resolvedPath:
+              posted.preset === 'mpv'
+                ? '/usr/bin/mpv'
+                : posted.preset === 'custom'
+                  ? posted.customPath || '/usr/bin/custom-player'
+                  : null,
+          }
+        } else {
+          data = externalPlayerSettings
+        }
+        break
+      case '/api/media/external-player/launch':
+        data = {
+          success: true,
+          mode:
+            externalPlayerSettings.platform === 'android' ? 'android_intent' : 'desktop_process',
+          player: externalPlayerSettings.platform === 'android' ? 'Android' : 'mpv',
+          targetKind: 'file',
+        }
         break
       default:
         if (url.pathname.endsWith('/filters'))

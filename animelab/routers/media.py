@@ -8,15 +8,30 @@ import mimetypes
 import re
 import urllib.parse
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Literal, Optional
 from fastapi import APIRouter, Request, Header, HTTPException, Response, Query
 from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
+from pydantic import BaseModel, ConfigDict, Field
 
 import httpx
+from animelab import config as app_config, platform_events
 from animelab.config import settings
 from animelab.security import is_safe_url, is_safe_url_async, is_safe_path
 from animelab.media_policy import validate_media_url
+from animelab.routers.network import is_local
 from animelab.services.download_manager import download_manager
+from animelab.services.external_player import (
+    append_media_ticket,
+    build_player_command,
+    external_media_tickets,
+    external_player,
+    extract_local_task_id,
+    local_loopback_origin,
+    sanitize_title,
+    spawn_desktop_player,
+    valid_ticket_format,
+    validate_local_media_url,
+)
 from animelab.services.proxy_service import proxy_service
 from animelab.services.library_service import library_service
 from animelab.services.voiranime_service import voiranime_service, normalize_voiranime_url
@@ -171,7 +186,12 @@ async def extension_resource(token: str, request: Request):
                 if len(body) > 8*1024*1024:
                     raise HTTPException(413, 'Playlist ou sous-titre trop volumineux.')
             if manifest:
-                content = extension_media.playlist(body.decode('utf-8-sig'), resource, str(response.url))
+                params = getattr(request, 'query_params', {}) or {}
+                ticket = valid_ticket_format(params.get('media_ticket'))
+                suffix = f'?media_ticket={ticket}' if ticket else ''
+                content = extension_media.playlist(
+                    body.decode('utf-8-sig'), resource, str(response.url), query_suffix=suffix
+                )
                 ctype = 'application/vnd.apple.mpegurl'
             else:
                 content = to_webvtt(body.decode('utf-8-sig'), format_hint=path.rsplit('.', 1)[-1])
@@ -908,6 +928,9 @@ async def hls_proxy_playlist(request: Request, url: str = Query(...)):
                     if r_k.status_code == 200 and len(r_k.content) == 16:
                         HLS_KEY_CACHE[key_url] = r_k.content
 
+            params = getattr(request, "query_params", {}) or {}
+            ticket = valid_ticket_format(params.get("media_ticket"))
+            ticket_param = f"&media_ticket={ticket}" if ticket else ""
             lines = []
             seq = 1
             for line in m3u8_text.splitlines():
@@ -929,7 +952,7 @@ async def hls_proxy_playlist(request: Request, url: str = Query(...)):
                     seg_abs = urllib.parse.urljoin(url, s)
                     await asyncio.to_thread(validate_media_url, seg_abs)
                     key_param = f"&key={urllib.parse.quote(key_url)}" if key_url else ""
-                    seg_proxy = f"/api/media/hls-proxy/segment.ts?url={urllib.parse.quote(seg_abs)}{key_param}&seq={seq}"
+                    seg_proxy = f"/api/media/hls-proxy/segment.ts?url={urllib.parse.quote(seg_abs)}{key_param}&seq={seq}{ticket_param}"
                     lines.append(seg_proxy)
                     seq += 1
                 else:
@@ -1159,5 +1182,289 @@ async def stream_proxy(
         await client.aclose()
         logger.error("[stream-proxy] Error streaming %s: %s", url, e)
         raise HTTPException(status_code=502, detail="Erreur proxying flux vidéo")
+
+
+class ExternalPlayerSettingsBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    preset: Literal["none", "mpv", "vlc", "custom", "system"] = "none"
+    customPath: str = Field(default="", max_length=4096)
+    preferExternal: bool = False
+
+
+class ExternalPlayerSubtitleInput(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    src: str = Field(min_length=1, max_length=4096)
+    label: str = Field(default="", max_length=200)
+    srclang: str = Field(default="", max_length=32)
+
+
+class ExternalPlayerLaunchBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    taskId: str | None = Field(default=None, max_length=64)
+    streamUrl: str | None = Field(default=None, max_length=4096)
+    isHls: bool = False
+    title: str = Field(default="", max_length=300)
+    subtitles: list[ExternalPlayerSubtitleInput] = Field(default_factory=list, max_length=16)
+
+
+def _guess_video_mime(filename: str | None) -> str:
+    if not filename:
+        return "video/*"
+    lower = filename.lower()
+    if lower.endswith(".mkv"):
+        return "video/x-matroska"
+    if lower.endswith((".mp4", ".m4v")):
+        return "video/mp4"
+    if lower.endswith(".webm"):
+        return "video/webm"
+    guessed = mimetypes.guess_type(filename)[0]
+    if guessed and guessed.startswith("video/"):
+        return guessed
+    return "video/*"
+
+
+def _exported_android_uris(task) -> list[str]:
+    try:
+        raw = json.loads(getattr(task, "exportUrisJson", "[]") or "[]")
+        if isinstance(raw, list):
+            return [u for u in raw if isinstance(u, str) and u.startswith("content://")]
+    except (TypeError, ValueError):
+        pass
+    return []
+
+
+async def _resolve_remote_or_local_subtitles(
+    subtitles: list[ExternalPlayerSubtitleInput],
+    *,
+    origin: str,
+    is_android: bool,
+) -> list[str]:
+    resolved: list[str] = []
+    for sub in subtitles:
+        src = sub.src.strip()
+        if not src:
+            continue
+        if src.startswith("/api/media/"):
+            try:
+                scope_kind, scope_value = validate_local_media_url(src, allow_subtitle=True)
+            except ValueError:
+                continue
+            full = f"{origin}{src}"
+            if is_android:
+                ticket = external_media_tickets.issue(scope_kind, scope_value)
+                full = append_media_ticket(full, ticket)
+            resolved.append(full)
+        elif src.startswith(("http://", "https://")):
+            try:
+                await asyncio.to_thread(validate_media_url, src)
+                if await is_safe_url_async(src):
+                    resolved.append(src)
+            except ValueError:
+                continue
+        if is_android and resolved:
+            break
+    return resolved
+
+
+@router.get("/api/media/external-player/settings")
+async def get_external_player_settings(request: Request):
+    return external_player.snapshot(
+        client_local=is_local(request),
+        is_android=bool(app_config.IS_ANDROID),
+    )
+
+
+@router.post("/api/media/external-player/settings")
+async def save_external_player_settings(body: ExternalPlayerSettingsBody, request: Request):
+    if not is_local(request):
+        raise HTTPException(
+            status_code=403,
+            detail="Le lecteur externe ne peut être configuré que depuis cette machine",
+        )
+    try:
+        return await asyncio.to_thread(
+            external_player.save,
+            body.model_dump(),
+            is_android=bool(app_config.IS_ANDROID),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/api/media/external-player/launch")
+async def launch_external_player(body: ExternalPlayerLaunchBody, request: Request):
+    if not is_local(request):
+        raise HTTPException(
+            status_code=403,
+            detail="Le lecteur externe ne peut être lancé que depuis cette machine",
+        )
+
+    is_android = bool(app_config.IS_ANDROID)
+    effective_task_id = (body.taskId or "").strip() or extract_local_task_id(body.streamUrl)
+    clean_title = sanitize_title(body.title)
+    origin = local_loopback_origin(str(request.base_url), settings.PORT)
+
+    if is_android:
+        if effective_task_id:
+            task = download_manager.get_task(effective_task_id)
+            if not task:
+                raise HTTPException(status_code=404, detail="Vidéo introuvable")
+            title = clean_title or sanitize_title(f"{task.animeName} - Épisode {task.episodeNumber}")
+            mime_type = _guess_video_mime(task.fileName or task.savePath)
+            export_uris = _exported_android_uris(task)
+            subtitle_uri: str | None = export_uris[1] if len(export_uris) > 1 else None
+            if not subtitle_uri and task.savePathSubtitle:
+                for p in parse_subtitle_paths(task.savePathSubtitle):
+                    sf = Path(p)
+                    if is_safe_path(sf) and sf.is_file():
+                        sub_ticket = external_media_tickets.issue("task", task.id)
+                        subtitle_uri = f"{origin}/api/media/subtitle/{urllib.parse.quote(task.id, safe='')}/0?media_ticket={sub_ticket}"
+                        break
+
+            if export_uris and platform_events.exported_copy_exists(export_uris[0]) is not False:
+                return {
+                    "success": True,
+                    "mode": "android_intent",
+                    "player": "Android",
+                    "targetKind": "file",
+                    "androidIntent": {
+                        "kind": "uri",
+                        "target": export_uris[0],
+                        "mimeType": mime_type,
+                        "title": title,
+                        "subtitleUri": subtitle_uri,
+                    },
+                }
+
+            if not task.savePath:
+                raise HTTPException(status_code=404, detail="Fichier vidéo introuvable")
+            file_path = Path(task.savePath)
+            if not is_safe_path(file_path):
+                raise HTTPException(status_code=403, detail="Accès refusé : fichier hors du répertoire autorisé")
+            if not file_path.is_file():
+                raise HTTPException(status_code=404, detail="Fichier vidéo introuvable sur le disque")
+            return {
+                "success": True,
+                "mode": "android_intent",
+                "player": "Android",
+                "targetKind": "file",
+                "androidIntent": {
+                    "kind": "file",
+                    "target": str(file_path.resolve()),
+                    "mimeType": mime_type,
+                    "title": title,
+                    "subtitleUri": subtitle_uri,
+                },
+            }
+
+        raw_url = (body.streamUrl or "").strip()
+        if not raw_url:
+            raise HTTPException(status_code=400, detail="Cible vidéo manquante.")
+        if raw_url.startswith("/api/media/"):
+            try:
+                scope_kind, scope_value = validate_local_media_url(raw_url)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            ticket = external_media_tickets.issue(scope_kind, scope_value)
+            target_url = append_media_ticket(f"{origin}{raw_url}", ticket)
+        else:
+            try:
+                await asyncio.to_thread(validate_media_url, raw_url)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            if not await is_safe_url_async(raw_url):
+                raise HTTPException(status_code=400, detail="URL média non autorisée ou non sécurisée")
+            target_url = raw_url
+
+        subs = await _resolve_remote_or_local_subtitles(body.subtitles, origin=origin, is_android=True)
+        mime_type = (
+            "application/vnd.apple.mpegurl"
+            if (body.isHls or ".m3u8" in raw_url.lower())
+            else "video/*"
+        )
+        return {
+            "success": True,
+            "mode": "android_intent",
+            "player": "Android",
+            "targetKind": "stream",
+            "androidIntent": {
+                "kind": "url",
+                "target": target_url,
+                "mimeType": mime_type,
+                "title": clean_title,
+                "subtitleUri": subs[0] if subs else None,
+            },
+        }
+
+    # Desktop launch branch
+    try:
+        resolved_player = external_player.resolve_configured_executable(is_android=False)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if resolved_player is None:
+        raise HTTPException(status_code=409, detail="Aucun lecteur externe n’est configuré.")
+    player_label, exe_path = resolved_player
+
+    if effective_task_id:
+        task = download_manager.get_task(effective_task_id)
+        if not task or not task.savePath:
+            raise HTTPException(status_code=404, detail="Vidéo introuvable")
+        file_path = Path(task.savePath)
+        if not is_safe_path(file_path):
+            raise HTTPException(status_code=403, detail="Accès refusé : fichier hors du répertoire autorisé")
+        if not file_path.is_file():
+            raise HTTPException(status_code=404, detail="Fichier vidéo introuvable sur le disque")
+        local_subs = [
+            str(Path(p).resolve())
+            for p in parse_subtitle_paths(task.savePathSubtitle)
+            if p and is_safe_path(Path(p)) and Path(p).is_file()
+        ]
+        title = clean_title or sanitize_title(f"{task.animeName} - Épisode {task.episodeNumber}")
+        try:
+            argv = build_player_command(
+                exe_path, str(file_path.resolve()), title=title, subtitles=local_subs
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        await asyncio.to_thread(spawn_desktop_player, argv)
+        return {
+            "success": True,
+            "mode": "desktop_process",
+            "player": player_label,
+            "targetKind": "file",
+        }
+
+    raw_url = (body.streamUrl or "").strip()
+    if not raw_url:
+        raise HTTPException(status_code=400, detail="Cible vidéo manquante.")
+    if raw_url.startswith("/api/media/"):
+        try:
+            validate_local_media_url(raw_url)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        target_url = f"{origin}{raw_url}"
+    else:
+        try:
+            await asyncio.to_thread(validate_media_url, raw_url)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if not await is_safe_url_async(raw_url):
+            raise HTTPException(status_code=400, detail="URL média non autorisée ou non sécurisée")
+        target_url = raw_url
+
+    desktop_subs = await _resolve_remote_or_local_subtitles(
+        body.subtitles, origin=origin, is_android=False
+    )
+    try:
+        argv = build_player_command(exe_path, target_url, title=clean_title, subtitles=desktop_subs)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    await asyncio.to_thread(spawn_desktop_player, argv)
+    return {
+        "success": True,
+        "mode": "desktop_process",
+        "player": player_label,
+        "targetKind": "stream",
+    }
 
 

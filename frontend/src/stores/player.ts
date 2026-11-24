@@ -1,4 +1,11 @@
-import type { PlaybackState, PlaybackOpen, PlaybackTrack, PlaybackCheckpoint } from '@/types/api'
+import type {
+  PlaybackState,
+  PlaybackOpen,
+  PlaybackTrack,
+  PlaybackCheckpoint,
+  ExternalPlayerSettings,
+  ExternalPlayerLaunchResponse,
+} from '@/types/api'
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { api } from '@/api/client'
@@ -64,6 +71,16 @@ export function sanitizeRemotePref(value: string | null | undefined, fallback: s
   return cleaned
 }
 
+export interface ExternalWatchPromptState {
+  animeTitle: string
+  animeUrl: string
+  source: string
+  episodeNumber: string | number
+  version: string
+  playerName: string
+  fallback?: () => Promise<void>
+}
+
 export const usePlayerStore = defineStore('player', () => {
   const isOpen = ref(false)
   const animeTitle = ref('')
@@ -85,6 +102,15 @@ export const usePlayerStore = defineStore('player', () => {
   const isLoading = ref(false)
   const error = ref<string | null>(null)
   const challenges = ref<SourceChallenge[]>([])
+  const externalPlayer = ref<ExternalPlayerSettings | null>(null)
+  const externalLaunching = ref(false)
+  const pendingExternalWatch = ref<ExternalWatchPromptState | null>(null)
+  const canLaunchExternal = computed(() =>
+    Boolean(externalPlayer.value?.available && externalPlayer.value?.configured),
+  )
+  const prefersExternal = computed(() =>
+    Boolean(canLaunchExternal.value && externalPlayer.value?.preferExternal),
+  )
   function clearVerification() {
     challenges.value = []
     useVerificationStore().clearPending('player-stream')
@@ -365,13 +391,15 @@ export const usePlayerStore = defineStore('player', () => {
     await loadPlayback({ taskId: String(taskId) }, request)
     if (request !== requestVersion) return
     if (playback.value) {
-      animeUrl.value = playback.value.animeUrl
-      source.value = playback.value.source
-      if (currentEpisode.value) currentEpisode.value.version = playback.value.version
+      if (playback.value.animeUrl) animeUrl.value = playback.value.animeUrl
+      if (playback.value.source) source.value = playback.value.source
+      if (currentEpisode.value && typeof playback.value.version === 'string')
+        currentEpisode.value.version = playback.value.version
       const listMatch = episodes.value.find(
         (e) => e.downloadTaskId != null && String(e.downloadTaskId) === String(taskId),
       )
-      if (listMatch) listMatch.version = playback.value.version
+      if (listMatch && typeof playback.value.version === 'string')
+        listMatch.version = playback.value.version
     }
     try {
       const tracks = await api.getLocalSubtitles(taskId)
@@ -464,12 +492,13 @@ export const usePlayerStore = defineStore('player', () => {
     epNum: number | string,
     fileName?: string,
     playlist: Episode[] = [],
+    knownAnimeUrl = '',
   ) {
     void savePlayback(true)
     ++mediaEpoch.value
     const request = ++requestVersion
     animeTitle.value = title
-    animeUrl.value = ''
+    animeUrl.value = knownAnimeUrl
     source.value = 'local'
     const epObj: Episode = {
       number: epNum,
@@ -488,6 +517,175 @@ export const usePlayerStore = defineStore('player', () => {
     } else {
       episodes.value = []
       await loadLocalEpisode(epObj, request)
+    }
+  }
+
+  function setExternalPlayerConfig(config: ExternalPlayerSettings | null) {
+    externalPlayer.value = config
+  }
+
+  async function loadExternalPlayerConfig(force = false) {
+    if ((!force && externalPlayer.value) || !api.getExternalPlayerSettings) return
+    try {
+      externalPlayer.value = await api.getExternalPlayerSettings()
+    } catch {
+      // Leave null so the built-in player remains available seamlessly.
+    }
+  }
+
+  function dismissExternalWatch() {
+    pendingExternalWatch.value = null
+  }
+
+  function triggerAndroidExternalIntent(res: ExternalPlayerLaunchResponse) {
+    if (res.mode !== 'android_intent' || !res.androidIntent) return
+    if (typeof window === 'undefined') {
+      throw new Error('Pont Android indisponible.')
+    }
+    const bridge = (
+      window as Window & { AnimeLabAndroid?: { openExternalPlayer?: (payload: string) => string } }
+    ).AnimeLabAndroid
+    if (!bridge || typeof bridge.openExternalPlayer !== 'function') {
+      throw new Error('Pont Android indisponible.')
+    }
+    const raw = bridge.openExternalPlayer(JSON.stringify(res.androidIntent))
+    const parsed = raw ? (JSON.parse(raw) as { launched?: unknown; error?: string }) : null
+    if (!parsed?.launched) {
+      throw new Error(parsed?.error || 'Impossible d’ouvrir le lecteur externe.')
+    }
+  }
+
+  async function launchCurrentInExternalPlayer(): Promise<ExternalPlayerLaunchResponse> {
+    if (!currentEpisode.value || !api.launchExternalPlayer) {
+      throw new Error('Aucun épisode prêt pour le lecteur externe.')
+    }
+    const title = `${animeTitle.value} - Épisode ${currentEpisode.value.number}`
+    const taskId =
+      isDownloaded.value && currentEpisode.value.downloadTaskId != null
+        ? String(currentEpisode.value.downloadTaskId)
+        : null
+    const payload = taskId
+      ? { taskId, title }
+      : videoUrl.value
+        ? {
+            streamUrl: videoUrl.value,
+            isHls: isHls.value,
+            title,
+            subtitles: subtitles.value,
+          }
+        : null
+    if (!payload) {
+      throw new Error('Aucun flux disponible pour le lecteur externe.')
+    }
+
+    externalLaunching.value = true
+    try {
+      const res = await api.launchExternalPlayer(payload)
+      triggerAndroidExternalIntent(res)
+      pendingExternalWatch.value = {
+        animeTitle: animeTitle.value,
+        animeUrl: animeUrl.value || playback.value?.animeUrl || '',
+        source: source.value,
+        episodeNumber: currentEpisode.value.number,
+        version: currentEpisode.value.version || playback.value?.version || '',
+        playerName: res.player,
+      }
+      return res
+    } finally {
+      externalLaunching.value = false
+    }
+  }
+
+  async function launchEpisodeExternal(params: {
+    title: string
+    animeUrl: string
+    source: string
+    episode: Episode
+    allEpisodes?: Episode[]
+    taskId?: string | number | null
+  }): Promise<ExternalPlayerLaunchResponse> {
+    if (!api.launchExternalPlayer) {
+      throw new Error('Lecteur externe indisponible.')
+    }
+    const displayTitle = `${params.title} - Épisode ${params.episode.number}`
+    externalLaunching.value = true
+    try {
+      let launchPayload: {
+        taskId?: string | null
+        streamUrl?: string | null
+        isHls?: boolean
+        title?: string
+        subtitles?: SubtitleTrack[]
+      }
+      let fallback: () => Promise<void>
+
+      if (params.taskId != null) {
+        launchPayload = { taskId: String(params.taskId), title: displayTitle }
+        fallback = async () => {
+          await playLocalFile(
+            params.taskId!,
+            params.title,
+            params.episode.number,
+            params.episode.title,
+            params.allEpisodes || [],
+          )
+        }
+      } else {
+        const targetUrl = params.episode.playerUrl || params.episode.downloadPageUrl
+        if (!targetUrl) {
+          throw new Error('Aucun lien de streaming disponible pour cet épisode.')
+        }
+        const streamRes = await api.resolveVideoStream({
+          animeName: params.title,
+          episodeNumber: params.episode.number,
+          episodeUrl: targetUrl,
+          animeUrl: params.animeUrl,
+          version: params.episode.version || '',
+          source: params.source,
+        })
+        const finalUrl = streamRes.streamUrl || streamRes.videoUrl
+        if (!finalUrl) {
+          throw new Error(
+            streamRes.error || "Impossible d'extraire la vidéo directe pour cet hébergeur.",
+          )
+        }
+        const streamTaskId =
+          streamRes.isDownloaded && (streamRes as { taskId?: string | number }).taskId != null
+            ? String((streamRes as { taskId?: string | number }).taskId)
+            : null
+        launchPayload = streamTaskId
+          ? { taskId: streamTaskId, title: displayTitle }
+          : {
+              streamUrl: finalUrl,
+              isHls: Boolean(streamRes.isHls) || finalUrl.includes('.m3u8'),
+              title: displayTitle,
+              subtitles: streamRes.subtitles || [],
+            }
+        fallback = async () => {
+          await openPlayer(
+            params.title,
+            params.animeUrl,
+            params.source,
+            params.episode,
+            params.allEpisodes || [],
+          )
+        }
+      }
+
+      const res = await api.launchExternalPlayer(launchPayload)
+      triggerAndroidExternalIntent(res)
+      pendingExternalWatch.value = {
+        animeTitle: params.title,
+        animeUrl: params.animeUrl,
+        source: params.source,
+        episodeNumber: params.episode.number,
+        version: params.episode.version || '',
+        playerName: res.player,
+        fallback,
+      }
+      return res
+    } finally {
+      externalLaunching.value = false
     }
   }
 
@@ -519,6 +717,11 @@ export const usePlayerStore = defineStore('player', () => {
     isLoading,
     error,
     challenges,
+    externalPlayer,
+    externalLaunching,
+    pendingExternalWatch,
+    canLaunchExternal,
+    prefersExternal,
     hasNext,
     hasPrev,
     openPlayer,
@@ -530,5 +733,10 @@ export const usePlayerStore = defineStore('player', () => {
     changeQuality,
     changeSubtitle,
     resolveStream,
+    setExternalPlayerConfig,
+    loadExternalPlayerConfig,
+    dismissExternalWatch,
+    launchCurrentInExternalPlayer,
+    launchEpisodeExternal,
   }
 })

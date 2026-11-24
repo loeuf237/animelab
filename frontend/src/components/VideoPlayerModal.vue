@@ -86,6 +86,20 @@
           </div>
 
           <button
+            v-if="
+              playerStore.canLaunchExternal && (playerStore.videoUrl || playerStore.isDownloaded)
+            "
+            type="button"
+            class="btn btn-secondary btn-sm player-external-btn"
+            :disabled="playerStore.externalLaunching"
+            :title="tx('Ouvrir dans un lecteur externe')"
+            @click="openInExternalPlayer"
+          >
+            <ExternalLink :size="15" aria-hidden="true" />
+            <span class="player-external-label">{{ tx('Lecteur externe') }}</span>
+          </button>
+
+          <button
             type="button"
             class="btn-icon player-close-btn"
             :title="tx('Fermer (Échap)')"
@@ -148,12 +162,54 @@
             <line x1="12" y1="16" x2="12.01" y2="16"></line>
           </svg>
           <p>{{ tx(playerStore.error) }}</p>
-          <button type="button" class="btn btn-primary" @click="retryPlayback">
-            {{ tx('Réessayer') }}
-          </button>
+          <div class="player-error-actions">
+            <button type="button" class="btn btn-primary" @click="retryPlayback">
+              {{ tx('Réessayer') }}
+            </button>
+            <button
+              v-if="
+                playerStore.canLaunchExternal && (playerStore.videoUrl || playerStore.isDownloaded)
+              "
+              type="button"
+              class="btn btn-secondary"
+              :disabled="playerStore.externalLaunching"
+              @click="openInExternalPlayer"
+            >
+              <ExternalLink :size="15" aria-hidden="true" />
+              {{ tx('Ouvrir dans le lecteur externe') }}
+            </button>
+          </div>
         </div>
       </div>
 
+      <p v-if="externalError" role="status" class="playback-notice playback-notice-error">
+        {{ tx(externalError) }}
+      </p>
+      <div v-if="playerStore.pendingExternalWatch" class="external-watch-bar" role="status">
+        <span>
+          {{ tx('Lecture dans le lecteur externe') }} ({{
+            tx(playerStore.pendingExternalWatch.playerName)
+          }})
+        </span>
+        <div class="external-watch-bar-actions">
+          <button
+            v-if="playerStore.pendingExternalWatch.animeUrl || playerStore.animeUrl"
+            type="button"
+            class="btn btn-primary btn-sm"
+            @click="markExternalEpisodeWatched"
+          >
+            <Check :size="14" aria-hidden="true" />
+            {{ tx('Marquer comme vu') }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            @click="playerStore.dismissExternalWatch"
+          >
+            {{ tx('Fermer') }}
+          </button>
+        </div>
+      </div>
       <p v-if="playerStore.progressNotice" role="status" class="playback-notice">
         {{ tx(playerStore.progressNotice) }}
       </p>
@@ -194,7 +250,15 @@
 <script setup lang="ts">
 import { tx } from '@/utils/locale'
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
-import { HardDrive, SkipBack, SkipForward, Subtitles, X } from 'lucide-vue-next'
+import {
+  Check,
+  ExternalLink,
+  HardDrive,
+  SkipBack,
+  SkipForward,
+  Subtitles,
+  X,
+} from 'lucide-vue-next'
 import Hls from 'hls.js'
 import { usePlayerStore, playbackTrackKey } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
@@ -209,6 +273,7 @@ let attachedVideo: HTMLVideoElement | null = null
 let markedWatched = false
 let attachedEpoch = -1
 let attachedUrl: string | null = null
+const externalError = ref('')
 function ownsMedia() {
   return (
     !!attachedVideo &&
@@ -386,6 +451,7 @@ function releaseVideo() {
 
 function setupVideo(url: string | null) {
   releaseVideo()
+  externalError.value = ''
   if (!url || !videoRef.value) return
   markedWatched = false
   playerStore.error = null
@@ -484,6 +550,39 @@ function retryPlayback() {
   }
 }
 
+async function openInExternalPlayer() {
+  externalError.value = ''
+  if (videoRef.value && !videoRef.value.paused) {
+    checkpoint()
+    videoRef.value.pause()
+  }
+  try {
+    await playerStore.launchCurrentInExternalPlayer()
+  } catch (err) {
+    externalError.value =
+      err instanceof Error ? err.message : 'Impossible d’ouvrir le lecteur externe.'
+  }
+}
+
+function markExternalEpisodeWatched() {
+  const prompt = playerStore.pendingExternalWatch
+  const animeUrl = prompt?.animeUrl || playerStore.animeUrl
+  const epNum = prompt?.episodeNumber ?? playerStore.currentEpisode?.number
+  if (!animeUrl || epNum == null) {
+    playerStore.dismissExternalWatch()
+    return
+  }
+  markedWatched = true
+  void libraryStore.markWatched(
+    animeUrl,
+    epNum,
+    true,
+    prompt?.version || playerStore.currentEpisode?.version || '',
+    prompt?.animeTitle || playerStore.animeTitle,
+  )
+  playerStore.dismissExternalWatch()
+}
+
 function onServerChange(e: Event) {
   const target = e.target as HTMLSelectElement
   playerStore.changeServer(target.value)
@@ -549,6 +648,44 @@ onUnmounted(() => {
   color: #cbd5e1;
   font-size: 0.85rem;
   flex-shrink: 0;
+}
+.playback-notice-error {
+  color: #fda4af;
+}
+.player-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+.player-external-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #f8fafc;
+}
+.player-external-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.15);
+}
+.external-watch-bar {
+  flex-shrink: 0;
+  padding: 8px 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.84rem;
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.05);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+.external-watch-bar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .player-overlay {
   position: fixed;
@@ -810,6 +947,14 @@ onUnmounted(() => {
   .player-close-btn {
     min-width: 44px;
     min-height: 44px;
+  }
+
+  .player-external-btn {
+    min-height: 40px;
+  }
+
+  .external-watch-bar {
+    padding: 8px 12px;
   }
 
   .player-footer {

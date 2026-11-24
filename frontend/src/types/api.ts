@@ -206,3 +206,38 @@ export interface RecipeRevision {
   reason: string
   created_at: string
 }
+
+export type ExternalPlayerPreset = 'none' | 'mpv' | 'vlc' | 'custom' | 'system'
+
+export interface DetectedExternalPlayer {
+  id: string
+  label: string
+  path: string
+}
+
+export interface ExternalPlayerSettings {
+  available: boolean
+  platform: 'desktop' | 'android'
+  clientLocal: boolean
+  preset: ExternalPlayerPreset
+  customPath: string
+  preferExternal: boolean
+  configured: boolean
+  resolvedPath: string | null
+  detected: DetectedExternalPlayer[]
+}
+
+export interface AndroidExternalIntent {
+  kind: 'uri' | 'file' | 'url'
+  target: string
+  mimeType: string
+  title: string
+  subtitleUri?: string | null
+}
+
+export interface ExternalPlayerLaunchResponse extends Result {
+  mode: 'desktop_process' | 'android_intent'
+  player: string
+  targetKind: 'file' | 'stream'
+  androidIntent?: AndroidExternalIntent | null
+}

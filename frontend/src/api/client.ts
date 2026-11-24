@@ -21,6 +21,8 @@ import type {
   VerificationMode,
   VerificationJob,
   VerificationResult,
+  ExternalPlayerSettings,
+  ExternalPlayerLaunchResponse,
 } from '@/types/api'
 import { language, tx } from '@/utils/locale'
 import type {
@@ -1008,6 +1010,34 @@ export const api = {
     if (params.server && params.server !== 'auto') search.set('server', params.server)
     if (params.quality && params.quality !== 'auto') search.set('quality', params.quality)
     return request<VideoStreamInfo>(`/api/media/stream/resolve?${search.toString()}`)
+  },
+
+  async getExternalPlayerSettings(): Promise<ExternalPlayerSettings> {
+    return request('/api/media/external-player/settings')
+  },
+
+  async saveExternalPlayerSettings(payload: {
+    preset: ExternalPlayerSettings['preset']
+    customPath?: string
+    preferExternal?: boolean
+  }): Promise<ExternalPlayerSettings> {
+    return request('/api/media/external-player/settings', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  async launchExternalPlayer(payload: {
+    taskId?: string | null
+    streamUrl?: string | null
+    isHls?: boolean
+    title?: string
+    subtitles?: SubtitleTrack[]
+  }): Promise<ExternalPlayerLaunchResponse> {
+    return request('/api/media/external-player/launch', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
   },
 
   async getEpisodeServers(

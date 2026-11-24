@@ -1,8 +1,11 @@
 package com.animan.app
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.ClipData
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
@@ -13,10 +16,13 @@ import android.view.HapticFeedbackConstants
 import android.view.View
 import android.view.WindowManager
 import android.webkit.JavascriptInterface
+import android.webkit.MimeTypeMap
 import android.webkit.WebView
 import android.widget.Toast
+import androidx.core.content.FileProvider
 import androidx.core.view.WindowInsetsControllerCompat
 import org.json.JSONObject
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -243,6 +249,119 @@ class NativeUiBridge(
             }
         } catch (_: Exception) {
             ""
+        }
+    }
+
+    @JavascriptInterface
+    fun openExternalPlayer(payloadJson: String?): String {
+        if (payloadJson.isNullOrBlank() || payloadJson.length > 16384) {
+            return JSONObject().put("launched", false).put("error", "Cible média invalide.").toString()
+        }
+        if (!checkLocalOriginSync()) {
+            return JSONObject().put("launched", false).put("error", "Origine non autorisée.").toString()
+        }
+        return try {
+            val payload = JSONObject(payloadJson)
+            val kind = payload.optString("kind", "")
+            val target = payload.optString("target", "").trim()
+            if (target.isEmpty()) {
+                return JSONObject().put("launched", false).put("error", "Cible média manquante.").toString()
+            }
+
+            val playUri = when (kind) {
+                "uri" -> Uri.parse(target).takeIf { it.scheme == "content" }
+                "file" -> {
+                    val downloadsRoot = File(activity.filesDir, "downloads").canonicalFile
+                    val targetFile = File(target).canonicalFile
+                    if (!targetFile.isFile || !targetFile.path.startsWith(downloadsRoot.path + File.separator)) {
+                        null
+                    } else {
+                        FileProvider.getUriForFile(activity, "${activity.packageName}.fileprovider", targetFile)
+                    }
+                }
+                "url" -> Uri.parse(target).takeIf { it.scheme == "http" || it.scheme == "https" }
+                else -> null
+            } ?: return JSONObject().put("launched", false).put("error", "Cible média invalide.").toString()
+
+            val requestedMime = payload.optString("mimeType", "").trim()
+            val safeMime = when {
+                requestedMime == "video/*" -> "video/*"
+                requestedMime == "application/vnd.apple.mpegurl" -> requestedMime
+                requestedMime == "application/x-mpegurl" -> requestedMime
+                requestedMime.matches(Regex("^video/[A-Za-z0-9.+_-]{1,64}$")) -> requestedMime
+                kind == "file" -> {
+                    val ext = File(target).extension.lowercase(Locale.US)
+                    MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext)
+                        ?.takeIf { it.startsWith("video/") }
+                        ?: "video/*"
+                }
+                else -> "video/*"
+            }
+
+            val rawTitle = payload.optString("title", "")
+            val cleanTitle = rawTitle.replace(Regex("[\\u0000-\\u001f\\u007f]"), " ")
+                .trim().replace(Regex("\\s+"), " ").take(200)
+
+            val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(playUri, safeMime)
+                if (playUri.scheme == "content") {
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    clipData = ClipData.newRawUri(cleanTitle.ifBlank { "AnimeLab" }, playUri)
+                }
+                if (cleanTitle.isNotBlank()) {
+                    putExtra("title", cleanTitle)
+                    putExtra(Intent.EXTRA_TITLE, cleanTitle)
+                }
+                val rawSub = payload.optString("subtitleUri", "").trim()
+                if (rawSub.isNotEmpty() && !payload.isNull("subtitleUri")) {
+                    val subUri = Uri.parse(rawSub)
+                    if (subUri.scheme in listOf("content", "http", "https")) {
+                        putExtra("subs", arrayOf(subUri))
+                        putExtra("subtitles_location", subUri.toString())
+                        if (subUri.scheme == "content") {
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            if (clipData == null) {
+                                clipData = ClipData.newRawUri(cleanTitle.ifBlank { "AnimeLab" }, subUri)
+                            } else {
+                                clipData?.addItem(ClipData.Item(subUri))
+                            }
+                        }
+                    }
+                }
+            }
+
+            var launched = false
+            var errorMessage = ""
+            val latch = CountDownLatch(1)
+            activity.runOnUiThread {
+                try {
+                    if (activity.isDestroyed || activity.isFinishing) {
+                        errorMessage = "Fenêtre fermée."
+                    } else if (activity.packageManager.queryIntentActivities(viewIntent, 0).isEmpty()) {
+                        errorMessage = "Aucun lecteur vidéo externe n’est installé sur cet appareil."
+                    } else {
+                        val chooser = Intent.createChooser(viewIntent, cleanTitle.ifBlank { "AnimeLab" })
+                        activity.startActivity(chooser)
+                        launched = true
+                    }
+                } catch (_: ActivityNotFoundException) {
+                    errorMessage = "Aucun lecteur vidéo externe n’est installé sur cet appareil."
+                } catch (_: SecurityException) {
+                    errorMessage = "Impossible de partager le média avec le lecteur externe."
+                } catch (exc: Exception) {
+                    errorMessage = exc.message ?: "Impossible d’ouvrir le lecteur externe."
+                } finally {
+                    latch.countDown()
+                }
+            }
+            if (!latch.await(2, TimeUnit.SECONDS)) {
+                return JSONObject().put("launched", false).put("error", "Délai dépassé.").toString()
+            }
+            JSONObject().put("launched", launched).apply {
+                if (!launched) put("error", errorMessage.ifBlank { "Impossible d’ouvrir le lecteur externe." })
+            }.toString()
+        } catch (exc: Exception) {
+            JSONObject().put("launched", false).put("error", exc.message ?: "Impossible d’ouvrir le lecteur externe.").toString()
         }
     }
 }

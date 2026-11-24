@@ -10,6 +10,7 @@ interface AndroidUiBridge {
   setKeepScreenOn?: (enabled: boolean) => void
   getPlatformInfo?: () => string
   exportDiagnostics?: (jsonPayload: string) => string
+  openExternalPlayer?: (payloadJson: string) => string
 }
 
 interface PyWebViewBridge {
@@ -18,6 +19,7 @@ interface PyWebViewBridge {
     set_theme?: (theme: 'dark' | 'light') => Promise<unknown> | void
     set_title?: (title: string) => Promise<unknown> | void
     choose_download_directory?: () => Promise<string | null>
+    choose_external_player?: () => Promise<string | null>
   }
 }
 
@@ -197,6 +199,37 @@ export function exportNativeDiagnostics(jsonPayload: string): string | null {
   try {
     const result = (window as NativeWindow).AnimeLabAndroid?.exportDiagnostics?.(jsonPayload)
     return typeof result === 'string' && result.trim() ? result.trim() : null
+  } catch {
+    return null
+  }
+}
+
+export function openNativeExternalPlayer(
+  payload: Record<string, unknown>,
+): { launched: boolean; error?: string } | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const fn = (window as NativeWindow).AnimeLabAndroid?.openExternalPlayer
+    if (typeof fn !== 'function') return null
+    const raw = fn(JSON.stringify(payload))
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as { launched?: unknown; error?: unknown }
+    return {
+      launched: Boolean(parsed?.launched),
+      error: typeof parsed?.error === 'string' ? parsed.error : undefined,
+    }
+  } catch {
+    return null
+  }
+}
+
+export async function chooseDesktopExternalPlayer(): Promise<string | null> {
+  if (typeof window === 'undefined') return null
+  try {
+    const fn = (window as NativeWindow).pywebview?.api?.choose_external_player
+    if (typeof fn !== 'function') return null
+    const selected = await fn()
+    return typeof selected === 'string' && selected.trim() ? selected.trim() : null
   } catch {
     return null
   }

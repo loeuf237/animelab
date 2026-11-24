@@ -4,6 +4,7 @@ completed_handler = None
 storage_status_handler = None
 storage_action_handler = None
 app_update_install_handler = None
+exported_copy_exists_handler = None
 
 
 def progress(task):
@@ -22,6 +23,10 @@ def storage_status():
 
 def install_app_update(path):
     return app_update_install_handler(path) if app_update_install_handler else None
+
+
+def exported_copy_exists(uri: str) -> bool | None:
+    return bool(exported_copy_exists_handler(uri)) if exported_copy_exists_handler else None
 
 
 def completed_paths(task):

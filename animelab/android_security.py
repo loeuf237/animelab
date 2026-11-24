@@ -1,6 +1,7 @@
 """Authenticate every request to the Android loopback engine, including sockets."""
 from http.cookies import SimpleCookie
 import hmac
+import urllib.parse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 
@@ -26,6 +27,14 @@ class AndroidSessionMiddleware:
             except Exception:
                 supplied = ""
         if not hmac.compare_digest(supplied.encode("utf-8"), self.token.encode("utf-8")):
+            if scope["type"] == "http" and scope.get("method", "GET") in ("GET", "HEAD"):
+                query = scope.get("query_string", b"").decode("latin1")
+                ticket = urllib.parse.parse_qs(query, keep_blank_values=False).get("media_ticket", [None])[0]
+                if ticket:
+                    from animelab.services.external_player import external_media_tickets
+
+                    if external_media_tickets.verify(ticket, scope.get("path", ""), query):
+                        return await self.app(scope, receive, send)
             if scope["type"] == "websocket":
                 await send({"type": "websocket.close", "code": 1008})
             else:

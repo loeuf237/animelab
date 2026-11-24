@@ -50,7 +50,7 @@ const component = (
         '@/utils/locale': inline('export const tx=v=>String(v??"");'),
         '@/stores/library': inline('export const useLibraryStore=()=>({markWatched(){}});'),
         'lucide-vue-next': inline(
-          'const Icon=()=>null; export const HardDrive=Icon, SkipBack=Icon, SkipForward=Icon, Subtitles=Icon, X=Icon;',
+          'const Icon=()=>null; export const Check=Icon, ExternalLink=Icon, HardDrive=Icon, SkipBack=Icon, SkipForward=Icon, Subtitles=Icon, X=Icon;',
         ),
         'hls.js': inline(`export default class Hls {
  static Events={MANIFEST_PARSED:'manifest',ERROR:'error'};
@@ -434,6 +434,96 @@ test('local playlist enables next and previous episode navigation across downloa
   await nextTick()
   assert.equal(player.currentEpisode.number, 1)
   assert.equal(videos.at(-1).src, '/api/media/stream/task-1')
+  player.closePlayer()
+  await nextTick()
+})
+
+test('external player launch pauses built-in playback, triggers Android bridge, and clears pending state when dismissed', async (t) => {
+  const bridged = []
+  globalThis.window = {
+    addEventListener() {},
+    removeEventListener() {},
+    AnimeLabAndroid: {
+      openExternalPlayer(payloadJson) {
+        bridged.push(JSON.parse(payloadJson))
+        return JSON.stringify({ launched: true })
+      },
+    },
+  }
+  setActivePinia(createPinia())
+  const launches = []
+  api.getExternalPlayerSettings = async () => ({
+    available: true,
+    platform: 'android',
+    clientLocal: true,
+    preset: 'system',
+    customPath: '',
+    preferExternal: false,
+    configured: true,
+    resolvedPath: null,
+    detected: [{ id: 'system', label: 'Lecteur système Android', path: '' }],
+  })
+  api.launchExternalPlayer = async (payload) => {
+    launches.push(payload)
+    return {
+      success: true,
+      mode: 'android_intent',
+      player: 'Android',
+      targetKind: 'file',
+      androidIntent: {
+        kind: 'uri',
+        target: 'content://downloads/42',
+        mimeType: 'video/mp4',
+        title: 'Local Anime - Épisode 1',
+      },
+    }
+  }
+  api.getLocalSubtitles = async () => []
+  api.openPlaybackSession = async () => ({
+    sessionId: 'c'.repeat(32),
+    source: 'french-manga',
+    animeUrl: 'https://example.org/local-anime',
+    episodeNumber: 1,
+    version: 'VF',
+    positionSeconds: 0,
+    durationSeconds: 1200,
+    selection: { quality: 'HD', server: 'auto', subtitle: null, audio: null },
+  })
+  const player = usePlayerStore()
+  const { videos, app, root } = mountPlayer()
+  t.after(() => {
+    app.unmount()
+    delete api.getExternalPlayerSettings
+    delete api.launchExternalPlayer
+    delete api.getLocalSubtitles
+    delete api.openPlaybackSession
+    delete globalThis.window
+  })
+
+  await player.loadExternalPlayerConfig(true)
+  assert.equal(player.canLaunchExternal, true)
+  assert.equal(player.prefersExternal, false)
+  await player.playLocalFile('task-42', 'Local Anime', 1, 'Ep 1.mp4')
+  await nextTick()
+
+  const buttons = []
+  function walk(el) {
+    if (el.type === 'button') buttons.push(el)
+    for (const c of el.children) walk(c)
+  }
+  walk(root)
+  const extBtn = buttons.find((b) => b.props?.title === 'Ouvrir dans un lecteur externe')
+  assert.ok(extBtn, 'External player header button should render when configured')
+  await extBtn.props.onClick()
+  await nextTick()
+
+  assert.ok(videos[0].pauses > 0, 'Built-in video must pause before handing off to external player')
+  assert.equal(launches[0].taskId, 'task-42')
+  assert.equal(bridged[0].target, 'content://downloads/42')
+  assert.equal(player.pendingExternalWatch?.animeUrl, 'https://example.org/local-anime')
+
+  player.dismissExternalWatch()
+  assert.equal(player.pendingExternalWatch, null)
   player.closePlayer()
   await nextTick()
 })

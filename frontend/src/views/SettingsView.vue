@@ -188,6 +188,7 @@
               </div>
             </div>
           </section>
+          <ExternalPlayerSettings />
         </div>
 
         <!-- Onglet 2 : Téléchargements & Bande Passante -->
@@ -947,6 +948,7 @@ import { useStartupStore } from '@/stores/startup'
 import ProxyPoolSettings from '@/components/ProxyPoolSettings.vue'
 import BrowserVerificationSettings from '@/components/BrowserVerificationSettings.vue'
 import AndroidStorageSettings from '@/components/AndroidStorageSettings.vue'
+import ExternalPlayerSettings from '@/components/ExternalPlayerSettings.vue'
 import { useRoute } from 'vue-router'
 
 const i18nStore = useI18nStore()

@@ -33,6 +33,7 @@
 
     <!-- Global Video Streaming Modal -->
     <VideoPlayerModal />
+    <ExternalWatchPrompt />
     <AppNotifications />
   </div>
 </template>
@@ -49,6 +50,7 @@ import AppTopbar from '@/components/AppTopbar.vue'
 import AppBottomNav from '@/components/AppBottomNav.vue'
 import CommandPaletteModal from '@/components/CommandPaletteModal.vue'
 import VideoPlayerModal from '@/components/VideoPlayerModal.vue'
+import ExternalWatchPrompt from '@/components/ExternalWatchPrompt.vue'
 import { useDownloadStore } from '@/stores/downloads'
 import { useI18nStore } from '@/stores/i18n'
 import { usePlayerStore } from '@/stores/player'
@@ -76,6 +78,7 @@ watch(
     if (screen === 'app') {
       downloadStore.startSSE()
       void downloadStore.fetchTasks()
+      void playerStore.loadExternalPlayerConfig()
       if (bookmarkPending) {
         bookmarkPending = false
         // Mount the palette before opening it so its open watcher can restore

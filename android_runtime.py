@@ -166,6 +166,7 @@ def start(data_dir, cache_dir, port, token, test_mode=False):
     seanime_runtime.configure_android(jclass("com.animan.app.SeanimeJsBridge"))
     platform_events.storage_status_handler = lambda: json.loads(str(storage.status()))
     platform_events.storage_action_handler = lambda action: json.loads(str(storage.request(action)))
+    platform_events.exported_copy_exists_handler = lambda uri: bool(hooks.exportedCopyExists(uri))
     extension_bridge = jclass("com.animan.app.ExtensionBridge")
     platform_events.app_update_install_handler = lambda path: json.loads(str(extension_bridge.installAppUpdate(path)))
     import run

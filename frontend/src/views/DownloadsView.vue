@@ -848,6 +848,16 @@
               </svg>
             </button>
             <button
+              v-if="playerStore.canLaunchExternal"
+              class="btn btn-secondary btn-sm btn-icon"
+              :disabled="playerStore.externalLaunching"
+              :aria-label="tx('Ouvrir dans un lecteur externe')"
+              :title="tx('Ouvrir dans un lecteur externe')"
+              @click="playTaskExternal(task)"
+            >
+              <ExternalLink :size="15" aria-hidden="true" />
+            </button>
+            <button
               class="btn btn-sm btn-icon"
               :aria-label="tx('Vérifier l\'intégrité du fichier MP4')"
               :title="tx('Vérifier l\'intégrité du fichier MP4')"
@@ -1033,7 +1043,7 @@
 </template>
 
 <script setup lang="ts">
-import { Zap } from 'lucide-vue-next'
+import { ExternalLink, Zap } from 'lucide-vue-next'
 import { language, tx } from '@/utils/locale'
 import { resolveImageUrl } from '@/utils/media'
 import ProxyRotationButton from '@/components/ProxyRotationButton.vue'
@@ -1124,6 +1134,7 @@ async function performAction(action: () => Promise<unknown>) {
 }
 
 onMounted(async () => {
+  void playerStore.loadExternalPlayerConfig()
   api
     .getAndroidStorage()
     .then((state) => {
@@ -1567,7 +1578,7 @@ function normalizeAnimeKey(name?: string | null): string {
   return (name || '').trim().toLowerCase()
 }
 
-function playTask(task: DownloadTask) {
+function buildTaskPlaylist(task: DownloadTask): Episode[] {
   const targetAnime = normalizeAnimeKey(task.animeName)
   const targetVer = (task.version || '').trim().toUpperCase()
   const targetSource = (task.source || '').trim().toLowerCase()
@@ -1591,12 +1602,60 @@ function playTask(task: DownloadTask) {
       downloadTaskId: t.id,
     })
   }
+  return playlist
+}
+
+function resolveTaskAnimeUrl(task: DownloadTask): string {
+  if (task.animeUrl) return task.animeUrl
+  const match = libraryStore.favorites.find(
+    (fav) => normalizeAnimeKey(fav.title) === normalizeAnimeKey(task.animeName),
+  )
+  return match?.url || ''
+}
+
+async function launchTaskExternal(task: DownloadTask): Promise<boolean> {
+  try {
+    const res = await playerStore.launchEpisodeExternal({
+      title: task.animeName,
+      animeUrl: resolveTaskAnimeUrl(task),
+      source: task.source || 'local',
+      episode: {
+        number: task.episodeNumber,
+        title: task.fileName || `Épisode ${task.episodeNumber}`,
+        version: task.version || '',
+        isDownloaded: true,
+        downloadTaskId: task.id,
+      },
+      allEpisodes: buildTaskPlaylist(task),
+      taskId: task.id,
+    })
+    showToast(`${tx('Ouverture dans')} ${res.player}`, 'info')
+    return true
+  } catch (err) {
+    showToast(
+      err instanceof Error ? err.message : 'Impossible d’ouvrir le lecteur externe.',
+      'error',
+    )
+    return false
+  }
+}
+
+async function playTaskExternal(task: DownloadTask) {
+  await launchTaskExternal(task)
+}
+
+async function playTask(task: DownloadTask) {
+  const playlist = buildTaskPlaylist(task)
+  if (playerStore.prefersExternal) {
+    if (await launchTaskExternal(task)) return
+  }
   void playerStore.playLocalFile(
     task.id,
     task.animeName,
     task.episodeNumber,
     task.fileName,
     playlist,
+    resolveTaskAnimeUrl(task),
   )
 }
 

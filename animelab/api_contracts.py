@@ -417,6 +417,39 @@ class ProxyImport(WireModel):
     pool: ProxyPool
 
 
+class DetectedExternalPlayerResponse(WireModel):
+    id: str
+    label: str
+    path: str = ''
+
+
+class ExternalPlayerSettingsResponse(WireModel):
+    available: bool
+    platform: Literal['desktop', 'android']
+    clientLocal: bool
+    preset: Literal['none', 'mpv', 'vlc', 'custom', 'system'] = 'none'
+    customPath: str = ''
+    preferExternal: bool = False
+    configured: bool = False
+    resolvedPath: str | None = None
+    detected: list[DetectedExternalPlayerResponse] = []
+
+
+class AndroidExternalIntentResponse(WireModel):
+    kind: Literal['uri', 'file', 'url']
+    target: str
+    mimeType: str
+    title: str = ''
+    subtitleUri: str | None = None
+
+
+class ExternalPlayerLaunchResponse(Result):
+    mode: Literal['desktop_process', 'android_intent']
+    player: str
+    targetKind: Literal['file', 'stream']
+    androidIntent: AndroidExternalIntentResponse | None = None
+
+
 HomeFeed.model_rebuild()
 
 
@@ -450,6 +483,9 @@ RESPONSES = {
     'android_storage_action': StorageState, 'android_export_download': Result,
     'get_settings': DownloadSettings, 'get_proxy_settings': ProxySettings,
     'get_subtitles_list': list[SubtitleTrack], 'resolve_stream': StreamResponse,
+    'get_external_player_settings': ExternalPlayerSettingsResponse,
+    'save_external_player_settings': ExternalPlayerSettingsResponse,
+    'launch_external_player': ExternalPlayerLaunchResponse,
     'list_extensions_api': ExtensionList, 'list_catalogues': CatalogueSources,
     'catalogue_filters': CatalogueFilters, 'browse_catalogue': CataloguePage,
     'sessions': NetworkOptions, 'start': VerificationJob, 'complete': VerificationResult, 'recheck': VerificationResult,

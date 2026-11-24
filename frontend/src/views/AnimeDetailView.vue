@@ -564,6 +564,18 @@
                 <svg viewBox="0 0 24 24"><path d="M7 4v16l13-8Z" /></svg>
               </button>
 
+              <button
+                v-if="playerStore.canLaunchExternal"
+                type="button"
+                class="btn btn-icon btn-secondary"
+                :disabled="playerStore.externalLaunching"
+                :aria-label="tx(`Ouvrir l’épisode ${ep.number} dans un lecteur externe`)"
+                :title="tx('Ouvrir dans un lecteur externe')"
+                @click.stop="playEpisodeExternal(ep)"
+              >
+                <ExternalLink :size="15" aria-hidden="true" />
+              </button>
+
               <!-- Bouton Téléchargement Circulaire -->
               <button
                 v-if="ep.isDownloaded"
@@ -691,7 +703,7 @@
 import { tx } from '@/utils/locale'
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Building2, Clock, Languages } from 'lucide-vue-next'
+import { Building2, Clock, ExternalLink, Languages } from 'lucide-vue-next'
 import { useAnimeStore } from '@/stores/anime'
 import { usePlayerStore } from '@/stores/player'
 import { useDownloadStore } from '@/stores/downloads'
@@ -963,12 +975,42 @@ watch(
 )
 
 onMounted(() => {
+  void playerStore.loadExternalPlayerConfig()
   fetchDetail()
 })
 onUnmounted(() => animeStore.clearDetail())
 
-function playEpisode(ep: Episode) {
+async function launchEpisodeExternal(ep: Episode): Promise<boolean> {
+  if (!detail.value) return false
+  try {
+    const res = await playerStore.launchEpisodeExternal({
+      title: detail.value.anime.title,
+      animeUrl: detail.value.anime.url,
+      source: detail.value.source,
+      episode: ep,
+      allEpisodes: detail.value.anime.episodes,
+      taskId: ep.isDownloaded ? ep.downloadTaskId : null,
+    })
+    showToast(`${tx('Ouverture dans')} ${res.player}`, 'info')
+    return true
+  } catch (err) {
+    showToast(
+      err instanceof Error ? err.message : 'Impossible d’ouvrir le lecteur externe.',
+      'error',
+    )
+    return false
+  }
+}
+
+async function playEpisodeExternal(ep: Episode) {
+  await launchEpisodeExternal(ep)
+}
+
+async function playEpisode(ep: Episode) {
   if (!detail.value) return
+  if (playerStore.prefersExternal) {
+    if (await launchEpisodeExternal(ep)) return
+  }
   playerStore.openPlayer(
     detail.value.anime.title,
     detail.value.anime.url,
