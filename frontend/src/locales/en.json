@@ -1340,5 +1340,19 @@
   "Résultats de recherche :": "Search results:",
   "Épisodes :": "Episodes:",
   "Flux vidéo :": "Video streams:",
-  "Exemples :": "Samples:"
+  "Exemples :": "Samples:",
+  "Communauté & support": "Community & Support",
+  "Rejoignez le groupe Telegram officiel d’AnimeLab pour obtenir de l’aide, suivre les nouveautés et partager vos retours.": "Join the official AnimeLab Telegram group for support, release updates, and feedback.",
+  "Rejoindre le groupe Telegram": "Join the Telegram group",
+  "Facultatif — vous pouvez rejoindre le groupe plus tard depuis Paramètres → À propos.": "Optional — you can also join later from Settings → About.",
+  "À propos": "About",
+  "À propos d’AnimeLab": "About AnimeLab",
+  "Application multiplateforme pour découvrir, regarder, télécharger et organiser vos animés.": "Cross-platform application to discover, watch, download, and organize anime.",
+  "Version installée": "Installed version",
+  "Version active du moteur et de l’interface.": "Active version of the engine and interface.",
+  "Plateforme": "Platform",
+  "Environnement d’exécution actuel.": "Current runtime environment.",
+  "Chaîne d’annonces Telegram": "Telegram announcements channel",
+  "Liens utiles & licence": "Useful links & license",
+  "Local (Disque)": "Local (Disk)"
 }

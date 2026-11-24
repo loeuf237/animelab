@@ -247,3 +247,51 @@ test('a desktop folder is saved only after a successful validation', async ({ pa
   expect(saved).toEqual(['/home/test/Videos/AnimeLab'])
   await expect(page.getByRole('button', { name: 'Commencer', exact: true })).toBeEnabled()
 })
+
+for (const width of [320, 1440]) {
+  test(`Telegram group invitation appears in onboarding and Settings About at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 850 })
+    const { state } = await installation(page, { lang: 'fr' })
+    await page.goto('/app/')
+    await page.getByRole('button', { name: 'Suivant', exact: true }).click()
+    await page.getByRole('button', { name: 'Utiliser le dossier du serveur' }).click()
+
+    const onboardingLink = page.locator('a[href="https://t.me/AnimeLabGroup"]')
+    await expect(onboardingLink).toBeVisible()
+    await expect(onboardingLink).toHaveAttribute('target', '_blank')
+    await expect(onboardingLink).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
+      true,
+    )
+
+    // Onboarding remains non-blocking: clicking Get started completes setup directly.
+    await page.getByRole('button', { name: 'Commencer', exact: true }).click()
+    await expect(page).toHaveURL(/\/library$/)
+    expect(state.preferences.onboardingCompleted).toBe(true)
+
+    await page.goto('/app/settings?tab=about')
+    const aboutLink = page.locator('a[href="https://t.me/AnimeLabGroup"]')
+    await expect(aboutLink).toBeVisible()
+    await expect(aboutLink).toHaveAttribute('target', '_blank')
+    await expect(aboutLink).toHaveAttribute('rel', 'noopener noreferrer')
+    await expect(page.getByText('0.1.6-beta.3', { exact: true })).toBeVisible()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
+      true,
+    )
+  })
+}
+
+test('English Settings About section shows translated labels and Telegram link', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await installation(page, { completed: true, lang: 'en' })
+  await page.goto('/app/settings')
+  await page.locator('.settings-nav-tab', { hasText: 'About' }).click()
+  await expect(page.getByRole('heading', { name: 'About AnimeLab' })).toBeVisible()
+  const tgLink = page.getByRole('link', { name: 'Join the Telegram group' })
+  await expect(tgLink).toBeVisible()
+  await expect(tgLink).toHaveAttribute('href', 'https://t.me/AnimeLabGroup')
+})

@@ -130,6 +130,35 @@
   color: var(--muted);
   margin-top: 0;
 }
+.setup-card + .setup-card {
+  margin-top: 16px;
+}
+.community-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.community-card-head .setup-card-icon {
+  flex-shrink: 0;
+  margin-bottom: 0;
+}
+.community-card-head p {
+  margin-bottom: 0;
+}
+.telegram-cta {
+  text-decoration: none;
+  white-space: normal;
+  line-height: 1.35;
+}
+.telegram-cta svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+}
+.community-card .setup-fine-print {
+  margin-top: 12px !important;
+}
 .appearance-card h2 {
   margin-bottom: 18px;
 }

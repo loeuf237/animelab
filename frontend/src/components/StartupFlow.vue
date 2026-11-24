@@ -258,6 +258,38 @@
               }}
             </p>
           </div>
+          <div v-if="isLastStep" class="setup-card community-card">
+            <div class="community-card-head">
+              <MessageCircle class="setup-card-icon" aria-hidden="true" />
+              <div>
+                <h2>{{ tx('Communauté & support') }}</h2>
+                <p>
+                  {{
+                    tx(
+                      'Rejoignez le groupe Telegram officiel d’AnimeLab pour obtenir de l’aide, suivre les nouveautés et partager vos retours.',
+                    )
+                  }}
+                </p>
+              </div>
+            </div>
+            <a
+              class="setup-outlined telegram-cta"
+              href="https://t.me/AnimeLabGroup"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <MessageCircle aria-hidden="true" />
+              <span>{{ tx('Rejoindre le groupe Telegram') }}</span>
+              <ExternalLink aria-hidden="true" />
+            </a>
+            <p class="setup-fine-print">
+              {{
+                tx(
+                  'Facultatif — vous pouvez rejoindre le groupe plus tard depuis Paramètres → À propos.',
+                )
+              }}
+            </p>
+          </div>
         </template>
         <p v-if="error || flow.error" class="setup-error" role="alert">
           {{ tx(error || flow.error) }}
@@ -352,6 +384,7 @@ import {
   ExternalLink,
   Folder,
   FolderOpen,
+  MessageCircle,
   PackageOpen,
   RefreshCw,
   Rocket,

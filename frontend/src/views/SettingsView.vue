@@ -24,6 +24,7 @@
         <option value="sources">Sources</option>
         <option value="storage">{{ tx('Système & Stockage') }}</option>
         <option value="proxy">{{ tx('Proxy & Réseau') }}</option>
+        <option value="about">{{ tx('À propos') }}</option>
       </select>
     </label>
     <div class="settings-layout-grid">
@@ -76,6 +77,16 @@
         >
           <Network :size="17" aria-hidden="true" />
           <span>{{ tx('Proxy & Réseau') }}</span>
+        </button>
+
+        <button
+          type="button"
+          class="settings-nav-tab"
+          :class="{ active: currentTab === 'about' }"
+          @click="currentTab = 'about'"
+        >
+          <Info :size="17" aria-hidden="true" />
+          <span>{{ tx('À propos') }}</span>
         </button>
       </nav>
 
@@ -779,6 +790,130 @@
             </div>
           </section>
         </div>
+
+        <!-- Onglet 6 : À propos & Communauté -->
+        <div
+          v-show="currentTab === 'about'"
+          class="settings-tab-pane"
+          :class="{ active: currentTab === 'about' }"
+        >
+          <section class="settings-card-pro">
+            <div class="settings-card-header-pro about-header-pro">
+              <img :src="brandIcon" alt="" class="about-brand-icon" />
+              <div>
+                <h2 class="settings-card-title-pro">{{ tx('À propos d’AnimeLab') }}</h2>
+                <p class="settings-card-sub-pro">
+                  {{
+                    tx(
+                      'Application multiplateforme pour découvrir, regarder, télécharger et organiser vos animés.',
+                    )
+                  }}
+                </p>
+              </div>
+            </div>
+
+            <div class="setting-row-pro">
+              <div class="setting-meta-pro">
+                <div class="setting-title-pro">{{ tx('Version installée') }}</div>
+                <div class="setting-desc-pro">
+                  {{ tx('Version active du moteur et de l’interface.') }}
+                </div>
+              </div>
+              <div class="setting-ctrl-pro">
+                <span class="chip">{{ startupStore.snapshot?.currentVersion || '—' }}</span>
+              </div>
+            </div>
+
+            <div class="setting-row-pro">
+              <div class="setting-meta-pro">
+                <div class="setting-title-pro">{{ tx('Plateforme') }}</div>
+                <div class="setting-desc-pro">{{ tx('Environnement d’exécution actuel.') }}</div>
+              </div>
+              <div class="setting-ctrl-pro">
+                <span class="chip chip-source">{{ platformLabel }}</span>
+              </div>
+            </div>
+
+            <div class="setting-row-pro">
+              <div class="setting-meta-pro">
+                <div class="setting-title-pro">{{ tx('Communauté & support') }}</div>
+                <div class="setting-desc-pro">
+                  {{
+                    tx(
+                      'Rejoignez le groupe Telegram officiel d’AnimeLab pour obtenir de l’aide, suivre les nouveautés et partager vos retours.',
+                    )
+                  }}
+                </div>
+              </div>
+              <div class="setting-ctrl-pro about-links-row">
+                <a
+                  class="btn btn-primary about-link-btn"
+                  href="https://t.me/AnimeLabGroup"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <MessageCircle :size="16" aria-hidden="true" />
+                  <span>{{ tx('Rejoindre le groupe Telegram') }}</span>
+                  <ExternalLink :size="14" aria-hidden="true" />
+                </a>
+                <a
+                  class="btn btn-secondary about-link-btn"
+                  href="https://t.me/animelabchannel"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <span>{{ tx('Chaîne d’annonces Telegram') }}</span>
+                  <ExternalLink :size="14" aria-hidden="true" />
+                </a>
+              </div>
+            </div>
+
+            <div class="setting-row-pro" style="border-bottom: none">
+              <div class="setting-meta-pro">
+                <div class="setting-title-pro">{{ tx('Liens utiles & licence') }}</div>
+                <div class="setting-desc-pro">GNU General Public License v3 (GPL-3.0-only)</div>
+              </div>
+              <div class="setting-ctrl-pro about-links-row">
+                <a
+                  class="btn btn-secondary btn-sm about-link-btn"
+                  href="https://github.com/loeuf237/animelab"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <span>GitHub</span>
+                  <ExternalLink :size="14" aria-hidden="true" />
+                </a>
+                <a
+                  class="btn btn-secondary btn-sm about-link-btn"
+                  href="https://github.com/loeuf237/animelab/releases"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <span>{{ tx('Versions') }}</span>
+                  <ExternalLink :size="14" aria-hidden="true" />
+                </a>
+                <a
+                  class="btn btn-secondary btn-sm about-link-btn"
+                  href="https://github.com/loeuf237/animelab/issues"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <span>Issues</span>
+                  <ExternalLink :size="14" aria-hidden="true" />
+                </a>
+                <a
+                  class="btn btn-secondary btn-sm about-link-btn"
+                  href="https://github.com/loeuf237/animelab/discussions"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <span>Discussions</span>
+                  <ExternalLink :size="14" aria-hidden="true" />
+                </a>
+              </div>
+            </div>
+          </section>
+        </div>
       </div>
     </div>
 
@@ -788,7 +923,18 @@
 
 <script setup lang="ts">
 import DiagnosticsExport from '@/components/DiagnosticsExport.vue'
-import { Download, Film, Globe, HardDrive, Network, Save } from 'lucide-vue-next'
+import brandIcon from '@/assets/brand-icon.png'
+import {
+  Download,
+  ExternalLink,
+  Film,
+  Globe,
+  HardDrive,
+  Info,
+  MessageCircle,
+  Network,
+  Save,
+} from 'lucide-vue-next'
 import { tx } from '@/utils/locale'
 import { themeMode, palette } from '@/stores/appearance'
 import ThemePicker from '@/components/ThemePicker.vue'
@@ -797,16 +943,26 @@ import { useNotifications } from '@/stores/notifications'
 import { ref, computed, onMounted } from 'vue'
 import { api } from '@/api/client'
 import { useI18nStore } from '@/stores/i18n'
+import { useStartupStore } from '@/stores/startup'
 import ProxyPoolSettings from '@/components/ProxyPoolSettings.vue'
 import BrowserVerificationSettings from '@/components/BrowserVerificationSettings.vue'
 import AndroidStorageSettings from '@/components/AndroidStorageSettings.vue'
 import { useRoute } from 'vue-router'
 
 const i18nStore = useI18nStore()
+const startupStore = useStartupStore()
 
-const currentTab = ref<'general' | 'downloads' | 'sources' | 'storage' | 'proxy'>('general')
+const currentTab = ref<'general' | 'downloads' | 'sources' | 'storage' | 'proxy' | 'about'>(
+  'general',
+)
 if (useRoute().query.tab === 'proxy') currentTab.value = 'proxy'
 if (useRoute().query.tab === 'storage') currentTab.value = 'storage'
+if (useRoute().query.tab === 'about') currentTab.value = 'about'
+
+const platformLabel = computed(() => {
+  const parts = [startupStore.snapshot?.runtime, startupStore.snapshot?.os].filter(Boolean)
+  return parts.length ? parts.join(' · ') : 'web'
+})
 const activeSourceTab = ref<'voir-anime' | 'animepahe' | 'french-manga'>('voir-anime')
 
 const uaSelection = ref('Random (Rotator)')
@@ -1103,5 +1259,24 @@ onMounted(() => {
   background: rgba(239, 68, 68, 0.2);
   color: #f87171;
   border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.about-brand-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.about-links-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.about-link-btn {
+  text-decoration: none;
+  white-space: normal;
+  min-height: 44px;
 }
 </style>

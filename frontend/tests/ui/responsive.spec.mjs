@@ -116,6 +116,7 @@ for (const width of [320, 360, 390, 412, 768, 769, 900, 1024, 1440])
           'sources',
           'storage',
           'proxy',
+          'about',
         ].entries()) {
           if (width <= 768)
             await page.locator('.settings-section-select select').selectOption(section)
@@ -300,3 +301,74 @@ for (const [width, height] of [
     await page.keyboard.press('Escape')
     await expect(search).toBeHidden()
   })
+
+for (const [width, height] of [
+  [360, 780],
+  [780, 360],
+  [1440, 900],
+]) {
+  test(`player next/prev episode works for local downloads and fits ${width}x${height}`, async ({
+    page,
+  }) => {
+    const completedTasks = [1, 2].map((ep) => ({
+      id: 100 + ep,
+      animeName: 'Sample Series',
+      animeUrl: 'https://example.test/sample',
+      episodeNumber: ep,
+      fileName: `Sample Series - Episode ${ep} [VF].mp4`,
+      source: 'french-manga',
+      version: 'VF',
+      selectedQuality: '1080p',
+      status: 'COMPLETED',
+      totalBytes: 100000000,
+      downloadedBytes: 100000000,
+      speedBytes: 0,
+      progress: 100,
+      verificationStatus: 'VALID',
+      formattedDuration: '24m 00s',
+      exportStatus: 'NOT_REQUESTED',
+    }))
+    await page.setViewportSize({ width, height })
+    await mockApp(page, { taskList: completedTasks })
+    await page.route('**/api/media/subtitles/**', (route) => route.fulfill({ json: [] }))
+    await page.route('**/api/media/stream/*', (route) =>
+      route.fulfill({ status: 200, contentType: 'video/mp4', body: '' }),
+    )
+    await page.goto('/app/downloads')
+    await page.locator('.download-tabs > button').nth(1).click()
+    await expect(page.locator('.task-row-card')).toHaveCount(2)
+    await page.locator('.task-row-card').first().locator('button[title*="Lire"]').click()
+
+    const modal = page.locator('.player-modal')
+    await expect(modal).toBeVisible()
+    await expect(modal.locator('.episode-title')).toContainText('Épisode 1')
+    const nextBtn = modal.getByRole('button', { name: 'Épisode suivant' })
+    const prevBtn = modal.getByRole('button', { name: 'Épisode précédent' })
+    await expect(prevBtn).toBeDisabled()
+    await expect(nextBtn).toBeEnabled()
+
+    const bounds = await modal.boundingBox()
+    expect(bounds.x).toBeGreaterThanOrEqual(0)
+    expect(bounds.y).toBeGreaterThanOrEqual(0)
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(height + 1)
+    const nextBox = await nextBtn.boundingBox()
+    expect(nextBox.y + nextBox.height).toBeLessThanOrEqual(height + 1)
+    await noOverflow(page)
+
+    await nextBtn.click()
+    await expect(modal.locator('.episode-title')).toContainText('Épisode 2')
+    await expect(modal.locator('video.video-element')).toHaveAttribute(
+      'src',
+      '/api/media/stream/102',
+    )
+    await expect(prevBtn).toBeEnabled()
+    await expect(nextBtn).toBeDisabled()
+
+    await prevBtn.click()
+    await expect(modal.locator('.episode-title')).toContainText('Épisode 1')
+    await expect(modal.locator('video.video-element')).toHaveAttribute(
+      'src',
+      '/api/media/stream/101',
+    )
+  })
+}
