@@ -86,7 +86,8 @@
           </div>
 
           <button
-            class="btn-icon"
+            type="button"
+            class="btn-icon player-close-btn"
             :title="tx('Fermer (Échap)')"
             :aria-label="tx('Fermer (Échap)')"
             @click="playerStore.closePlayer"
@@ -105,7 +106,9 @@
           controls
           autoplay
           playsinline
-          crossorigin="anonymous"
+          webkit-playsinline
+          :crossorigin="videoCrossOrigin"
+          @play="onPlay"
           @timeupdate="onTimeUpdate"
           @loadedmetadata="onMetadataLoaded"
           @pause="checkpoint"
@@ -145,7 +148,9 @@
             <line x1="12" y1="16" x2="12.01" y2="16"></line>
           </svg>
           <p>{{ tx(playerStore.error) }}</p>
-          <button class="btn-primary" @click="retryPlayback">{{ tx('Réessayer') }}</button>
+          <button type="button" class="btn btn-primary" @click="retryPlayback">
+            {{ tx('Réessayer') }}
+          </button>
         </div>
       </div>
 
@@ -158,7 +163,8 @@
       </div>
       <div class="player-footer">
         <button
-          class="btn-secondary"
+          type="button"
+          class="btn btn-secondary"
           :disabled="!playerStore.hasPrev"
           @click="playerStore.playPrev"
         >
@@ -171,7 +177,12 @@
           {{ tx(playerStore.serverType || 'Direct') }}
         </span>
 
-        <button class="btn-primary" :disabled="!playerStore.hasNext" @click="playerStore.playNext">
+        <button
+          type="button"
+          class="btn btn-primary"
+          :disabled="!playerStore.hasNext"
+          @click="playerStore.playNext"
+        >
           {{ tx('Épisode suivant') }}
           <SkipForward :size="15" aria-hidden="true" />
         </button>
@@ -210,6 +221,27 @@ function ownsMedia() {
 const hasQualities = computed(() => {
   return Object.keys(playerStore.availableQualities || {}).length > 1
 })
+
+const videoCrossOrigin = computed(() =>
+  playerStore.videoUrl?.startsWith('/') || playerStore.subtitles.length > 0
+    ? 'anonymous'
+    : undefined,
+)
+
+function setKeepScreenOn(enabled: boolean) {
+  if (typeof window === 'undefined') return
+  try {
+    ;(
+      window as Window & { AnimeLabAndroid?: { setKeepScreenOn?: (value: boolean) => void } }
+    ).AnimeLabAndroid?.setKeepScreenOn?.(enabled)
+  } catch {
+    /* ignore unavailable Android hook */
+  }
+}
+
+function onPlay() {
+  setKeepScreenOn(true)
+}
 
 function syncSubtitleTracks() {
   if (!videoRef.value) return
@@ -318,11 +350,13 @@ function refreshAudioTracks() {
   }
 }
 function checkpoint() {
+  setKeepScreenOn(false)
   if (!videoRef.value || !ownsMedia()) return
   playerStore.recordTime(videoRef.value.currentTime, videoRef.value.duration)
   void playerStore.savePlayback(true)
 }
 function onEnded() {
+  setKeepScreenOn(false)
   if (!ownsMedia()) return
   if (videoRef.value) playerStore.recordTime(videoRef.value.currentTime, videoRef.value.duration)
   void playerStore.savePlayback(true, true)
@@ -335,6 +369,7 @@ watch(
 )
 
 function releaseVideo() {
+  setKeepScreenOn(false)
   attachedUrl = null
   attachedEpoch = -1
   if (hlsInstance) {
@@ -360,7 +395,9 @@ function setupVideo(url: string | null) {
   const owner = attachedVideo,
     epoch = attachedEpoch
 
-  const isHls = url.includes('.m3u8')
+  const isHls = playerStore.isHls || url.includes('.m3u8')
+  let networkRetries = 0
+  let mediaRetries = 0
 
   if (isHls && Hls.isSupported()) {
     hlsInstance = new Hls({
@@ -376,10 +413,31 @@ function setupVideo(url: string | null) {
       refreshAudioTracks()
     })
     hlsInstance.on(Hls.Events.ERROR, (_event, data) => {
-      if (data.fatal && owner === attachedVideo && epoch === attachedEpoch && url === attachedUrl) {
-        playerStore.error =
-          'Impossible de lire ce flux vidéo. Réessayez ou choisissez un autre serveur.'
+      if (owner !== attachedVideo || epoch !== attachedEpoch || url !== attachedUrl) return
+      if (!data.fatal) return
+      if (
+        hlsInstance &&
+        Hls.ErrorTypes?.NETWORK_ERROR &&
+        data.type === Hls.ErrorTypes.NETWORK_ERROR &&
+        networkRetries < 1
+      ) {
+        networkRetries++
+        hlsInstance.startLoad()
+        return
       }
+      if (
+        hlsInstance &&
+        Hls.ErrorTypes?.MEDIA_ERROR &&
+        data.type === Hls.ErrorTypes.MEDIA_ERROR &&
+        mediaRetries < 1
+      ) {
+        mediaRetries++
+        hlsInstance.recoverMediaError()
+        return
+      }
+      setKeepScreenOn(false)
+      playerStore.error =
+        'Impossible de lire ce flux vidéo. Réessayez ou choisissez un autre serveur.'
     })
   } else {
     videoRef.value.src = url
@@ -480,55 +538,62 @@ onUnmounted(() => {
   window.removeEventListener('pagehide', checkpoint)
   checkpoint()
   releaseVideo()
+  setKeepScreenOn(false)
 })
 </script>
 
 <style scoped>
 .playback-notice {
   margin: 0;
-  padding: 8px 16px;
-  color: var(--muted);
+  padding: 6px 20px;
+  color: #cbd5e1;
   font-size: 0.85rem;
+  flex-shrink: 0;
 }
 .player-overlay {
   position: fixed;
   inset: 0;
+  height: 100dvh;
   background: rgba(0, 0, 0, 0.88);
   backdrop-filter: blur(10px);
   z-index: 300;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px))
+    max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
   animation: fadeIn 0.25s ease;
 }
 
 .player-modal {
+  color-scheme: dark;
   width: 100%;
   max-width: 1100px;
-  max-height: 92vh;
+  max-height: 94dvh;
   display: flex;
   flex-direction: column;
-  background: rgba(14, 18, 30, 0.95);
-  border: 1px solid var(--border-highlight);
-  box-shadow:
-    0 20px 60px rgba(0, 0, 0, 0.8),
-    var(--accent-glow);
-  border-radius: var(--radius-lg);
+  background: rgba(14, 18, 30, 0.96);
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+  border-radius: var(--radius, 12px);
   overflow: hidden;
 }
 
 .player-header {
-  padding: 14px 20px;
+  flex-shrink: 0;
+  padding: 12px 18px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
 }
 
 .header-info {
+  flex: 1 1 200px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -536,7 +601,9 @@ onUnmounted(() => {
 }
 
 .anime-title {
-  font-size: 1.15rem;
+  margin: 0;
+  color: #f8fafc;
+  font-size: 1.1rem;
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
@@ -544,6 +611,10 @@ onUnmounted(() => {
 }
 
 .local-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
   font-size: 0.72rem;
   background: rgba(16, 185, 129, 0.2);
   color: #34d399;
@@ -555,7 +626,10 @@ onUnmounted(() => {
 
 .episode-title {
   font-size: 0.85rem;
-  color: var(--accent-secondary);
+  color: #93c5fd;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .header-actions {
@@ -565,27 +639,52 @@ onUnmounted(() => {
   flex-wrap: wrap;
 }
 
+.player-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+  cursor: pointer;
+}
+
+.player-close-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
 .select-group {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 0.82rem;
-  color: var(--text-muted);
+  color: #cbd5e1;
 }
 
 .header-select {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  color: var(--text-main);
-  padding: 4px 8px;
+  background: #171c2c;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-sm, 8px);
+  color: #f8fafc;
+  padding: 6px 10px;
   font-size: 0.82rem;
   outline: none;
 }
 
+.header-select option {
+  background: #171c2c;
+  color: #f8fafc;
+}
+
 .player-body {
   position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
   width: 100%;
+  max-height: 70dvh;
   aspect-ratio: 16 / 9;
   background: #000;
   display: flex;
@@ -602,24 +701,26 @@ onUnmounted(() => {
 .player-state-overlay {
   position: absolute;
   inset: 0;
+  padding: 20px;
+  text-align: center;
   background: rgba(10, 13, 20, 0.9);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 16px;
-  color: var(--text-main);
+  color: #f8fafc;
 }
 
 .player-state-overlay.error {
-  color: var(--color-danger);
+  color: #fda4af;
 }
 
 .spinner {
   width: 44px;
   height: 44px;
-  border: 3px solid rgba(var(--accent-rgb), 0.22);
-  border-top-color: var(--accent);
+  border: 3px solid rgba(var(--accent-rgb, 56, 189, 248), 0.22);
+  border-top-color: var(--accent, #38bdf8);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -631,32 +732,148 @@ onUnmounted(() => {
 }
 
 .player-footer {
-  padding: 14px 20px;
+  flex-shrink: 0;
+  padding: 12px 18px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-top: 1px solid var(--border-subtle);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
   flex-wrap: wrap;
   gap: 10px;
 }
 
-.player-footer button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.player-footer .btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #f8fafc;
+}
+
+.player-footer .btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.player-footer button:disabled {
+  opacity: 0.4 !important;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .source-tag {
   font-size: 0.82rem;
-  color: var(--text-dim);
+  color: #94a3b8;
+  text-align: center;
 }
-</style>
 
-<style scoped>
 .player-verification {
   flex-shrink: 0;
-  max-height: 35vh;
+  max-height: 35dvh;
   overflow: auto;
   padding: 0.75rem;
+}
+
+@media (max-width: 768px) {
+  .player-overlay {
+    padding: max(8px, env(safe-area-inset-top, 0px)) max(8px, env(safe-area-inset-right, 0px))
+      max(8px, env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px));
+  }
+
+  .player-modal {
+    max-height: 96dvh;
+  }
+
+  .player-header {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .anime-title {
+    font-size: 1rem;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .select-group {
+    flex: 1 1 130px;
+    min-width: 0;
+  }
+
+  .header-select {
+    flex: 1;
+    min-width: 0;
+    min-height: 40px;
+  }
+
+  .player-close-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .player-footer {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .source-tag {
+    order: -1;
+    flex: 1 0 100%;
+    font-size: 0.78rem;
+  }
+
+  .player-footer button {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .player-overlay {
+    padding: 0;
+  }
+
+  .player-modal {
+    max-width: none;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    border: 0;
+  }
+
+  .player-header {
+    padding: 6px 12px;
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+
+  .anime-title {
+    font-size: 0.95rem;
+  }
+
+  .player-body {
+    flex: 1 1 0;
+    max-height: none;
+    aspect-ratio: auto;
+  }
+
+  .player-footer {
+    padding: 6px 12px;
+    flex-wrap: nowrap;
+  }
+
+  .source-tag {
+    display: none;
+  }
+
+  .player-footer button {
+    min-height: 36px;
+    padding: 4px 12px;
+    font-size: 13px;
+  }
 }
 </style>

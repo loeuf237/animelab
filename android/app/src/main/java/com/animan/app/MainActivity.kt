@@ -10,6 +10,8 @@ import android.app.DownloadManager
 import android.provider.Settings
 import android.widget.Toast
 import android.view.ViewGroup
+import android.view.WindowManager
+import android.widget.FrameLayout
 import android.os.Build
 import android.os.Bundle
 import android.view.View
@@ -36,9 +38,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private var customView: View? = null
     private var customCallback: WebChromeClient.CustomViewCallback? = null
+    private var savedCutoutMode: Int? = null
     private var fileCallback: ValueCallback<Array<Uri>>? = null
     private var connectJob: Job? = null
     private lateinit var nativeUiBridge: NativeUiBridge
+
+    internal fun isInFullscreenVideo(): Boolean = customView != null
+
+    private fun isKeepScreenOnRequested(): Boolean =
+        ::nativeUiBridge.isInitialized && nativeUiBridge.keepScreenOnRequested
     private val backCallback = object : OnBackPressedCallback(true) {
         override fun handleOnBackPressed() {
             if (customView != null) {
@@ -115,8 +123,12 @@ class MainActivity : AppCompatActivity() {
             binding.loadingStatus,
         )
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
-            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            if (customView != null) {
+                view.setPadding(0, 0, 0, 0)
+            } else {
+                val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+                view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            }
             insets
         }
         onBackPressedDispatcher.addCallback(this, backCallback)
@@ -254,23 +266,52 @@ class MainActivity : AppCompatActivity() {
                 customView = view; customCallback = callback
                 binding.webView.visibility = View.GONE
                 binding.customViewContainer.visibility = View.VISIBLE
-                binding.customViewContainer.addView(view)
+                binding.customViewContainer.addView(
+                    view,
+                    FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                    ),
+                )
                 requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    savedCutoutMode = window.attributes.layoutInDisplayCutoutMode
+                    window.attributes = window.attributes.apply {
+                        layoutInDisplayCutoutMode =
+                            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                    }
+                }
                 WindowInsetsControllerCompat(window, window.decorView).apply {
                     systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                     hide(WindowInsetsCompat.Type.systemBars())
                 }
+                ViewCompat.requestApplyInsets(binding.root)
             }
             override fun onHideCustomView() {
+                if (customView == null) return
                 customView?.let { binding.customViewContainer.removeView(it) }
                 customView = null; customCallback?.onCustomViewHidden(); customCallback = null
                 binding.customViewContainer.visibility = View.GONE; binding.webView.visibility = View.VISIBLE
                 requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                if (!isKeepScreenOnRequested()) {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && savedCutoutMode != null) {
+                    val mode = savedCutoutMode!!
+                    savedCutoutMode = null
+                    window.attributes = window.attributes.apply { layoutInDisplayCutoutMode = mode }
+                }
                 WindowInsetsControllerCompat(window, window.decorView).show(WindowInsetsCompat.Type.systemBars())
+                ViewCompat.requestApplyInsets(binding.root)
             }
         }
     }
     override fun onDestroy() {
+        customView?.let { binding.customViewContainer.removeView(it) }
+        customCallback?.onCustomViewHidden()
+        customView = null; customCallback = null
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         if (StorageAccess.actionHandler === permissionAction) StorageAccess.actionHandler = null
         fileCallback?.onReceiveValue(null); fileCallback = null
         (binding.webView.parent as? ViewGroup)?.removeView(binding.webView)

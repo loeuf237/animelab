@@ -151,6 +151,7 @@ function onKeyDown(e: KeyboardEvent) {
     return
   }
   if (
+    playerStore.isOpen ||
     isEditableTarget(e.target) ||
     isPaletteOpen.value ||
     document.querySelector('.dialog-overlay')

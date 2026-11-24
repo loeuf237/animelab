@@ -308,6 +308,7 @@ export interface VideoStreamInfo {
   success?: boolean
   streamUrl?: string
   videoUrl?: string
+  isHls?: boolean
   serverType?: string
   availableServers?: string[]
   qualities?: Record<string, string>

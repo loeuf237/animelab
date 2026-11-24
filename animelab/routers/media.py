@@ -379,6 +379,7 @@ async def resolve_stream(
         return {
             "success": True,
             "isDownloaded": True,
+            "isHls": False,
             "sourceType": "local",
             "taskId": local_task.id,
             "streamUrl": f"/api/media/stream/{local_task.id}",
@@ -631,6 +632,8 @@ async def resolve_stream(
             }
         )
 
+    is_hls = bool(video_url and ".m3u8" in video_url.lower())
+
     # Si le flux provient de Kwik / Owocdn HLS, le router via le proxy HLS local
     if native_media:
         from animelab.services.extension_media import extension_media
@@ -662,6 +665,7 @@ async def resolve_stream(
     payload: Dict[str, Any] = {
         "success": True,
         "isDownloaded": False,
+        "isHls": is_hls,
         "sourceType": "remote",
         "streamUrl": video_url,
         "serverType": server_type,

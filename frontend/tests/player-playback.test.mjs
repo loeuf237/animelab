@@ -369,3 +369,144 @@ test('HLS audio selection restores by language and label, then saves the new cho
   player.closePlayer()
   await nextTick()
 })
+
+test('local playlist enables next and previous episode navigation across downloads', async (t) => {
+  globalThis.window = { addEventListener() {}, removeEventListener() {} }
+  setActivePinia(createPinia())
+  const opened = []
+  let resolveCalls = 0
+  api.openPlaybackSession = async (body) => {
+    opened.push(body)
+    return {
+      sessionId: String(body.taskId).padEnd(32, '0').slice(0, 32),
+      source: 'french-manga',
+      animeUrl: 'https://example.org/series',
+      episodeNumber: body.taskId === 'task-1' ? 1 : 2,
+      version: 'VF',
+      positionSeconds: 0,
+      durationSeconds: 1400,
+      selection: {
+        quality: 'Original (Local)',
+        server: 'Disque dur (Local)',
+        subtitle: 'auto',
+        audio: null,
+      },
+    }
+  }
+  api.resolveVideoStream = async () => {
+    resolveCalls++
+    return {}
+  }
+  api.getLocalSubtitles = async (taskId) => [
+    { src: `/api/media/subtitle/${taskId}/0`, srclang: 'fr', label: 'Français' },
+  ]
+  const player = usePlayerStore()
+  const { videos, app } = mountPlayer()
+  t.after(() => {
+    app.unmount()
+    delete api.openPlaybackSession
+    delete api.resolveVideoStream
+    delete api.getLocalSubtitles
+    delete globalThis.window
+  })
+
+  const playlist = [
+    { number: 2, title: 'Ep 2.mp4', version: 'VF', isDownloaded: true, downloadTaskId: 'task-2' },
+    { number: 1, title: 'Ep 1.mp4', version: 'VF', isDownloaded: true, downloadTaskId: 'task-1' },
+  ]
+  await player.playLocalFile('task-1', 'My Series', 1, 'Ep 1.mp4', playlist)
+  await nextTick()
+  assert.equal(player.hasPrev, false)
+  assert.equal(player.hasNext, true)
+  assert.equal(videos.at(-1).src, '/api/media/stream/task-1')
+
+  await player.playNext()
+  await nextTick()
+  assert.equal(player.currentEpisode.number, 2)
+  assert.equal(player.hasPrev, true)
+  assert.equal(player.hasNext, false)
+  assert.equal(videos.at(-1).src, '/api/media/stream/task-2')
+  assert.equal(player.selectedSubtitle, '/api/media/subtitle/task-2/0')
+  assert.equal(resolveCalls, 0)
+  assert.deepEqual(opened, [{ taskId: 'task-1' }, { taskId: 'task-2' }])
+
+  await player.playPrev()
+  await nextTick()
+  assert.equal(player.currentEpisode.number, 1)
+  assert.equal(videos.at(-1).src, '/api/media/stream/task-1')
+  player.closePlayer()
+  await nextTick()
+})
+
+test('descending source episodes sort ascending, sanitize local prefs, and honor backend isHls flag', async (t) => {
+  globalThis.window = { addEventListener() {}, removeEventListener() {} }
+  globalThis.__hlsTest = true
+  setActivePinia(createPinia())
+  const resolveParams = []
+  api.openPlaybackSession = async (body) => ({
+    sessionId: 'b'.repeat(32),
+    source: 'ext-source',
+    animeUrl: body.animeUrl,
+    episodeNumber: body.episodeNumber,
+    version: body.version,
+    positionSeconds: 0,
+    durationSeconds: 1400,
+    selection: {
+      quality: 'Original (Local)',
+      server: 'Disque dur (Local)',
+      subtitle: null,
+      audio: null,
+    },
+  })
+  api.resolveVideoStream = async (params) => {
+    resolveParams.push(params)
+    return {
+      streamUrl: `/api/media/extension-resource/tok-${params.episodeNumber}`,
+      isHls: true,
+      isDownloaded: false,
+      serverType: 'StreamSB',
+      selectedQuality: '1080p',
+      subtitles: [],
+    }
+  }
+  const player = usePlayerStore()
+  const { app } = mountPlayer()
+  t.after(() => {
+    app.unmount()
+    delete api.openPlaybackSession
+    delete api.resolveVideoStream
+    delete globalThis.window
+    delete globalThis.__hlsTest
+    delete globalThis.__hlsInstance
+  })
+
+  const rawDescending = [
+    { number: 3, title: 'Ep 3', playerUrl: 'https://example.org/ep3', version: 'VOSTFR' },
+    { number: 1, title: 'Ep 1', playerUrl: 'https://example.org/ep1', version: 'VOSTFR' },
+    { number: 2, title: 'Ep 2', playerUrl: 'https://example.org/ep2', version: 'VOSTFR' },
+  ]
+  await player.openPlayer(
+    'Test Anime',
+    'https://example.org/anime',
+    'ext-source',
+    rawDescending[1],
+    rawDescending,
+  )
+  await nextTick()
+  assert.equal(player.episodes.map((e) => e.number).join(','), '1,2,3')
+  assert.equal(player.hasPrev, false)
+  assert.equal(player.hasNext, true)
+  assert.equal(player.isHls, true)
+  assert.equal(resolveParams[0].server, undefined)
+  assert.equal(resolveParams[0].quality, undefined)
+  assert.ok(globalThis.__hlsInstance)
+
+  await player.playNext()
+  await nextTick()
+  assert.equal(player.currentEpisode.number, 2)
+  assert.equal(player.hasPrev, true)
+  assert.equal(player.hasNext, true)
+  assert.equal(resolveParams[1].episodeUrl, 'https://example.org/ep2')
+  player.closePlayer()
+  await nextTick()
+})

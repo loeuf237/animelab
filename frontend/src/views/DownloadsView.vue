@@ -1046,7 +1046,7 @@ import { useDownloadStore } from '@/stores/downloads'
 import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { useNotifications } from '@/stores/notifications'
-import type { DownloadTask } from '@/types'
+import type { DownloadTask, Episode } from '@/types'
 import { api } from '@/api/client'
 
 defineOptions({ name: 'DownloadsView' })
@@ -1563,8 +1563,41 @@ async function executeCancelAll() {
 }
 
 // Media Playback (Mode Cinéma local)
+function normalizeAnimeKey(name?: string | null): string {
+  return (name || '').trim().toLowerCase()
+}
+
 function playTask(task: DownloadTask) {
-  playerStore.playLocalFile(task.id, task.animeName, task.episodeNumber, task.fileName)
+  const targetAnime = normalizeAnimeKey(task.animeName)
+  const targetVer = (task.version || '').trim().toUpperCase()
+  const targetSource = (task.source || '').trim().toLowerCase()
+  const seen = new Set<string>()
+  const playlist: Episode[] = []
+  for (const t of [...downloadStore.tasks, task]) {
+    const idKey = String(t.id)
+    if (seen.has(idKey)) continue
+    const isSelectedTask = idKey === String(task.id)
+    if (!isSelectedTask && t.status !== 'completed') continue
+    if (normalizeAnimeKey(t.animeName) !== targetAnime) continue
+    if ((t.version || '').trim().toUpperCase() !== targetVer) continue
+    const candidateSource = (t.source || '').trim().toLowerCase()
+    if (targetSource && candidateSource && candidateSource !== targetSource) continue
+    seen.add(idKey)
+    playlist.push({
+      number: t.episodeNumber,
+      title: t.fileName || `Épisode ${t.episodeNumber}`,
+      version: t.version || '',
+      isDownloaded: true,
+      downloadTaskId: t.id,
+    })
+  }
+  void playerStore.playLocalFile(
+    task.id,
+    task.animeName,
+    task.episodeNumber,
+    task.fileName,
+    playlist,
+  )
 }
 
 // Verification Handlers

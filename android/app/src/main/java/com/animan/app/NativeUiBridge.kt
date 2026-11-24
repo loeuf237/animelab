@@ -11,6 +11,7 @@ import android.os.Looper
 import android.provider.MediaStore
 import android.view.HapticFeedbackConstants
 import android.view.View
+import android.view.WindowManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.widget.Toast
@@ -28,6 +29,10 @@ class NativeUiBridge(
     private val webView: WebView,
     private val rootView: View,
 ) {
+    @Volatile
+    var keepScreenOnRequested: Boolean = false
+        private set
+
     companion object {
         const val PREFS_NAME = "animelab_ui"
         const val KEY_STATUS_COLOR = "status_color"
@@ -149,6 +154,20 @@ class NativeUiBridge(
                 else -> HapticFeedbackConstants.CLOCK_TICK
             }
             webView.performHapticFeedback(code)
+        }
+    }
+
+    @JavascriptInterface
+    fun setKeepScreenOn(enabled: Boolean) {
+        activity.runOnUiThread {
+            if (activity.isDestroyed || activity.isFinishing) return@runOnUiThread
+            if (!isLocalOrigin(webView.url)) return@runOnUiThread
+            keepScreenOnRequested = enabled
+            if (enabled) {
+                activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            } else if (activity !is MainActivity || !activity.isInFullscreenVideo()) {
+                activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
         }
     }
 

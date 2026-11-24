@@ -57,8 +57,10 @@ def test_servers_and_stream_routes_keep_private_native_inputs_out_of_responses(n
     response=client.get('/api/media/stream/resolve',params={'animeName':'One','episodeNumber':1,
                         'episodeUrl':'https://fixture.example/episode','source':source.source_id})
     assert response.status_code==200
-    assert response.json()['streamUrl'].startswith('/api/media/extension-resource/')
-    assert 'private' not in response.text and response.json()['qualities']=={}
+    body=response.json()
+    assert body['streamUrl'].startswith('/api/media/extension-resource/')
+    assert body['isHls'] is True
+    assert 'private' not in response.text and body['qualities']=={}
 
 
 @pytest.mark.parametrize('phase',['hosters','resolve_video'])

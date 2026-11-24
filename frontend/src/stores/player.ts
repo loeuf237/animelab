@@ -13,6 +13,57 @@ export function playbackTrackKey(track: { kind?: string; srclang?: string; label
   )
 }
 
+const LOCAL_PREF_LABELS = new Set(['Disque dur (Local)', 'Local (Disque)', 'Original (Local)'])
+
+export function normalizeEpisodeVersion(version?: string | null): string {
+  return (version || '').trim().toUpperCase()
+}
+
+export function episodeSeasonNumber(ep: Episode): number {
+  const season = Number(ep.nativeMetadata?.season)
+  return Number.isInteger(season) && season > 0 ? season : 0
+}
+
+export function sortEpisodesAscending(list: Episode[]): Episode[] {
+  return [...list].sort((a, b) => {
+    const seasonDiff = episodeSeasonNumber(a) - episodeSeasonNumber(b)
+    if (seasonDiff !== 0) return seasonDiff
+    const numA = Number(a.number)
+    const numB = Number(b.number)
+    if (Number.isFinite(numA) && Number.isFinite(numB) && numA !== numB) return numA - numB
+    return String(a.number).localeCompare(String(b.number), undefined, {
+      numeric: true,
+      sensitivity: 'base',
+    })
+  })
+}
+
+export function findEpisodeIndex(list: Episode[], target: Episode | null): number {
+  if (!target || !list.length) return -1
+  if (target.downloadTaskId != null) {
+    const targetId = String(target.downloadTaskId)
+    const taskIdx = list.findIndex(
+      (e) => e.downloadTaskId != null && String(e.downloadTaskId) === targetId,
+    )
+    if (taskIdx >= 0) return taskIdx
+  }
+  const key = episodeKey(target)
+  const exactIdx = list.findIndex((e) => episodeKey(e) === key)
+  if (exactIdx >= 0) return exactIdx
+  const targetVer = normalizeEpisodeVersion(target.version)
+  return list.findIndex(
+    (e) =>
+      String(e.number) === String(target.number) &&
+      normalizeEpisodeVersion(e.version) === targetVer,
+  )
+}
+
+export function sanitizeRemotePref(value: string | null | undefined, fallback: string): string {
+  const cleaned = (value || '').trim()
+  if (!cleaned || LOCAL_PREF_LABELS.has(cleaned)) return fallback
+  return cleaned
+}
+
 export const usePlayerStore = defineStore('player', () => {
   const isOpen = ref(false)
   const animeTitle = ref('')
@@ -25,6 +76,7 @@ export const usePlayerStore = defineStore('player', () => {
   const subtitles = ref<SubtitleTrack[]>([])
   const selectedSubtitle = ref<string | null>(null)
   const isDownloaded = ref(false)
+  const isHls = ref(false)
   const availableQualities = ref<Record<string, string>>({})
   const availableServers = ref<string[]>([])
   const selectedQuality = ref('HD')
@@ -139,18 +191,12 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   const hasNext = computed(() => {
-    if (!currentEpisode.value || !episodes.value.length) return false
-    const idx = episodes.value.findIndex(
-      (e) => currentEpisode.value !== null && episodeKey(e) === episodeKey(currentEpisode.value),
-    )
+    const idx = findEpisodeIndex(episodes.value, currentEpisode.value)
     return idx >= 0 && idx < episodes.value.length - 1
   })
 
   const hasPrev = computed(() => {
-    if (!currentEpisode.value || !episodes.value.length) return false
-    const idx = episodes.value.findIndex(
-      (e) => currentEpisode.value !== null && episodeKey(e) === episodeKey(currentEpisode.value),
-    )
+    const idx = findEpisodeIndex(episodes.value, currentEpisode.value)
     return idx > 0
   })
 
@@ -161,12 +207,19 @@ export const usePlayerStore = defineStore('player', () => {
     const targetUrl = currentEpisode.value.playerUrl || currentEpisode.value.downloadPageUrl
     if (!targetUrl) {
       error.value = 'Aucun lien de streaming disponible pour cet épisode.'
+      isLoading.value = false
       return
     }
+
+    const reqServer = sanitizeRemotePref(selectedServer.value, 'auto')
+    const reqQuality = sanitizeRemotePref(selectedQuality.value, 'auto')
+    selectedServer.value = reqServer
+    selectedQuality.value = sanitizeRemotePref(selectedQuality.value, 'HD')
 
     isLoading.value = true
     error.value = null
     videoUrl.value = null
+    isHls.value = false
 
     try {
       const res = await api.resolveVideoStream({
@@ -176,8 +229,8 @@ export const usePlayerStore = defineStore('player', () => {
         animeUrl: animeUrl.value,
         version: currentEpisode.value.version || '',
         source: source.value,
-        server: selectedServer.value !== 'auto' ? selectedServer.value : undefined,
-        quality: selectedQuality.value !== 'auto' ? selectedQuality.value : undefined,
+        server: reqServer !== 'auto' ? reqServer : undefined,
+        quality: reqQuality !== 'auto' ? reqQuality : undefined,
       })
       if (request !== requestVersion) return
 
@@ -186,7 +239,9 @@ export const usePlayerStore = defineStore('player', () => {
         videoUrl.value = finalUrl
         subtitles.value = res.subtitles || []
         chooseSubtitles()
-        isDownloaded.value = Boolean(res.isDownloaded)
+        const downloaded = Boolean(res.isDownloaded)
+        isDownloaded.value = downloaded
+        isHls.value = !downloaded && (Boolean(res.isHls) || finalUrl.includes('.m3u8'))
 
         const qMap = res.qualities || res.videoQualities || {}
         availableQualities.value = qMap
@@ -195,7 +250,11 @@ export const usePlayerStore = defineStore('player', () => {
         if (res.selectedQuality) selectedQuality.value = res.selectedQuality
         if (res.serverType) {
           serverType.value = res.serverType
-          if (selectedServer.value === 'auto') {
+          if (
+            !downloaded &&
+            selectedServer.value === 'auto' &&
+            sanitizeRemotePref(res.serverType, 'auto') !== 'auto'
+          ) {
             selectedServer.value = res.serverType
           }
         }
@@ -226,13 +285,25 @@ export const usePlayerStore = defineStore('player', () => {
   ) {
     void savePlayback(true)
     ++mediaEpoch.value
+    clearVerification()
     videoUrl.value = null
+    error.value = null
+    availableQualities.value = {}
+    availableServers.value = []
+    isDownloaded.value = false
+    isHls.value = false
+    isLoading.value = true
     const openRequest = ++requestVersion
     animeTitle.value = title
     animeUrl.value = url
     source.value = src
-    currentEpisode.value = episode
-    episodes.value = allEps.filter((e) => (e.version || '') === (episode.version || ''))
+    const targetVer = normalizeEpisodeVersion(episode.version)
+    const matching = allEps.filter((e) => normalizeEpisodeVersion(e.version) === targetVer)
+    if (findEpisodeIndex(matching, episode) < 0) matching.push(episode)
+    const sorted = sortEpisodesAscending(matching)
+    episodes.value = sorted
+    const idx = findEpisodeIndex(sorted, episode)
+    currentEpisode.value = idx >= 0 ? sorted[idx] : episode
     isOpen.value = true
     selectedServer.value = 'auto'
     selectedQuality.value = 'HD'
@@ -248,7 +319,8 @@ export const usePlayerStore = defineStore('player', () => {
       },
       openRequest,
     )
-    if (openRequest === requestVersion) await resolveStream()
+    if (openRequest !== requestVersion) return
+    await resolveStream()
   }
 
   function closePlayer() {
@@ -265,61 +337,101 @@ export const usePlayerStore = defineStore('player', () => {
     error.value = null
     subtitles.value = []
     selectedSubtitle.value = null
+    availableQualities.value = {}
+    availableServers.value = []
+    isDownloaded.value = false
+    isHls.value = false
     isLoading.value = false
   }
 
-  async function playNext() {
-    if (!hasNext.value) return
-    const idx = episodes.value.findIndex(
-      (e) => currentEpisode.value !== null && episodeKey(e) === episodeKey(currentEpisode.value),
-    )
-    if (idx >= 0 && idx < episodes.value.length - 1) {
-      void savePlayback(true)
-      ++mediaEpoch.value
-      videoUrl.value = null
-      const request = ++requestVersion
-      currentEpisode.value = episodes.value[idx + 1]
-      const episode = currentEpisode.value!
-      await loadPlayback(
-        {
-          source: source.value,
-          animeUrl: animeUrl.value,
-          animeName: animeTitle.value,
-          episodeNumber: Number(episode.number),
-          version: episode.version || '',
-        },
-        request,
+  async function loadLocalEpisode(episode: Episode, request: number) {
+    const taskId = episode.downloadTaskId
+    if (taskId == null) return
+    clearVerification()
+    currentEpisode.value = episode
+    isOpen.value = true
+    isLoading.value = false
+    error.value = null
+    isDownloaded.value = true
+    isHls.value = false
+    videoUrl.value = `/api/media/stream/${encodeURIComponent(taskId)}`
+    availableQualities.value = {}
+    availableServers.value = []
+    serverType.value = 'Local (Disque)'
+    selectedServer.value = 'auto'
+    selectedQuality.value = 'HD'
+    subtitles.value = []
+    selectedSubtitle.value = null
+    await loadPlayback({ taskId: String(taskId) }, request)
+    if (request !== requestVersion) return
+    if (playback.value) {
+      animeUrl.value = playback.value.animeUrl
+      source.value = playback.value.source
+      if (currentEpisode.value) currentEpisode.value.version = playback.value.version
+      const listMatch = episodes.value.find(
+        (e) => e.downloadTaskId != null && String(e.downloadTaskId) === String(taskId),
       )
+      if (listMatch) listMatch.version = playback.value.version
+    }
+    try {
+      const tracks = await api.getLocalSubtitles(taskId)
       if (request !== requestVersion) return
-      await resolveStream()
+      subtitles.value = tracks
+      chooseSubtitles()
+    } catch {
+      // Optional captions must never prevent the local video from playing.
     }
   }
 
-  async function playPrev() {
-    if (!hasPrev.value) return
-    const idx = episodes.value.findIndex(
-      (e) => currentEpisode.value !== null && episodeKey(e) === episodeKey(currentEpisode.value),
-    )
-    if (idx > 0) {
-      void savePlayback(true)
-      ++mediaEpoch.value
-      videoUrl.value = null
-      const request = ++requestVersion
-      currentEpisode.value = episodes.value[idx - 1]
-      const episode = currentEpisode.value!
-      await loadPlayback(
-        {
-          source: source.value,
-          animeUrl: animeUrl.value,
-          animeName: animeTitle.value,
-          episodeNumber: Number(episode.number),
-          version: episode.version || '',
-        },
-        request,
-      )
-      if (request !== requestVersion) return
-      await resolveStream()
+  async function stepEpisode(delta: 1 | -1) {
+    const idx = findEpisodeIndex(episodes.value, currentEpisode.value)
+    const nextIdx = idx + delta
+    if (idx < 0 || nextIdx < 0 || nextIdx >= episodes.value.length) return
+    const target = episodes.value[nextIdx]
+    void savePlayback(true)
+    ++mediaEpoch.value
+    const request = ++requestVersion
+    clearVerification()
+    error.value = null
+    videoUrl.value = null
+    subtitles.value = []
+    selectedSubtitle.value = null
+    availableQualities.value = {}
+    availableServers.value = []
+    isDownloaded.value = false
+    isHls.value = false
+    selectedServer.value = 'auto'
+    selectedQuality.value = 'HD'
+
+    if (target.downloadTaskId != null && !target.playerUrl && !target.downloadPageUrl) {
+      await loadLocalEpisode(target, request)
+      return
     }
+
+    isLoading.value = true
+    currentEpisode.value = target
+    await loadPlayback(
+      {
+        source: source.value,
+        animeUrl: animeUrl.value,
+        animeName: animeTitle.value,
+        episodeNumber: Number(target.number),
+        version: target.version || '',
+      },
+      request,
+    )
+    selectedServer.value = sanitizeRemotePref(selectedServer.value, 'auto')
+    selectedQuality.value = sanitizeRemotePref(selectedQuality.value, 'HD')
+    if (request !== requestVersion) return
+    await resolveStream()
+  }
+
+  async function playNext() {
+    await stepEpisode(1)
+  }
+
+  async function playPrev() {
+    await stepEpisode(-1)
   }
 
   async function changeServer(srv: string) {
@@ -351,6 +463,7 @@ export const usePlayerStore = defineStore('player', () => {
     title: string,
     epNum: number | string,
     fileName?: string,
+    playlist: Episode[] = [],
   ) {
     void savePlayback(true)
     ++mediaEpoch.value
@@ -358,38 +471,23 @@ export const usePlayerStore = defineStore('player', () => {
     animeTitle.value = title
     animeUrl.value = ''
     source.value = 'local'
-    currentEpisode.value = {
+    const epObj: Episode = {
       number: epNum,
       title: fileName || `Épisode ${epNum}`,
+      version: '',
       isDownloaded: true,
+      downloadTaskId: taskId,
     }
-    episodes.value = []
-    isOpen.value = true
-    isLoading.value = false
-    error.value = null
-    isDownloaded.value = true
-    videoUrl.value = `/api/media/stream/${encodeURIComponent(taskId)}`
-    availableQualities.value = {}
-    availableServers.value = []
-    serverType.value = 'Local (Disque)'
-    selectedServer.value = 'auto'
-    selectedQuality.value = 'HD'
-    subtitles.value = []
-    selectedSubtitle.value = null
-    await loadPlayback({ taskId: String(taskId) }, request)
-    if (request !== requestVersion) return
-    if (playback.value) {
-      animeUrl.value = playback.value.animeUrl
-      source.value = playback.value.source
-      if (currentEpisode.value) currentEpisode.value.version = playback.value.version
-    }
-    try {
-      const tracks = await api.getLocalSubtitles(taskId)
-      if (request !== requestVersion) return
-      subtitles.value = tracks
-      chooseSubtitles()
-    } catch {
-      // Optional captions must never prevent the local video from playing.
+    if (playlist.length) {
+      const combined = playlist.map((item) => ({ ...item }))
+      if (findEpisodeIndex(combined, epObj) < 0) combined.push(epObj)
+      const sorted = sortEpisodesAscending(combined)
+      episodes.value = sorted
+      const activeIdx = findEpisodeIndex(sorted, epObj)
+      await loadLocalEpisode(activeIdx >= 0 ? sorted[activeIdx] : epObj, request)
+    } else {
+      episodes.value = []
+      await loadLocalEpisode(epObj, request)
     }
   }
 
@@ -412,6 +510,7 @@ export const usePlayerStore = defineStore('player', () => {
     subtitles,
     selectedSubtitle,
     isDownloaded,
+    isHls,
     availableQualities,
     availableServers,
     selectedQuality,

@@ -7,6 +7,7 @@ export type HapticKind = 'selection' | 'impact' | 'confirm'
 interface AndroidUiBridge {
   syncSystemBars?: (statusHex: string, navHex: string, lightIcons: boolean) => void
   haptic?: (kind: HapticKind) => void
+  setKeepScreenOn?: (enabled: boolean) => void
   getPlatformInfo?: () => string
   exportDiagnostics?: (jsonPayload: string) => string
 }
@@ -177,6 +178,15 @@ export function triggerHaptic(kind: HapticKind = 'selection') {
   if (typeof window === 'undefined') return
   try {
     ;(window as NativeWindow).AnimeLabAndroid?.haptic?.(kind)
+  } catch {
+    /* ignore unavailable Android hook */
+  }
+}
+
+export function setNativeKeepScreenOn(enabled: boolean) {
+  if (typeof window === 'undefined') return
+  try {
+    ;(window as NativeWindow).AnimeLabAndroid?.setKeepScreenOn?.(enabled)
   } catch {
     /* ignore unavailable Android hook */
   }
