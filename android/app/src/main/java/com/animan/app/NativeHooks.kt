@@ -4,8 +4,11 @@ import android.content.ContentValues
 import android.provider.DocumentsContract
 import android.os.Environment
 import android.provider.MediaStore
+import android.util.Base64
 import android.webkit.MimeTypeMap
 import java.io.File
+import java.io.FileInputStream
+import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
 
 object NativeHooks {
@@ -45,6 +48,92 @@ object NativeHooks {
         } == true
     } catch (_: Exception) {
         false
+    }
+
+    @JvmStatic fun deleteExportedCopy(uriString: String): Boolean = try {
+        if (uriString.isBlank()) {
+            false
+        } else {
+            val uri = android.net.Uri.parse(uriString)
+            if (uri.scheme != "content") {
+                false
+            } else {
+                val context = EngineHost.context
+                val resolver = context.contentResolver
+                val deleted = if (DocumentsContract.isDocumentUri(context, uri)) {
+                    DocumentsContract.deleteDocument(resolver, uri)
+                } else {
+                    resolver.delete(uri, null, null) > 0
+                }
+                if (deleted) {
+                    val preferences = context.getSharedPreferences("animan_exports", ContextMode)
+                    val editor = preferences.edit()
+                    var changed = false
+                    for ((k, v) in preferences.all) {
+                        if (v as? String == uriString) {
+                            editor.remove(k)
+                            changed = true
+                        }
+                    }
+                    if (changed) editor.commit()
+                }
+                deleted
+            }
+        }
+    } catch (_: Exception) {
+        false
+    }
+
+    @JvmStatic fun exportedCopySize(uriString: String): Long = try {
+        if (uriString.isBlank()) {
+            -1L
+        } else {
+            val uri = android.net.Uri.parse(uriString)
+            if (uri.scheme != "content") {
+                -1L
+            } else {
+                EngineHost.context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+                    val stat = pfd.statSize
+                    if (stat >= 0L) stat else FileInputStream(pfd.fileDescriptor).channel.use { it.size() }
+                } ?: -1L
+            }
+        }
+    } catch (_: Exception) {
+        -1L
+    }
+
+    @JvmStatic fun readExportedCopyBase64(uriString: String, offset: Long, length: Int): String = try {
+        if (uriString.isBlank() || offset < 0L || length <= 0) {
+            ""
+        } else {
+            val uri = android.net.Uri.parse(uriString)
+            if (uri.scheme != "content") {
+                ""
+            } else {
+                val toRead = length.coerceAtMost(512 * 1024)
+                EngineHost.context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+                    FileInputStream(pfd.fileDescriptor).channel.use { ch ->
+                        val buf = ByteBuffer.allocate(toRead)
+                        var pos = offset
+                        while (buf.hasRemaining()) {
+                            val read = ch.read(buf, pos)
+                            if (read <= 0) break
+                            pos += read
+                        }
+                        val total = buf.position()
+                        if (total <= 0) ""
+                        else {
+                            val bytes = ByteArray(total)
+                            buf.flip()
+                            buf.get(bytes)
+                            Base64.encodeToString(bytes, Base64.NO_WRAP)
+                        }
+                    }
+                } ?: ""
+            }
+        }
+    } catch (_: Exception) {
+        ""
     }
 
     private fun exportCompletedFile(path: String, taskId: String): String {

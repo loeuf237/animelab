@@ -13,6 +13,15 @@ logger = logging.getLogger("animelab.security")
 ALLOWED_SCRAPING_DOMAINS = {
     "french-manga.net",
     "w16.french-manga.net",
+    "fstream.net",
+    "fs016.lol",
+    "french-stream.net",
+    "vidzy.org",
+    "vidzy.live",
+    "vidzy.cc",
+    "vidzy.lol",
+    "uqload.vc",
+    "fsvid.lol",
     "voiranime.cx",
     "voir-anime.to",
     "voiranime.to",
@@ -58,6 +67,11 @@ ALLOWED_SCRAPING_DOMAINS = {
 def get_all_allowed_domains() -> set:
     """Retourne la liste complète des domaines autorisés incluant les extensions dynamiques actives."""
     domains = set(ALLOWED_SCRAPING_DOMAINS)
+    try:
+        from animelab.services.french_stream_service import french_stream_service
+        domains.update(french_stream_service.get_allowed_domains())
+    except Exception:
+        pass
     try:
         from animelab.services.extension_service import extension_service
         domains.update(extension_service.get_allowed_domains())
@@ -115,7 +129,8 @@ def _resolve_dns(hostname: str) -> list[str]:
 def is_safe_url(
     url: str,
     allowed_domains: Optional[Iterable[str]] = None,
-    allow_private: bool = False
+    allow_private: bool = False,
+    require_dns: bool = True,
 ) -> bool:
     """
     Valide une URL contre les attaques SSRF :
@@ -162,6 +177,15 @@ def is_safe_url(
                 logger.warning("SSRF blocked: IP '%s' is private/loopback", ip)
                 return False
         except ValueError:
+            if (
+                hostname == "localhost"
+                or hostname.endswith(".localhost")
+                or hostname.endswith(".local")
+            ):
+                logger.warning("SSRF blocked: Local hostname '%s'", hostname)
+                return False
+            if not require_dns:
+                return True
             # Nom de domaine : résolution DNS pour inspecter les adresses réelles
             resolved_ips = _resolve_dns(hostname)
             if not resolved_ips:

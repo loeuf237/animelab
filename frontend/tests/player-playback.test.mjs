@@ -600,3 +600,66 @@ test('descending source episodes sort ascending, sanitize local prefs, and honor
   player.closePlayer()
   await nextTick()
 })
+
+test('openPlayer forwards downloadTaskId to resolveVideoStream and plays locally when available on disk', async (t) => {
+  globalThis.window = { addEventListener() {}, removeEventListener() {} }
+  setActivePinia(createPinia())
+  const resolveParams = []
+  api.openPlaybackSession = async (body) => ({
+    sessionId: 'c'.repeat(32),
+    source: body.source,
+    animeUrl: body.animeUrl,
+    episodeNumber: body.episodeNumber,
+    version: body.version,
+    positionSeconds: 0,
+    durationSeconds: 1400,
+    selection: { quality: 'HD', server: 'auto', subtitle: null, audio: null },
+  })
+  api.resolveVideoStream = async (params) => {
+    resolveParams.push(params)
+    return {
+      success: true,
+      isDownloaded: true,
+      isHls: false,
+      sourceType: 'local',
+      taskId: 'local-feedface01',
+      streamUrl: '/api/media/stream/local-feedface01',
+      serverType: 'Disque dur (Local)',
+      selectedQuality: 'Original (Local)',
+      subtitles: [],
+    }
+  }
+  const player = usePlayerStore()
+  const { app, videos } = mountPlayer()
+  t.after(() => {
+    app.unmount()
+    delete api.openPlaybackSession
+    delete api.resolveVideoStream
+    delete globalThis.window
+  })
+
+  const ep = {
+    number: 1,
+    title: 'Épisode 1',
+    version: 'VF',
+    playerUrl: 'https://voiranime.cx/anime/one-punch-man-vf/ep-1/',
+    isDownloaded: true,
+    downloadTaskId: 'local-feedface01',
+  }
+  await player.openPlayer(
+    'One Punch Man (VF)',
+    'https://voiranime.cx/anime/one-punch-man-vf/',
+    'voir-anime',
+    ep,
+    [ep],
+  )
+  await nextTick()
+
+  assert.equal(resolveParams[0].taskId, 'local-feedface01')
+  assert.equal(player.isDownloaded, true)
+  assert.equal(player.videoUrl, '/api/media/stream/local-feedface01')
+  assert.equal(player.currentEpisode.downloadTaskId, 'local-feedface01')
+  assert.equal(videos[0].src, '/api/media/stream/local-feedface01')
+  player.closePlayer()
+  await nextTick()
+})

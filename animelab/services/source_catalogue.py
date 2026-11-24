@@ -33,7 +33,7 @@ class SourceCatalogueService:
         return (service if isinstance(service, RegisteredSource) else source_registry.describe(source_id, service)).descriptor()
 
     def sources(self):
-        entries = [self.descriptor(sid, self.provider(sid)) for sid in ('voir-anime', 'animepahe', 'french-manga')]
+        entries = [self.descriptor(sid, self.provider(sid)) for sid in ('voir-anime', 'animepahe', 'french-manga', 'french-stream')]
         active = {source_identity(ext,ext.pkg): ext for ext in extension_service.get_enabled_container_sources()}
         entries += [self.descriptor(sid, ext) for sid, ext in active.items() if not getattr(ext,'metadata',{}).get('hidden')]
         for saved in extension_service.retained_source_descriptors():
@@ -140,6 +140,43 @@ class SourceCatalogueService:
                     if val and val not in existing_orders:
                         orders.append({'id': val, 'label': label})
                         existing_orders.add(val)
+        elif source_id == 'french-stream':
+            target = service.base_url + '/'
+            html, final_url = await self.html(service, target)
+            soup = BeautifulSoup(html, 'html.parser')
+            seen = set()
+            for link in soup.select('a[href]'):
+                href = urljoin(final_url, link['href'])
+                path = urlparse(href).path
+                label = link.get_text(' ', strip=True)
+                if urlparse(href).hostname != urlparse(final_url).hostname or not label or len(label) > 40:
+                    continue
+                if '/index.php' in path and 'do=cat' not in urlparse(href).query:
+                    continue
+                is_cat = (
+                    path in ('/films/', '/s-tv/', '/films/vf/', '/s-tv/s-vf/', '/s-tv/s-vostfr/', '/s-tv/s-vo/', '/films/animations/', '/animation-serie-/')
+                    or (path.startswith('/films/') and path.endswith('/'))
+                    or '-serie-' in path
+                    or '-series-' in path
+                    or '/series/' in path
+                    or '/xfsearch/' in path
+                )
+                if not is_cat or href in seen:
+                    continue
+                seen.add(href)
+                if path in ('/films/', '/s-tv/', '/films/top-film/', '/s-tv/sries-du-moment/'):
+                    group = 'Catalogue'
+                elif '/xfsearch/version-' in path or path in ('/films/vf/', '/s-tv/s-vf/', '/s-tv/s-vostfr/', '/s-tv/s-vo/'):
+                    group = 'Langue'
+                elif '/series/' in path:
+                    group = 'Statut'
+                elif '/xfsearch/ftagz/' in path or '/xfsearch/xx89/' in path or '/xfsearch/date-de-sortie/' in path:
+                    group = 'Tags'
+                else:
+                    group = 'Genres'
+                ident = hashlib.sha256(href.encode()).hexdigest()[:16]
+                tags.append({'id': ident, 'label': label, 'group': group, 'url': href,
+                             'value': path.rstrip('/').split('/')[-1]})
         elif source_id != 'animepahe':
             target = service.base_url + ('/?s=&post_type=wp-manga' if source_id == 'voir-anime' else '/')
             html, final_url = await self.html(service, target)
@@ -441,6 +478,21 @@ class SourceCatalogueService:
                 html, url = await self.html(service, url)
                 items = service.parse_search_results(html)
                 if query: items = [i for i in items if query.casefold() in i.title.casefold()]
+        elif source_id == 'french-stream':
+            if query and not selected and mode == 'search':
+                items = await service.search_anime(query)
+            else:
+                mode_paths = {
+                    'featured': '/films/top-film/',
+                    'popular': '/s-tv/sries-du-moment/',
+                    'catalogue': '/s-tv/',
+                    'latest': '/',
+                }
+                path = mode_paths.get(mode, '/')
+                url = url or (selected[0]['url'] if selected else service.base_url + path)
+                html, url = await self.html(service, url)
+                items = service.parse_search_results(html)
+                if query: items = [i for i in items if query.casefold() in i.title.casefold()]
         elif source_id == 'animepahe':
             if mode == 'search':
                 items = await service.search_anime(query)
@@ -497,7 +549,7 @@ class SourceCatalogueService:
         recipe = getattr(service, 'recipe', None)
         is_script_expansion = (
             getattr(service, 'runtime', '') != 'android-apk'
-            and source_id not in ('voir-anime', 'french-manga', 'animepahe')
+            and source_id not in ('voir-anime', 'french-manga', 'french-stream', 'animepahe')
             and bool(recipe and not recipe.runtime.get('catalogue') and recipe.runtime.get('listing_expansion', {}).get('kind') == 'script_sections')
             and order not in ('title', 'title_desc')
         )

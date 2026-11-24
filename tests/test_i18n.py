@@ -17,7 +17,8 @@ def mock_source_feeds(monkeypatch):
     from animelab.services.scraping_service import scraping_service
     from animelab.services.voiranime_service import voiranime_service
     from animelab.services.animepahe_service import animepahe_service
-    for service in (scraping_service, voiranime_service, animepahe_service):
+    from animelab.services.french_stream_service import french_stream_service
+    for service in (scraping_service, voiranime_service, animepahe_service, french_stream_service):
         monkeypatch.setattr(service, "get_latest_releases", AsyncMock(return_value=[]))
 
 @pytest.fixture(scope="module")

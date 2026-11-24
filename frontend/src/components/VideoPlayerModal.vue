@@ -627,6 +627,16 @@ function onKeyDown(e: KeyboardEvent) {
   }
 }
 
+watch(
+  () => playerStore.isOpen,
+  (open) => {
+    if (open && !playerStore.externalPlayer) {
+      void playerStore.loadExternalPlayerConfig()
+    }
+  },
+  { immediate: true },
+)
+
 onMounted(() => {
   window.addEventListener('keydown', onKeyDown)
   window.addEventListener('pagehide', checkpoint)

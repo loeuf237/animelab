@@ -179,6 +179,7 @@ const activeIdx = ref(0)
 const inputRef = ref<HTMLInputElement | null>(null)
 const sourceOptions = computed(() => [
   { id: 'french-manga', name: 'French-Manga' },
+  { id: 'french-stream', name: 'French-Stream' },
   { id: 'voir-anime', name: 'VoirAnime' },
   { id: 'animepahe', name: 'AnimePahe' },
   ...enabledExtensions.value.map((source) => ({

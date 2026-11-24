@@ -5,6 +5,9 @@ storage_status_handler = None
 storage_action_handler = None
 app_update_install_handler = None
 exported_copy_exists_handler = None
+exported_copy_size_handler = None
+read_exported_copy_handler = None
+delete_exported_copy_handler = None
 
 
 def progress(task):
@@ -27,6 +30,25 @@ def install_app_update(path):
 
 def exported_copy_exists(uri: str) -> bool | None:
     return bool(exported_copy_exists_handler(uri)) if exported_copy_exists_handler else None
+
+
+def exported_copy_size(uri: str) -> int | None:
+    if not exported_copy_size_handler:
+        return None
+    size = int(exported_copy_size_handler(uri))
+    return size if size >= 0 else None
+
+
+def read_exported_copy(uri: str, offset: int, length: int) -> bytes:
+    if not read_exported_copy_handler or offset < 0 or length <= 0:
+        return b""
+    return bytes(read_exported_copy_handler(uri, offset, length))
+
+
+def delete_exported_copy(uri: str) -> bool:
+    if not delete_exported_copy_handler or not uri:
+        return False
+    return bool(delete_exported_copy_handler(uri))
 
 
 def completed_paths(task):

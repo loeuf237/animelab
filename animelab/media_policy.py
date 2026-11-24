@@ -19,7 +19,7 @@ def media_domains():
     return domains
 
 
-def validate_media_url(url):
+def validate_media_url(url, *, require_dns: bool = True):
     domains = media_domains() if os.getenv('ANIMELAB_SHARED_WORKER') == '1' else None
-    if not is_safe_url(str(url), allowed_domains=domains):
+    if not is_safe_url(str(url), allowed_domains=domains, require_dns=require_dns):
         raise HTTPException(400, 'URL de média non autorisée ; demandez à l’administrateur d’approuver son domaine')

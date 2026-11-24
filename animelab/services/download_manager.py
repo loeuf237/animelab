@@ -679,12 +679,12 @@ class DownloadManagerService:
                 u_host = (parsed_u.hostname or "").lower()
                 clean_page_url = download_page_url.split("#")[0].strip()
                 is_known_embed = extractor_registry.is_known_embed(clean_page_url)
-                is_imported = bool(source and source not in ("french-manga", "voir-anime", "animepahe")) or is_known_embed
+                is_imported = bool(source and source not in ("french-manga", "french-stream", "voir-anime", "animepahe")) or is_known_embed
 
                 matched_container = None
                 try:
                     from animelab.services.extension_service import extension_service
-                    if source and source not in ("french-manga", "voir-anime", "animepahe"):
+                    if source and source not in ("french-manga", "french-stream", "voir-anime", "animepahe"):
                         matched_container = extension_service.get_container_source_by_id(source)
                     if not matched_container and not source and u_host:
                         for cs in extension_service.get_enabled_container_sources():
@@ -696,7 +696,7 @@ class DownloadManagerService:
                     raise
                 except Exception:
                     pass
-                if not matched_container and source not in ("french-manga", "voir-anime", "animepahe"):
+                if not matched_container and source not in ("french-manga", "french-stream", "voir-anime", "animepahe"):
                     try:
                         from animelab.services.seanime_service import seanime_service
                         if source:
@@ -2169,7 +2169,15 @@ class DownloadManagerService:
             return False
         if extractor_registry.is_known_embed(url):
             return False
-        if "vidzy.live" in url or "luluvdo.com" in url or "french-manga.net" in url:
+        from animelab.services.french_stream_service import is_french_stream_url
+        if (
+            "vidzy.live" in url
+            or "vidzy.org" in url
+            or "vidzy.lol" in url
+            or "luluvdo." in url
+            or "french-manga.net" in url
+            or is_french_stream_url(url)
+        ):
             return True
         if "vidzy.cc" in url and any(x in url for x in ["/e/", "/d/", "embed-"]):
             return True

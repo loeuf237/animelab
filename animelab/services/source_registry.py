@@ -146,9 +146,15 @@ class SourceRegistry:
         if self._natives is not None:
             return self._natives
         from animelab.services.scraping_service import scraping_service
+        from animelab.services.french_stream_service import french_stream_service
         from animelab.services.voiranime_service import voiranime_service
         from animelab.services.animepahe_service import animepahe_service
-        return {'french-manga': scraping_service, 'voir-anime': voiranime_service, 'animepahe': animepahe_service}
+        return {
+            'french-manga': scraping_service,
+            'french-stream': french_stream_service,
+            'voir-anime': voiranime_service,
+            'animepahe': animepahe_service,
+        }
 
     def extensions(self):
         if self._extensions is not None:
@@ -157,7 +163,12 @@ class SourceRegistry:
         return extension_service
 
     def describe(self, source_id: str, service: SourceProvider) -> RegisteredSource:
-        native_names = {'french-manga': 'French-Manga', 'voir-anime': 'VoirAnime', 'animepahe': 'AnimePahe'}
+        native_names = {
+            'french-manga': 'French-Manga',
+            'french-stream': 'French-Stream',
+            'voir-anime': 'VoirAnime',
+            'animepahe': 'AnimePahe',
+        }
         imported = source_id not in self.natives()
         recipe = getattr(service, 'recipe', None)
         if imported and getattr(service, 'runtime', '') == 'android-apk':
@@ -184,8 +195,8 @@ class SourceRegistry:
             )
         else:
             capabilities = SourceCapabilities(search=True, detail=True, latest=True,
-                popular=source_id == 'voir-anime', catalogue=not imported,
-                featured=source_id == 'french-manga', multi_tags=source_id == 'voir-anime')
+                popular=source_id in ('voir-anime', 'french-stream'), catalogue=not imported,
+                featured=source_id in ('french-manga', 'french-stream'), multi_tags=source_id == 'voir-anime')
         return RegisteredSource(source_id, native_names.get(source_id) or service.name,
                                 getattr(service, 'lang', 'en' if source_id == 'animepahe' else 'fr'),
                                 imported, service, capabilities)
@@ -212,12 +223,14 @@ class SourceRegistry:
         return self.describe(source_identity(service,source_id), service)
 
     def detect(self, url: str, fallback: str = 'french-manga') -> str:
+        from animelab.services.french_stream_service import is_french_stream_host
         host = (urlparse(url).hostname or '').lower()
         if not host:
             return fallback
         aliases = {'animepahe': ('animepahe.com', 'animepahe.pw', 'animepahe.si', 'kwik.cx', 'kwik.si', 'pahe.win'),
                    'voir-anime': ('voiranime.cx', 'voir-anime.to', 'voiranime.to', 'voiranime.io', 'voiranime.homes'),
-                   'french-manga': ('french-manga.net',)}
+                   'french-manga': ('french-manga.net',),
+                   'french-stream': ('fstream.net', 'fs016.lol', 'french-stream.net')}
         providers = self.all()
         preferred_id = fallback.strip().lower()
         if not any(provider.id == preferred_id for provider in providers):
@@ -231,6 +244,8 @@ class SourceRegistry:
         for provider in providers:
             domains = [urlparse(provider.base_url).hostname or ''] + list(aliases.get(provider.id, ()))
             if any(domain and (host == domain or host.endswith('.' + domain)) for domain in domains):
+                return provider.id
+            if provider.id == 'french-stream' and is_french_stream_host(host):
                 return provider.id
         return fallback
 

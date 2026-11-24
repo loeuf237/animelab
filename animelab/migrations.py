@@ -317,6 +317,11 @@ def seanime_extensions(conn):
     conn.exec_driver_sql('CREATE INDEX IF NOT EXISTS idx_seanime_extensions_enabled ON seanime_extensions(is_enabled)')
 
 
+def anime_detail_cache(conn):
+    from animelab.models.anime_detail_cache import AnimeDetailSnapshot
+    AnimeDetailSnapshot.__table__.create(bind=conn, checkfirst=True)
+
+
 MIGRATIONS = (
     Migration(1, 'core_tables', bootstrap),
     Migration(2, 'download_identity_and_verification', download_identity),
@@ -333,6 +338,7 @@ MIGRATIONS = (
     Migration(13, 'persistent_native_extension_references', native_extension_references),
     Migration(14, 'startup_appearance_and_update_preferences', startup_preferences),
     Migration(15, 'seanime_extensions', seanime_extensions),
+    Migration(16, 'anime_detail_cache', anime_detail_cache),
 )
 
 

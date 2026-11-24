@@ -410,7 +410,7 @@ async def test_seanime_service_and_end_to_end_api_flow(tmp_path, monkeypatch):
 
     dummy_natives = {
         sid: SimpleNamespace(name=sid, base_url=f"https://{sid}.example", lang="fr")
-        for sid in ("voir-anime", "animepahe", "french-manga")
+        for sid in ("voir-anime", "animepahe", "french-manga", "french-stream")
     }
     test_registry = SourceRegistry(
         natives=dummy_natives,

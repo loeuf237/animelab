@@ -144,3 +144,128 @@ test('launching an external player from downloads and player modal shows watch p
   await inlineBar.getByRole('button', { name: 'Marquer comme vu' }).click()
   await expect(inlineBar).toBeHidden()
 })
+
+test('external player button appears automatically on Linux/Desktop when players are detected even with preset none', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 820 })
+  const completedTask = {
+    id: 302,
+    animeName: 'Auto Detected External Show',
+    animeUrl: 'https://example.test/auto-detected',
+    episodeNumber: 1,
+    fileName: 'Auto Detected External Show - Episode 1 [VF].mp4',
+    source: 'french-manga',
+    version: 'VF',
+    selectedQuality: '1080p',
+    status: 'COMPLETED',
+    totalBytes: 100000000,
+    downloadedBytes: 100000000,
+    speedBytes: 0,
+    progress: 100,
+    verificationStatus: 'VALID',
+    formattedDuration: '24m 00s',
+    exportStatus: 'NOT_REQUESTED',
+  }
+  await mockApp(page, {
+    taskList: [completedTask],
+    externalPlayerSettings: {
+      available: true,
+      platform: 'desktop',
+      clientLocal: true,
+      preset: 'none',
+      customPath: '',
+      preferExternal: false,
+      configured: true,
+      resolvedPath: '/usr/bin/mpv',
+      detected: [
+        { id: 'mpv', label: 'mpv', path: '/usr/bin/mpv' },
+        { id: 'system', label: 'Lecteur par défaut du système', path: '/usr/bin/xdg-open' },
+      ],
+    },
+  })
+  await page.route('**/api/media/subtitles/**', (route) => route.fulfill({ json: [] }))
+  await page.route('**/api/media/stream/*', (route) =>
+    route.fulfill({ status: 200, contentType: 'video/mp4', body: '' }),
+  )
+  await page.route('**/api/media/stream/resolve*', (route) =>
+    route.fulfill({
+      json: {
+        success: true,
+        isDownloaded: true,
+        isHls: false,
+        sourceType: 'local',
+        taskId: '302',
+        videoUrl: '/api/media/stream/302',
+        quality: 'Local',
+        qualities: {},
+      },
+    }),
+  )
+  await page.route('**/api/playback/session', (route) =>
+    route.fulfill({
+      json: {
+        sessionId: 'e'.repeat(32),
+        source: 'french-manga',
+        animeUrl: 'https://example.test/auto-detected',
+        episodeNumber: 1,
+        version: 'VF',
+        positionSeconds: 0,
+        durationSeconds: 0,
+        selection: { quality: 'HD', server: 'auto', subtitle: null, audio: null },
+      },
+    }),
+  )
+  await page.route('**/api/anime/detail*', (route) =>
+    route.fulfill({
+      json: {
+        success: true,
+        source: 'french-manga',
+        sourceName: 'French-Manga',
+        isFavorite: false,
+        autoDownload: false,
+        downloadedEpisodes: [1],
+        watchedEpisodes: [],
+        totalEpisodes: 1,
+        downloadedCount: 1,
+        watchedCount: 0,
+        anime: {
+          title: 'Auto Detected External Show',
+          url: 'https://example.test/auto-detected',
+          imageUrl: '',
+          source: 'french-manga',
+          version: 'VF',
+          genres: [],
+          episodes: [
+            {
+              number: 1,
+              title: 'Épisode 1',
+              version: 'VF',
+              playerUrl: 'https://vidzy.org/embed-abc.html',
+              downloadPageUrl: 'https://vidzy.org/d/abc_n',
+              isDownloaded: true,
+              isWatched: false,
+              downloadTaskId: 302,
+            },
+          ],
+        },
+      },
+    }),
+  )
+
+  await page.goto('/app/downloads')
+  await page.locator('.download-tabs > button').nth(1).click()
+  const card = page.locator('.task-row-card').first()
+  await expect(card.getByRole('button', { name: 'Ouvrir dans un lecteur externe' })).toBeVisible()
+
+  await page.goto(
+    '/app/anime?url=' +
+      encodeURIComponent('https://example.test/auto-detected') +
+      '&source=french-manga',
+  )
+  const epRow = page.locator('.tachiyomi-episode-item').first()
+  await expect(epRow.getByRole('button', { name: /lecteur externe/i })).toBeVisible()
+  await epRow.locator('.btn-play-ep').click()
+  await expect(page.locator('.player-modal .player-external-btn')).toBeVisible()
+  await noOverflow(page)
+})

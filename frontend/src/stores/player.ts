@@ -230,8 +230,9 @@ export const usePlayerStore = defineStore('player', () => {
     if (!currentEpisode.value) return
     const request = ++requestVersion
     clearVerification()
-    const targetUrl = currentEpisode.value.playerUrl || currentEpisode.value.downloadPageUrl
-    if (!targetUrl) {
+    const epTaskId = currentEpisode.value.downloadTaskId
+    const targetUrl = currentEpisode.value.playerUrl || currentEpisode.value.downloadPageUrl || ''
+    if (!targetUrl && epTaskId == null) {
       error.value = 'Aucun lien de streaming disponible pour cet épisode.'
       isLoading.value = false
       return
@@ -257,6 +258,7 @@ export const usePlayerStore = defineStore('player', () => {
         source: source.value,
         server: reqServer !== 'auto' ? reqServer : undefined,
         quality: reqQuality !== 'auto' ? reqQuality : undefined,
+        taskId: epTaskId ?? undefined,
       })
       if (request !== requestVersion) return
 
@@ -267,6 +269,21 @@ export const usePlayerStore = defineStore('player', () => {
         chooseSubtitles()
         const downloaded = Boolean(res.isDownloaded)
         isDownloaded.value = downloaded
+        if (downloaded && res.taskId != null && currentEpisode.value) {
+          currentEpisode.value.downloadTaskId = res.taskId
+          currentEpisode.value.isDownloaded = true
+          const listMatch = episodes.value.find(
+            (e) =>
+              e === currentEpisode.value ||
+              (String(e.number) === String(currentEpisode.value?.number) &&
+                normalizeEpisodeVersion(e.version) ===
+                  normalizeEpisodeVersion(currentEpisode.value?.version)),
+          )
+          if (listMatch) {
+            listMatch.downloadTaskId = res.taskId
+            listMatch.isDownloaded = true
+          }
+        }
         isHls.value = !downloaded && (Boolean(res.isHls) || finalUrl.includes('.m3u8'))
 
         const qMap = res.qualities || res.videoQualities || {}
@@ -631,8 +648,8 @@ export const usePlayerStore = defineStore('player', () => {
           )
         }
       } else {
-        const targetUrl = params.episode.playerUrl || params.episode.downloadPageUrl
-        if (!targetUrl) {
+        const targetUrl = params.episode.playerUrl || params.episode.downloadPageUrl || ''
+        if (!targetUrl && params.episode.downloadTaskId == null) {
           throw new Error('Aucun lien de streaming disponible pour cet épisode.')
         }
         const streamRes = await api.resolveVideoStream({
@@ -642,6 +659,7 @@ export const usePlayerStore = defineStore('player', () => {
           animeUrl: params.animeUrl,
           version: params.episode.version || '',
           source: params.source,
+          taskId: params.episode.downloadTaskId ?? undefined,
         })
         const finalUrl = streamRes.streamUrl || streamRes.videoUrl
         if (!finalUrl) {

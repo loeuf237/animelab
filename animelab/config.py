@@ -75,6 +75,9 @@ class Settings:
 
     # Sources anime
     BASE_URL: str = getenv("ANIMAN_BASE_URL", "https://w16.french-manga.net")
+    FRENCH_STREAM_PORTAL_URL: str = getenv("ANIMAN_FRENCH_STREAM_PORTAL_URL", "https://fstream.net")
+    FRENCH_STREAM_URL: str = getenv("ANIMAN_FRENCH_STREAM_URL", "https://fs016.lol")
+    FRENCH_STREAM_BACKUP_URLS: list = ["https://fs016.lol", "https://french-stream.net", "https://fstream.net"]
     VOIR_ANIME_URL: str = getenv("ANIMAN_VOIR_ANIME_URL", "https://voiranime.cx")
     ANIMEPAHE_URL: str = getenv("ANIMAN_ANIMEPAHE_URL", "https://animepahe.pw")
     ANIMEPAHE_BACKUP_URLS: list = [

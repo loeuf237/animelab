@@ -207,7 +207,17 @@ export interface RecipeRevision {
   created_at: string
 }
 
-export type ExternalPlayerPreset = 'none' | 'mpv' | 'vlc' | 'custom' | 'system'
+export type ExternalPlayerPreset =
+  | 'none'
+  | 'system'
+  | 'mpv'
+  | 'vlc'
+  | 'celluloid'
+  | 'smplayer'
+  | 'totem'
+  | 'haruna'
+  | 'iina'
+  | 'custom'
 
 export interface DetectedExternalPlayer {
   id: string
@@ -240,4 +250,20 @@ export interface ExternalPlayerLaunchResponse extends Result {
   player: string
   targetKind: 'file' | 'stream'
   androidIntent?: AndroidExternalIntent | null
+}
+
+export interface DeleteDownloadedEpisodeRequest {
+  taskId?: string | null
+  animeUrl?: string
+  animeName?: string
+  episodeUrl?: string
+  episodeNumber?: number
+  version?: string
+  source?: string
+  season?: number
+}
+
+export interface DeleteDownloadedEpisodeResponse extends Result {
+  deletedFiles: number
+  removedTaskIds: string[]
 }

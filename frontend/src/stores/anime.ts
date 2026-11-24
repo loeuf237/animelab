@@ -13,6 +13,8 @@ export const useAnimeStore = defineStore('anime', () => {
   const selectedSource = ref('all')
   const isLoading = ref(false)
   const isDetailLoading = ref(false)
+  const isDetailRefreshing = ref(false)
+  const isOfflineSnapshot = ref(false)
   const error = ref<string | null>(null)
   const searchChallenges = ref<SourceChallenge[]>([])
   const searchWarnings = ref<{ source: string; message: string; url?: string; domain?: string }[]>(
@@ -93,6 +95,85 @@ export const useAnimeStore = defineStore('anime', () => {
     }
   }
 
+  async function refreshAnimeDetail(
+    url: string,
+    source: string = 'french-manga',
+    options?: { silent?: boolean; expectedSequence?: number },
+  ): Promise<{
+    updated: boolean
+    addedEpisodes?: number
+    offline?: boolean
+    challenge?: boolean
+    cancelled?: boolean
+    error?: string
+    detail?: AnimeDetailResponse
+  }> {
+    const silent = Boolean(options?.silent)
+    const sequence = options?.expectedSequence ?? ++detailSequence
+    const verification = useVerificationStore()
+    if (!silent) {
+      verification.clearPending('anime-detail')
+      detailChallenges.value = []
+      if (!currentDetail.value) {
+        isDetailLoading.value = true
+        error.value = null
+      }
+    }
+    isDetailRefreshing.value = true
+    try {
+      const fresh = await api.getAnimeDetail(url, source, { refresh: true })
+      if (sequence !== detailSequence) return { updated: false, cancelled: true }
+      const previousCount = currentDetail.value?.anime?.episodes?.length ?? 0
+      const freshCount = fresh?.anime?.episodes?.length ?? 0
+      const addedEpisodes = currentDetail.value ? Math.max(0, freshCount - previousCount) : 0
+      currentDetail.value = fresh
+      detailChallenges.value = []
+      error.value = null
+      isOfflineSnapshot.value = false
+      return { updated: true, addedEpisodes, detail: fresh }
+    } catch (err: any) {
+      if (sequence !== detailSequence) return { updated: false, cancelled: true }
+      const challenge = challengeFromError(err)
+      if (currentDetail.value) {
+        isOfflineSnapshot.value = true
+        if (!silent && challenge) {
+          detailChallenges.value = [challenge]
+          verification.waitForVerification('anime-detail', [challenge], async () => {
+            if (sequence === detailSequence) {
+              await refreshAnimeDetail(url, source, { silent: false })
+            }
+          })
+        }
+        return {
+          updated: false,
+          offline: true,
+          challenge: Boolean(challenge),
+          error: err?.message || '',
+        }
+      }
+      if (challenge) {
+        detailChallenges.value = [challenge]
+        verification.waitForVerification('anime-detail', [challenge], async () => {
+          if (sequence === detailSequence) {
+            await refreshAnimeDetail(url, source, { silent: false })
+          }
+        })
+      }
+      error.value = err?.message || "Impossible de charger la fiche de l'animé"
+      console.error('[useAnimeStore] refreshAnimeDetail error:', err)
+      return {
+        updated: false,
+        challenge: Boolean(challenge),
+        error: err?.message || '',
+      }
+    } finally {
+      if (sequence === detailSequence) {
+        isDetailRefreshing.value = false
+        isDetailLoading.value = false
+      }
+    }
+  }
+
   async function fetchAnimeDetail(url: string, source: string = 'french-manga') {
     const sequence = ++detailSequence
     const verification = useVerificationStore()
@@ -100,11 +181,20 @@ export const useAnimeStore = defineStore('anime', () => {
     detailChallenges.value = []
     currentDetail.value = null
     isDetailLoading.value = true
+    isDetailRefreshing.value = false
+    isOfflineSnapshot.value = false
     error.value = null
     try {
       const res = await api.getAnimeDetail(url, source)
       if (sequence !== detailSequence) return
       currentDetail.value = res
+      if (res?.fromCache) {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+          isOfflineSnapshot.value = true
+        } else {
+          void refreshAnimeDetail(url, source, { silent: true, expectedSequence: sequence })
+        }
+      }
       return res
     } catch (err: any) {
       if (sequence !== detailSequence) return
@@ -127,6 +217,8 @@ export const useAnimeStore = defineStore('anime', () => {
     useVerificationStore().clearPending('anime-detail')
     detailChallenges.value = []
     isDetailLoading.value = false
+    isDetailRefreshing.value = false
+    isOfflineSnapshot.value = false
     currentDetail.value = null
   }
 
@@ -139,12 +231,15 @@ export const useAnimeStore = defineStore('anime', () => {
     selectedSource,
     isLoading,
     isDetailLoading,
+    isDetailRefreshing,
+    isOfflineSnapshot,
     error,
     searchChallenges,
     searchWarnings,
     fetchHomeFeed,
     search,
     fetchAnimeDetail,
+    refreshAnimeDetail,
     clearDetail,
   }
 })

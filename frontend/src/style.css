@@ -3856,6 +3856,10 @@ html[data-theme='light'] .palette-preview-backdrop {
   cursor: pointer;
   flex-shrink: 0;
 }
+.tachiyomi-episode-item .episode-check:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
 
 .tachiyomi-ep-left {
   display: flex;
@@ -4094,7 +4098,8 @@ html[data-theme='light'] .palette-preview-backdrop {
   height: 18px;
 }
 
-.tachiyomi-circle-btn.is-downloaded {
+.tachiyomi-circle-btn.is-downloaded,
+.tachiyomi-circle-btn.is-downloaded:hover {
   border-color: rgba(var(--accent-rgb), 0.3);
   background: var(--accent-container);
   color: var(--on-accent-container);
@@ -5244,6 +5249,9 @@ textarea {
   min-width: 44px;
   min-height: 44px;
   cursor: pointer;
+}
+.episode-selection-target.is-disabled {
+  cursor: not-allowed;
 }
 .subtitle-cb-label {
   min-height: 44px;

@@ -13,6 +13,7 @@ from animelab.routers import anime as router
 from animelab.services.source_http import VerificationRequired
 from animelab.services.voiranime_service import voiranime_service
 from animelab.services.animepahe_service import animepahe_service
+from animelab.services.french_stream_service import french_stream_service
 from animelab.services.scraping_service import scraping_service
 from animelab.services.aniyomi_container import AniyomiContainerSource
 from animelab.services.aniyomi_dex_parser import SourceRecipe
@@ -36,7 +37,7 @@ async def test_empty_cache_refresh_runs_once_and_returns_first_results(original)
 
 @pytest.mark.asyncio
 async def test_home_feed_reports_protections_and_loads_more_than_four_extensions(monkeypatch):
-    for service in (scraping_service, voiranime_service, animepahe_service):
+    for service in (scraping_service, voiranime_service, animepahe_service, french_stream_service):
         monkeypatch.setattr(service, 'get_latest_releases', AsyncMock(return_value=[]))
     challenge = VerificationRequired('https://animepahe.pw/api?m=airing')
     animepahe_service.get_latest_releases.side_effect = challenge

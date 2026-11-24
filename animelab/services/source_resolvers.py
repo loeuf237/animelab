@@ -24,7 +24,7 @@ async def resolve_imported(ctx, task, direct_url, skip_local):
     matched_container = None
     try:
         from animelab.services.extension_service import extension_service
-        if task.source and task.source not in ("french-manga", "voir-anime", "animepahe"):
+        if task.source and task.source not in ("french-manga", "french-stream", "voir-anime", "animepahe"):
             matched_container = extension_service.get_container_source_by_id(task.source)
         if not matched_container and not task.source and u_host:
             for cs in extension_service.get_enabled_container_sources():
@@ -40,7 +40,7 @@ async def resolve_imported(ctx, task, direct_url, skip_local):
     if not matched_container:
         try:
             from animelab.services.seanime_service import seanime_service
-            if task.source and task.source not in ("french-manga", "voir-anime", "animepahe"):
+            if task.source and task.source not in ("french-manga", "french-stream", "voir-anime", "animepahe"):
                 matched_container = seanime_service.get_source_by_id(task.source)
             elif not task.source:
                 for s_src in seanime_service.get_enabled_sources():
@@ -230,7 +230,7 @@ class SourceResolverRegistry:
                              animepahe=resolve_animepahe, scraping=resolve_scraping, direct=resolve_direct)
 
     def select(self, ctx, task, url):
-        imported = ((task.source and task.source not in ('french-manga', 'voir-anime', 'animepahe'))
+        imported = ((task.source and task.source not in ('french-manga', 'french-stream', 'voir-anime', 'animepahe'))
                     or extractor_registry.is_known_embed(url))
         if imported:
             return 'imported'

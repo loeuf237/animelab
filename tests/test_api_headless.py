@@ -107,18 +107,20 @@ async def test_api_home_feed(client):
     with patch("animelab.services.scraping_service.scraping_service.get_latest_releases", new_callable=AsyncMock) as m_fm:
         with patch("animelab.services.voiranime_service.voiranime_service.get_latest_releases", new_callable=AsyncMock) as m_va:
             with patch("animelab.services.animepahe_service.animepahe_service.get_latest_releases", new_callable=AsyncMock) as m_ap:
-                m_fm.return_value = mock_releases
-                m_va.return_value = []
-                m_ap.return_value = []
+                with patch("animelab.services.french_stream_service.french_stream_service.get_latest_releases", new_callable=AsyncMock) as m_fs:
+                    m_fm.return_value = mock_releases
+                    m_va.return_value = []
+                    m_ap.return_value = []
+                    m_fs.return_value = []
 
-                resp = client.get("/api/home/feed")
-                assert resp.status_code == 200
-                data = resp.json()
-                assert data["success"] is True
-                assert len(data["latestFrenchManga"]) == 1
-                assert data["latestFrenchManga"][0]["title"] == "Dandadan"
-                assert "favorites" in data
-                assert "enabledExtensions" in data
+                    resp = client.get("/api/home/feed")
+                    assert resp.status_code == 200
+                    data = resp.json()
+                    assert data["success"] is True
+                    assert len(data["latestFrenchManga"]) == 1
+                    assert data["latestFrenchManga"][0]["title"] == "Dandadan"
+                    assert "favorites" in data
+                    assert "enabledExtensions" in data
 
 @pytest.mark.asyncio
 async def test_api_source_feed(client):

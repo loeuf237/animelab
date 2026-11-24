@@ -3,15 +3,20 @@ import logging
 import re
 from typing import Optional
 
+import urllib.parse
+
 from animelab.services.extractors.base import BaseVideoExtractor, ExtractorResult
 
 logger = logging.getLogger(__name__)
 
 class UqloadExtractor(BaseVideoExtractor):
     name = "Uqload"
-    domains = ["uqload.is", "uqload.to", "uqload.com", "uqload.co", "uqload.ws", "uqload.net"]
+    domains = ["uqload.is", "uqload.to", "uqload.com", "uqload.co", "uqload.ws", "uqload.net", "uqload.vc", "uqload.bz", "uqload.cx"]
 
     def get_default_referer(self, url: str) -> Optional[str]:
+        parsed = urllib.parse.urlparse(url or "")
+        if parsed.scheme in ("http", "https") and parsed.netloc and "uqload" in parsed.netloc.lower():
+            return f"{parsed.scheme}://{parsed.netloc}/"
         return "https://uqload.is/"
 
     async def extract(
@@ -21,7 +26,8 @@ class UqloadExtractor(BaseVideoExtractor):
         preferred_quality: Optional[str] = None,
     ) -> Optional[ExtractorResult]:
         try:
-            ref = referer or self.get_default_referer(url)
+            default_ref = self.get_default_referer(url) or "https://uqload.is/"
+            ref = referer or default_ref
             headers = self.get_headers(url)
             if ref:
                 headers["Referer"] = ref
@@ -44,7 +50,7 @@ class UqloadExtractor(BaseVideoExtractor):
 
                 file_size = -1
                 try:
-                    head_resp = await client.head(direct_mp4, headers={"Referer": "https://uqload.is/"}, timeout=5.0)
+                    head_resp = await client.head(direct_mp4, headers={"Referer": default_ref}, timeout=5.0)
                     cl = head_resp.headers.get("Content-Length")
                     if cl and cl.isdigit():
                         file_size = int(cl)
@@ -58,7 +64,7 @@ class UqloadExtractor(BaseVideoExtractor):
                     server_name="Uqload",
                     quality="HD",
                     qualities={"HD": direct_mp4},
-                    headers={"Referer": "https://uqload.is/"},
+                    headers={"Referer": default_ref},
                     size=file_size,
                 )
         except VerificationRequired:

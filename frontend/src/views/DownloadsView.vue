@@ -1081,7 +1081,10 @@ const downloadChallenges = computed(() =>
 let firstActivation = true
 onActivated(() => {
   if (firstActivation) firstActivation = false
-  else void downloadStore.fetchTasks()
+  else {
+    void downloadStore.fetchTasks()
+    void playerStore.loadExternalPlayerConfig()
+  }
 })
 const libraryStore = useLibraryStore()
 const playerStore = usePlayerStore()

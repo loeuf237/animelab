@@ -99,7 +99,7 @@ class ExtractorRegistry:
         elif s_lower == "kwik" or "owocdn" in u_lower:
             headers["Referer"] = "https://kwik.cx/"
         elif "vidzy" in u_lower or s_lower == "vidzy":
-            headers["Referer"] = "https://vidzy.live/"
+            headers["Referer"] = "https://vidzy.org/" if "vidzy.org" in u_lower else "https://vidzy.live/"
         else:
             try:
                 parsed = urlparse(url)

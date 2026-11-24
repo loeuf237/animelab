@@ -404,3 +404,72 @@ test('video resolution resumes after verification and never revives a closed pla
   assert.equal(player.videoUrl, null)
   assert.equal(player.challenges.length, 0)
 })
+
+test('cached library anime details display immediately, refresh in background when online, and stay visible when offline', async (t) => {
+  mockApi(t)
+  const previous = api.getAnimeDetail
+  t.after(() => {
+    api.getAnimeDetail = previous
+  })
+
+  const calls = []
+  let resolveBackground
+  api.getAnimeDetail = (url, source, options) => {
+    calls.push({ url, source, refresh: Boolean(options?.refresh) })
+    if (!options?.refresh) {
+      return Promise.resolve({
+        success: true,
+        fromCache: true,
+        cachedAt: '2026-11-24T10:00:00Z',
+        isFavorite: true,
+        anime: { title: 'Frieren', url, episodes: [{ number: 1, title: 'Ep 1' }] },
+      })
+    }
+    return new Promise((resolve) => {
+      resolveBackground = resolve
+    })
+  }
+
+  const store = useAnimeStore()
+  await store.fetchAnimeDetail('https://voiranime.cx/anime/frieren/', 'voir-anime')
+  assert.equal(store.isDetailLoading, false)
+  assert.equal(store.currentDetail.fromCache, true)
+  assert.equal(store.currentDetail.anime.episodes.length, 1)
+  assert.equal(calls.length, 2)
+  assert.equal(calls[1].refresh, true)
+
+  resolveBackground({
+    success: true,
+    fromCache: false,
+    isFavorite: true,
+    anime: {
+      title: 'Frieren',
+      url: 'https://voiranime.cx/anime/frieren/',
+      episodes: [
+        { number: 1, title: 'Ep 1' },
+        { number: 2, title: 'Ep 2' },
+      ],
+    },
+  })
+  await nextTick()
+  await new Promise((r) => setTimeout(r, 0))
+  assert.equal(store.currentDetail.fromCache, false)
+  assert.equal(store.currentDetail.anime.episodes.length, 2)
+  assert.equal(store.isOfflineSnapshot, false)
+
+  // Manual refresh failure keeps saved detail visible and flags offline state cleanly.
+  api.getAnimeDetail = async () => {
+    throw new Error('Connexion Internet indisponible pour actualiser la fiche.')
+  }
+  const outcome = await store.refreshAnimeDetail(
+    'https://voiranime.cx/anime/frieren/',
+    'voir-anime',
+    { silent: false },
+  )
+  assert.equal(outcome.updated, false)
+  assert.equal(outcome.offline, true)
+  assert.equal(store.error, null)
+  assert.equal(store.isOfflineSnapshot, true)
+  assert.equal(store.currentDetail.anime.episodes.length, 2)
+  store.clearDetail()
+})

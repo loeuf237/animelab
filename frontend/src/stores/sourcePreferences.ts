@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { language, readPreference, writePreference } from '@/utils/locale'
-const defaults = ['french-manga', 'voir-anime', 'animepahe']
+const defaults = ['french-manga', 'french-stream', 'voir-anime', 'animepahe']
 function readPinned(): string[] {
   try {
     const saved = JSON.parse(readPreference('pinned_sources') || 'null')

@@ -23,6 +23,8 @@ import type {
   VerificationResult,
   ExternalPlayerSettings,
   ExternalPlayerLaunchResponse,
+  DeleteDownloadedEpisodeRequest,
+  DeleteDownloadedEpisodeResponse,
 } from '@/types/api'
 import { language, tx } from '@/utils/locale'
 import type {
@@ -503,9 +505,16 @@ export const api = {
     return { nextCursor, queryScope }
   },
 
-  async getAnimeDetail(url: string, source: string = 'french-manga'): Promise<AnimeDetailResponse> {
-    const q = `?url=${encodeURIComponent(url)}&source=${encodeURIComponent(source)}`
-    return request<AnimeDetailResponse>(`/api/anime/detail${q}`)
+  async getAnimeDetail(
+    url: string,
+    source: string = 'french-manga',
+    options?: { refresh?: boolean },
+  ): Promise<AnimeDetailResponse> {
+    const search = new URLSearchParams()
+    search.set('url', url)
+    search.set('source', source)
+    if (options?.refresh) search.set('refresh', 'true')
+    return request<AnimeDetailResponse>(`/api/anime/detail?${search.toString()}`)
   },
 
   // --- Library & Favorites ---
@@ -999,6 +1008,7 @@ export const api = {
     source?: string
     server?: string
     quality?: string
+    taskId?: string | number | null
   }): Promise<VideoStreamInfo> {
     const search = new URLSearchParams()
     search.set('animeName', params.animeName)
@@ -1009,6 +1019,9 @@ export const api = {
     if (params.source) search.set('source', params.source)
     if (params.server && params.server !== 'auto') search.set('server', params.server)
     if (params.quality && params.quality !== 'auto') search.set('quality', params.quality)
+    if (params.taskId != null && String(params.taskId).trim() !== '') {
+      search.set('taskId', String(params.taskId))
+    }
     return request<VideoStreamInfo>(`/api/media/stream/resolve?${search.toString()}`)
   },
 
@@ -1370,6 +1383,15 @@ export const api = {
     return request(`/api/extensions/seanime/${encodeURIComponent(extId)}/diagnose`, {
       method: 'POST',
       body: JSON.stringify({ query }),
+    })
+  },
+
+  async deleteDownloadedEpisode(
+    payload: DeleteDownloadedEpisodeRequest,
+  ): Promise<DeleteDownloadedEpisodeResponse> {
+    return request('/api/media/downloaded/delete', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     })
   },
 }

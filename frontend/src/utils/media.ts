@@ -1,4 +1,7 @@
 export const PROXIED_IMAGE_HOSTS = [
+  'fstream.net',
+  'fs016.lol',
+  'french-stream.net',
   'voiranime.cx',
   'voir-anime.to',
   'voiranime.to',

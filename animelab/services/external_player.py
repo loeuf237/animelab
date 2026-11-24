@@ -18,7 +18,11 @@ import urllib.parse
 
 from animelab.config import settings
 
-PRESETS = frozenset({'none', 'mpv', 'vlc', 'custom', 'system'})
+PRESETS = frozenset(
+    {'none', 'system', 'mpv', 'vlc', 'celluloid', 'smplayer', 'totem', 'haruna', 'iina', 'custom'}
+)
+_DESKTOP_PLAYER_PRESETS = ('mpv', 'vlc', 'celluloid', 'smplayer', 'totem', 'haruna', 'iina')
+_WINDOWS_STARTFILE = '__windows_startfile__'
 DEFAULTS: dict[str, object] = {
     'preset': 'none',
     'customPath': '',
@@ -137,6 +141,20 @@ def validate_player_executable(value: str) -> str:
     return resolved
 
 
+def _resolve_desktop_system_opener() -> tuple[str, str] | None:
+    """Return `(label, opener_path)` for the OS default launcher on Desktop, or `None`."""
+    if sys.platform == 'win32':
+        return ('Lecteur par défaut du système', _WINDOWS_STARTFILE)
+    probes = ('open', '/usr/bin/open') if sys.platform == 'darwin' else ('xdg-open', '/usr/bin/xdg-open')
+    for probe in probes:
+        try:
+            resolved = validate_player_executable(probe)
+        except ValueError:
+            continue
+        return ('Lecteur par défaut du système', resolved)
+    return None
+
+
 def detect_installed_players(*, is_android: bool = False) -> list[dict[str, str]]:
     """Discover supported external media players installed on this device."""
     if is_android:
@@ -172,6 +190,31 @@ def detect_installed_players(*, is_android: bool = False) -> list[dict[str, str]
                 r'C:\Program Files (x86)\VideoLAN\VLC\vlc.exe',
             ),
         ),
+        (
+            'celluloid',
+            'Celluloid',
+            ('celluloid', '/usr/bin/celluloid', '/usr/local/bin/celluloid'),
+        ),
+        (
+            'smplayer',
+            'SMPlayer',
+            ('smplayer', '/usr/bin/smplayer', '/usr/local/bin/smplayer'),
+        ),
+        (
+            'totem',
+            'Vidéos (Totem)',
+            ('totem', '/usr/bin/totem'),
+        ),
+        (
+            'haruna',
+            'Haruna',
+            ('haruna', '/usr/bin/haruna', '/usr/local/bin/haruna'),
+        ),
+        (
+            'iina',
+            'IINA',
+            ('iina', '/Applications/IINA.app', str(Path.home() / 'Applications' / 'IINA.app')),
+        ),
     )
     for player_id, label, probes in candidates:
         for probe in probes:
@@ -181,6 +224,9 @@ def detect_installed_players(*, is_android: bool = False) -> list[dict[str, str]
                 continue
             detected.append({'id': player_id, 'label': label, 'path': resolved})
             break
+    system_opener = _resolve_desktop_system_opener()
+    if system_opener is not None:
+        detected.append({'id': 'system', 'label': system_opener[0], 'path': system_opener[1]})
     return detected
 
 
@@ -209,8 +255,11 @@ def build_player_command(
     subtitles: list[str] | None = None,
 ) -> list[str]:
     """Construct a safe argument vector (`shell=False`) for launching an external player."""
-    exe = validate_player_executable(executable)
     clean_target = _validate_launch_arg(target.strip(), 'Cible média')
+    if executable == _WINDOWS_STARTFILE and sys.platform == 'win32':
+        return [_WINDOWS_STARTFILE, clean_target]
+
+    exe = validate_player_executable(executable)
     clean_title = sanitize_title(title)
     clean_subs: list[str] = []
     for sub in subtitles or []:
@@ -243,6 +292,12 @@ def build_player_command(
 def spawn_desktop_player(argv: list[str]) -> None:
     """Spawn a detached external player process without invoking a shell."""
     if sys.platform == 'win32':
+        if len(argv) >= 2 and argv[0] == _WINDOWS_STARTFILE:
+            startfile = getattr(os, 'startfile', None)
+            if startfile is None:
+                raise RuntimeError('Lanceur système Windows indisponible.')
+            startfile(argv[1])
+            return
         flags = getattr(subprocess, 'DETACHED_PROCESS', 0) | getattr(
             subprocess, 'CREATE_NEW_PROCESS_GROUP', 0
         )
@@ -400,28 +455,64 @@ class ExternalPlayerSettings:
             'preferExternal': prefer_external,
         }
 
-    def resolve_configured_executable(
+    def _resolve_desktop_executable(
         self,
-        data: dict[str, object] | None = None,
+        values: dict[str, object],
+        detected: list[dict[str, str]],
         *,
-        is_android: bool = False,
+        allow_auto_fallback: bool = False,
+        for_stream: bool = False,
     ) -> tuple[str, str] | None:
-        """Return `(display_label, executable_path)` for Desktop, or `None` when disabled."""
-        if is_android:
-            return ('Android', '')
-        values = data if data is not None else self._load_raw()
         preset = str(values.get('preset') or 'none')
-        if preset in ('none', 'system'):
-            return None
+        if preset == 'none':
+            if not allow_auto_fallback or not detected:
+                return None
+            choice = (
+                next((item for item in detected if item['id'] != 'system'), detected[0])
+                if for_stream
+                else detected[0]
+            )
+            return (choice['label'], choice['path'])
+        if preset == 'system':
+            if for_stream:
+                direct = next((item for item in detected if item['id'] != 'system'), None)
+                if direct is not None:
+                    return (direct['label'], direct['path'])
+            system_entry = next((item for item in detected if item['id'] == 'system'), None)
+            if system_entry is not None:
+                return (system_entry['label'], system_entry['path'])
+            opener = _resolve_desktop_system_opener()
+            if opener is None:
+                raise ValueError('Lanceur système introuvable sur cette machine.')
+            return opener
         if preset == 'custom':
             exe = validate_player_executable(str(values.get('customPath') or ''))
             return (Path(exe).stem or 'Custom', exe)
-        detected = detect_installed_players(is_android=False)
         match = next((item for item in detected if item['id'] == preset), None)
         if match:
             return (match['label'], match['path'])
         exe = validate_player_executable(preset)
         return (preset.upper() if preset == 'vlc' else preset, exe)
+
+    def resolve_configured_executable(
+        self,
+        data: dict[str, object] | None = None,
+        *,
+        is_android: bool = False,
+        allow_auto_fallback: bool = False,
+        for_stream: bool = False,
+    ) -> tuple[str, str] | None:
+        """Return `(display_label, executable_path)` for Desktop, or `None` when disabled."""
+        if is_android:
+            return ('Android', '')
+        values = data if data is not None else self._load_raw()
+        detected = detect_installed_players(is_android=False)
+        return self._resolve_desktop_executable(
+            values,
+            detected,
+            allow_auto_fallback=allow_auto_fallback,
+            for_stream=for_stream,
+        )
 
     def snapshot(self, *, client_local: bool, is_android: bool = False) -> dict[str, object]:
         """Return public external-player capabilities without leaking paths remotely."""
@@ -456,16 +547,16 @@ class ExternalPlayerSettings:
             }
 
         preset = str(raw['preset'])
-        if preset == 'system':
-            preset = 'none'
         resolved_path: str | None = None
         if preset != 'none':
             try:
-                resolved = self.resolve_configured_executable(raw, is_android=False)
+                resolved = self._resolve_desktop_executable(raw, detected)
                 if resolved:
                     resolved_path = resolved[1]
             except ValueError:
                 resolved_path = None
+        elif detected:
+            resolved_path = detected[0]['path']
 
         return {
             'available': True,
@@ -473,7 +564,7 @@ class ExternalPlayerSettings:
             'clientLocal': True,
             'preset': preset,
             'customPath': str(raw['customPath']),
-            'preferExternal': bool(raw['preferExternal'] and resolved_path),
+            'preferExternal': bool(preset != 'none' and raw['preferExternal'] and resolved_path),
             'configured': bool(resolved_path),
             'resolvedPath': resolved_path,
             'detected': detected,
@@ -497,7 +588,7 @@ class ExternalPlayerSettings:
                 'preferExternal': prefer_external,
             }
         else:
-            if preset not in ('none', 'mpv', 'vlc', 'custom'):
+            if preset not in PRESETS:
                 raise ValueError('Préréglage de lecteur externe invalide.')
             if preset == 'none':
                 values = {'preset': 'none', 'customPath': custom_path, 'preferExternal': False}

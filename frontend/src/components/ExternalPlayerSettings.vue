@@ -32,8 +32,14 @@
               :disabled="saving"
             >
               <option value="none">{{ tx('Lecteur intégré uniquement') }}</option>
+              <option v-if="hasSystemOpener || form.preset === 'system'" value="system">
+                {{ tx('Lecteur par défaut du système') }}
+              </option>
               <option value="mpv">{{ optionLabel('mpv', 'mpv') }}</option>
               <option value="vlc">{{ optionLabel('vlc', 'VLC') }}</option>
+              <option v-for="extra in extraDetectedPlayers" :key="extra.id" :value="extra.id">
+                {{ extra.label }} ({{ tx('détecté') }})
+              </option>
               <option value="custom">{{ tx('Chemin personnalisé') }}</option>
             </select>
             <div v-if="config.detected.length" class="ext-detected-chips">
@@ -45,7 +51,7 @@
                 :class="{ active: form.preset === item.id }"
                 @click="form.preset = item.id as ExternalPlayerSettings['preset']"
               >
-                {{ item.label }}
+                {{ tx(item.label) }}
               </button>
             </div>
           </div>
@@ -53,6 +59,13 @@
             {{
               tx(
                 'Aucun lecteur détecté automatiquement : indiquez un chemin personnalisé si mpv ou VLC est installé ailleurs.',
+              )
+            }}
+          </p>
+          <p v-else-if="form.preset === 'none'" class="setting-desc-pro">
+            {{
+              tx(
+                `Le bouton « Lecteur externe » utilisera automatiquement ${config.detected[0].label}. Choisissez un lecteur ci-dessus si vous voulez l’utiliser par défaut à la lecture.`,
               )
             }}
           </p>
@@ -145,6 +158,13 @@ const form = reactive<{
   customPath: '',
   preferExternal: false,
 })
+
+const hasSystemOpener = computed(() => config.value.detected.some((item) => item.id === 'system'))
+const extraDetectedPlayers = computed(() =>
+  config.value.detected.filter(
+    (item) => !['none', 'system', 'mpv', 'vlc', 'custom'].includes(item.id),
+  ),
+)
 
 const canBrowseDesktop = computed(() => {
   if (typeof window === 'undefined') return false

@@ -146,6 +146,8 @@ export interface AnimeDetailResponse {
   totalEpisodes: number
   downloadedCount: number
   watchedCount: number
+  fromCache?: boolean
+  cachedAt?: string | null
 }
 
 export interface DownloadTask {
@@ -297,6 +299,7 @@ export interface HomeFeedResponse {
   success: boolean
   latestReleases?: Record<string, AnimeResult[]>
   latestFrenchManga?: AnimeResult[]
+  latestFrenchStream?: AnimeResult[]
   latestVoirAnime?: AnimeResult[]
   latestAnimePahe?: AnimeResult[]
   extensionsReleases?: Record<string, { name: string; releases: AnimeResult[] }>
@@ -318,6 +321,7 @@ export interface VideoStreamInfo {
   title?: string
   subtitles?: SubtitleTrack[]
   isDownloaded?: boolean
+  taskId?: string | number | null
   filePath?: string
   sourceType?: string
   error?: string

@@ -301,7 +301,7 @@
                 <p class="settings-card-sub-pro">
                   {{
                     tx(
-                      'Configuration individualisée pour chaque source (VoirAnime, AnimePahe, French-Manga).',
+                      'Configuration individualisée pour chaque source (VoirAnime, AnimePahe, French-Manga, French-Stream).',
                     )
                   }}
                 </p>
@@ -337,6 +337,16 @@
                 @click="activeSourceTab = 'french-manga'"
               >
                 <span>French-Manga</span>
+                <span class="source-tab-badge">FR</span>
+              </button>
+
+              <button
+                type="button"
+                class="source-tab-btn"
+                :class="{ active: activeSourceTab === 'french-stream' }"
+                @click="activeSourceTab = 'french-stream'"
+              >
+                <span>French-Stream</span>
                 <span class="source-tab-badge">FR</span>
               </button>
             </div>
@@ -391,6 +401,23 @@
                 French-Manga (Vidzy)
               </div>
               <p>{{ tx('Flux directs Vidzy avec sous-titres FR synchronisés.') }}</p>
+            </div>
+
+            <!-- French-Stream -->
+            <div
+              v-show="activeSourceTab === 'french-stream'"
+              style="padding: 28px 24px; text-align: center; color: var(--muted)"
+            >
+              <div style="font-weight: 600; color: var(--text); margin-bottom: 6px">
+                French-Stream (fstream.net)
+              </div>
+              <p>
+                {{
+                  tx(
+                    'Films, séries et animés VF / VOSTFR liés à French-Manga, avec mise à jour automatique du miroir depuis fstream.net.',
+                  )
+                }}
+              </p>
             </div>
           </section>
         </div>
@@ -965,7 +992,9 @@ const platformLabel = computed(() => {
   const parts = [startupStore.snapshot?.runtime, startupStore.snapshot?.os].filter(Boolean)
   return parts.length ? parts.join(' · ') : 'web'
 })
-const activeSourceTab = ref<'voir-anime' | 'animepahe' | 'french-manga'>('voir-anime')
+const activeSourceTab = ref<'voir-anime' | 'animepahe' | 'french-manga' | 'french-stream'>(
+  'voir-anime',
+)
 
 const uaSelection = ref('Random (Rotator)')
 const customUa = ref('')

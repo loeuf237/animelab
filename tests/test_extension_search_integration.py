@@ -1,4 +1,5 @@
 from animelab.services.animepahe_service import animepahe_service
+from animelab.services.french_stream_service import french_stream_service
 from animelab.services.scraping_service import scraping_service
 from animelab.services.voiranime_service import voiranime_service
 import pytest
@@ -134,7 +135,7 @@ async def test_animesama_detail_episodes_parsing():
 
 def test_api_search_includes_extensions(client, monkeypatch):
     from animelab.routers import anime
-    for source in (scraping_service, voiranime_service, animepahe_service):
+    for source in (scraping_service, voiranime_service, animepahe_service, french_stream_service):
         monkeypatch.setattr(source, "search_anime", AsyncMock(return_value=[]))
     mock_source = MagicMock()
     mock_source.pkg = "eu.kanade.tachiyomi.animeextension.fr.mockext"

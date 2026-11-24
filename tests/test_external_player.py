@@ -351,3 +351,82 @@ def test_android_manifest_declares_non_exported_fileprovider():
     paths_xml = ET.parse(root / 'android' / 'app' / 'src' / 'main' / 'res' / 'xml' / 'file_paths.xml').getroot()
     entries = paths_xml.findall('./files-path')
     assert [(e.attrib.get('name'), e.attrib.get('path')) for e in entries] == [('downloads', 'downloads/')]
+
+
+@pytest.mark.asyncio
+async def test_desktop_system_preset_and_auto_detected_fallback(monkeypatch, tmp_path):
+    monkeypatch.setattr(app_config, 'IS_ANDROID', False)
+    monkeypatch.delenv('ANIMELAB_SHARED_WORKER', raising=False)
+    monkeypatch.setattr(app_config.settings, 'DOWNLOAD_DIR', str(tmp_path / 'downloads'))
+    monkeypatch.setattr(app_config.settings, 'CACHE_DIR', tmp_path / 'cache')
+    monkeypatch.setattr(ep_mod, 'external_player', ep_mod.ExternalPlayerSettings(tmp_path / 'cache' / 'external-player.json'))
+    monkeypatch.setattr(media, 'external_player', ep_mod.external_player)
+
+    mpv_exe = _make_fake_player(tmp_path, 'mpv')
+    xdg_exe = _make_fake_player(tmp_path, 'xdg-open')
+    monkeypatch.setattr(
+        ep_mod,
+        'detect_installed_players',
+        lambda *, is_android=False: [
+            {'id': 'mpv', 'label': 'mpv', 'path': str(mpv_exe.resolve())},
+            {'id': 'system', 'label': 'Lecteur par défaut du système', 'path': str(xdg_exe.resolve())},
+        ],
+    )
+
+    dl_dir = tmp_path / 'downloads'
+    dl_dir.mkdir(parents=True, exist_ok=True)
+    ep_file = dl_dir / 'Show Ep 1.mp4'
+    ep_file.write_bytes(b'video')
+    task_ok = SimpleNamespace(
+        id='task-ok',
+        animeName='Show',
+        episodeNumber=1,
+        fileName='Show Ep 1.mp4',
+        savePath=str(ep_file),
+        savePathSubtitle=None,
+        exportUrisJson='[]',
+    )
+    monkeypatch.setattr(media.download_manager, 'get_task', lambda tid: task_ok if tid == 'task-ok' else None)
+
+    spawned: list[list[str]] = []
+    monkeypatch.setattr(media, 'spawn_desktop_player', lambda argv: spawned.append(argv))
+
+    app = _test_app()
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app, client=('127.0.0.1', 1)),
+        base_url='http://127.0.0.1:8080',
+    ) as client:
+        # With preset='none' and detected players installed, explicit external button is available.
+        initial = (await client.get('/api/media/external-player/settings')).json()
+        assert initial['preset'] == 'none'
+        assert initial['configured'] is True
+        assert initial['preferExternal'] is False
+        assert initial['resolvedPath'] == str(mpv_exe.resolve())
+
+        # Explicit launch with preset='none' falls back to first detected player cleanly.
+        auto_launch = await client.post('/api/media/external-player/launch', json={'taskId': 'task-ok'})
+        assert auto_launch.status_code == 200
+        assert spawned[-1][0] == str(mpv_exe.resolve())
+
+        # Desktop accepts preset='system' and uses OS opener for local files while preferring video player for streams.
+        saved_sys = await client.post(
+            '/api/media/external-player/settings',
+            json={'preset': 'system', 'preferExternal': True},
+        )
+        assert saved_sys.status_code == 200
+        sys_snap = saved_sys.json()
+        assert sys_snap['preset'] == 'system'
+        assert sys_snap['configured'] is True
+        assert sys_snap['preferExternal'] is True
+        assert sys_snap['resolvedPath'] == str(xdg_exe.resolve())
+
+        local_sys = await client.post('/api/media/external-player/launch', json={'taskId': 'task-ok'})
+        assert local_sys.status_code == 200
+        assert spawned[-1][0] == str(xdg_exe.resolve())
+
+        stream_sys = await client.post(
+            '/api/media/external-player/launch',
+            json={'streamUrl': '/api/media/stream-proxy?url=https%3A%2F%2Fcdn.example%2Fep.mp4'},
+        )
+        assert stream_sys.status_code == 200
+        assert spawned[-1][0] == str(mpv_exe.resolve())

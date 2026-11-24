@@ -25,6 +25,19 @@
       </div>
 
       <div class="tachiyomi-topbar-actions" v-if="detail">
+        <!-- Bouton Actualiser (style Mihon) -->
+        <button
+          type="button"
+          class="tachiyomi-bar-btn"
+          :class="{ 'is-spinning': Boolean(animeStore.isDetailRefreshing) }"
+          :disabled="Boolean(animeStore.isDetailRefreshing)"
+          :aria-label="tx('Actualiser la fiche')"
+          :title="tx('Actualiser la fiche')"
+          @click="refreshDetail"
+        >
+          <RefreshCw :size="18" aria-hidden="true" />
+        </button>
+
         <!-- Bouton Téléchargement Massif -->
         <button
           type="button"
@@ -102,7 +115,12 @@
           class="tachiyomi-popup-menu"
           style="display: block; right: 0"
         >
-          <button type="button" class="tachiyomi-menu-item" @click="fetchDetail">
+          <button
+            type="button"
+            class="tachiyomi-menu-item"
+            :disabled="Boolean(animeStore.isDetailRefreshing)"
+            @click="refreshDetail"
+          >
             <span>{{ tx('Actualiser la fiche') }}</span>
           </button>
           <button type="button" class="tachiyomi-menu-item" @click="markAll(true)">
@@ -174,6 +192,21 @@
               >{{ tx(detail.anime.status || nativeStatus) }} •
               {{ tx(detail.sourceName || detail.source) }}</span
             >
+          </div>
+          <div
+            v-if="detail.fromCache || animeStore.isOfflineSnapshot"
+            class="tachiyomi-meta-line tachiyomi-cache-line"
+          >
+            <HardDrive :size="14" class="tachiyomi-meta-icon" aria-hidden="true" />
+            <span>
+              {{
+                tx(
+                  animeStore.isOfflineSnapshot
+                    ? 'Hors ligne · fiche locale'
+                    : 'Fiche enregistrée localement',
+                )
+              }}<template v-if="formattedCachedAt"> · {{ formattedCachedAt }}</template>
+            </span>
           </div>
         </div>
       </section>
@@ -451,18 +484,23 @@
             :key="rowKey(ep)"
             class="episode-item tachiyomi-episode-item"
             :class="{
-              'ep-downloaded': ep.isDownloaded,
+              'ep-downloaded': isEpisodeDownloaded(ep),
               'ep-watched': isWatched(ep),
             }"
           >
             <!-- Gauche: Checkbox, Unread dot, Thumbnail, Informations -->
             <div class="tachiyomi-ep-left">
-              <label class="episode-selection-target" @click.stop>
+              <label
+                class="episode-selection-target"
+                :class="{ 'is-disabled': isEpisodeDownloaded(ep) }"
+                @click.stop
+              >
                 <input
                   type="checkbox"
                   class="episode-check"
                   :aria-label="tx(`Sélectionner l’épisode ${ep.number} ${ep.version || ''}`)"
-                  :checked="selectedEpisodes.has(rowKey(ep))"
+                  :disabled="isEpisodeDownloaded(ep)"
+                  :checked="!isEpisodeDownloaded(ep) && selectedEpisodes.has(rowKey(ep))"
                   @click.stop
                   @change="toggleEpisodeSelection(rowKey(ep))"
                 />
@@ -501,7 +539,7 @@
                   </span>
 
                   <span
-                    v-if="ep.isDownloaded"
+                    v-if="isEpisodeDownloaded(ep)"
                     class="ep-done-badge"
                     :title="tx('Fichier disponible sur le disque dur')"
                   >
@@ -524,7 +562,7 @@
                   </span>
 
                   <!-- Pilule interactive Sous-titres -->
-                  <div class="ep-sub-control" @click.stop>
+                  <div v-if="!isEpisodeDownloaded(ep)" class="ep-sub-control" @click.stop>
                     <button
                       type="button"
                       class="ep-sub-chip"
@@ -552,11 +590,13 @@
               <button
                 type="button"
                 class="btn btn-icon btn-play-ep"
-                :class="ep.isDownloaded ? 'btn-play-local' : 'btn-play-stream'"
+                :class="isEpisodeDownloaded(ep) ? 'btn-play-local' : 'btn-play-stream'"
                 :aria-label="tx(`Lire l’épisode ${ep.number} ${ep.version || ''}`)"
                 :title="
                   tx(
-                    ep.isDownloaded ? 'Lecture locale (Disque dur)' : 'Streaming direct (En ligne)',
+                    isEpisodeDownloaded(ep)
+                      ? 'Lecture locale (Disque dur)'
+                      : 'Streaming direct (En ligne)',
                   )
                 "
                 @click.stop="playEpisode(ep)"
@@ -576,14 +616,30 @@
                 <ExternalLink :size="15" aria-hidden="true" />
               </button>
 
-              <!-- Bouton Téléchargement Circulaire -->
+              <!-- Bouton Suppression téléchargement / Bouton Téléchargement Circulaire -->
               <button
-                v-if="ep.isDownloaded"
+                v-if="isEpisodeDownloaded(ep)"
                 type="button"
-                class="tachiyomi-circle-btn is-downloaded"
-                :title="tx('Fichier disponible sur le disque dur')"
+                class="btn btn-icon btn-danger-outline btn-delete-ep"
+                :disabled="deletingEpisodeKey === rowKey(ep)"
+                :aria-label="
+                  tx(`Supprimer le téléchargement de l’épisode ${ep.number} ${ep.version || ''}`)
+                "
+                :title="tx('Supprimer l’épisode téléchargé')"
+                @click.stop="promptDeleteDownloaded(ep)"
               >
-                <svg viewBox="0 0 24 24">
+                <Trash2 :size="15" aria-hidden="true" />
+              </button>
+
+              <!-- Indicateur déjà téléchargé / Bouton Téléchargement Circulaire -->
+              <span
+                v-if="isEpisodeDownloaded(ep)"
+                class="tachiyomi-circle-btn is-downloaded"
+                role="img"
+                :title="tx('Déjà téléchargé')"
+                :aria-label="tx('Déjà téléchargé')"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
                   <circle
                     cx="12"
                     cy="12"
@@ -601,7 +657,7 @@
                     stroke-linejoin="round"
                   />
                 </svg>
-              </button>
+              </span>
 
               <button
                 v-else
@@ -696,6 +752,33 @@
         </ul>
       </template>
     </ConfirmDialog>
+
+    <ConfirmDialog
+      :open="!!pendingDeleteEpisode"
+      :title="tx('Supprimer l’épisode téléchargé')"
+      :confirm-label="tx('Supprimer')"
+      :busy="!!deletingEpisodeKey"
+      :danger="true"
+      @cancel="pendingDeleteEpisode = null"
+      @confirm="confirmDeleteDownloaded"
+    >
+      <template v-if="pendingDeleteEpisode">
+        <p>
+          {{
+            tx(
+              `Voulez-vous supprimer définitivement le fichier local de l’épisode ${pendingDeleteEpisode.number}${pendingDeleteEpisode.version ? ` (${pendingDeleteEpisode.version})` : ''} ?`,
+            )
+          }}
+        </p>
+        <p class="source-hint">
+          {{
+            tx(
+              'Le fichier vidéo et ses sous-titres locaux seront supprimés du disque dur. Votre progression de visionnage sera conservée.',
+            )
+          }}
+        </p>
+      </template>
+    </ConfirmDialog>
   </div>
 </template>
 
@@ -703,7 +786,16 @@
 import { tx } from '@/utils/locale'
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Building2, Clock, ExternalLink, Languages } from 'lucide-vue-next'
+import {
+  Building2,
+  Clock,
+  ExternalLink,
+  HardDrive,
+  Languages,
+  RefreshCw,
+  Trash2,
+} from 'lucide-vue-next'
+import { api } from '@/api/client'
 import { useAnimeStore } from '@/stores/anime'
 import { usePlayerStore } from '@/stores/player'
 import { useDownloadStore } from '@/stores/downloads'
@@ -745,6 +837,8 @@ const downloadingEpisodes = ref<Set<string>>(new Set())
 const isBatchDownloading = ref(false)
 
 const pendingBatch = ref<Parameters<typeof downloadStore.startBatchDownload>[0] | null>(null)
+const pendingDeleteEpisode = ref<Episode | null>(null)
+const deletingEpisodeKey = ref<string | null>(null)
 const batchVersionSummary = computed(() => {
   const counts = new Map<string, number>()
   for (const ep of pendingBatch.value?.episodes || [])
@@ -780,15 +874,24 @@ const coverUseProxy = ref(false)
 const coverBroken = ref(false)
 const coverSrc = computed(() => {
   const raw = detail.value?.anime.imageUrl
-  return coverUseProxy.value ? proxyImageUrl(raw) : resolveImageUrl(raw)
+  if (!raw) return ''
+  return coverUseProxy.value || detail.value?.isFavorite ? proxyImageUrl(raw) : resolveImageUrl(raw)
 })
 const heroBgImg = computed(() => {
   const raw = detail.value?.anime.backdropUrl || detail.value?.anime.imageUrl
+  if (!raw) return 'none'
   const resolved =
-    coverUseProxy.value && raw === detail.value?.anime.imageUrl
+    detail.value?.isFavorite || (coverUseProxy.value && raw === detail.value?.anime.imageUrl)
       ? proxyImageUrl(raw)
       : resolveImageUrl(raw)
   return resolved ? `url("${resolved.replace(/"/g, '\\"')}")` : 'none'
+})
+const formattedCachedAt = computed(() => {
+  const raw = detail.value?.cachedAt
+  if (!raw) return ''
+  const dt = new Date(raw)
+  if (Number.isNaN(dt.getTime())) return ''
+  return dt.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })
 })
 function onCoverError() {
   const raw = detail.value?.anime.imageUrl
@@ -907,7 +1010,72 @@ function toggleBatchSubtitles() {
   }
 }
 
+function normalizeVersionKey(version?: string | null): string {
+  return (version || '').trim().toUpperCase()
+}
+
+function equivalentUrlStem(url?: string | null): string {
+  return (url || '').trim().replace(/\/+$/, '')
+}
+
+function findCompletedDownloadTask(ep: Episode) {
+  const taskList = Array.isArray(downloadStore.tasks) ? downloadStore.tasks : []
+  if (!taskList.length || !detail.value) return undefined
+  const epNum = Number(ep.number)
+  const epVer = normalizeVersionKey(ep.version || detail.value.anime.version || '')
+  const epUrls = new Set([ep.downloadPageUrl, ep.playerUrl].map(equivalentUrlStem).filter(Boolean))
+  const curAnimeName = (detail.value.anime.title || '').trim().toLowerCase()
+  const curAnimeUrl = equivalentUrlStem(detail.value.anime.url)
+  return taskList.find((t) => {
+    const st = String(t.rawStatus || t.status || '').toUpperCase()
+    if (st !== 'COMPLETED') return false
+    if (Number(t.episodeNumber) !== epNum) return false
+    const taskVer = normalizeVersionKey(t.version)
+    if (epVer && taskVer && taskVer !== epVer) return false
+    if (epVer && !taskVer && !epUrls.has(equivalentUrlStem(t.fileUrl))) return false
+    if (epUrls.size && epUrls.has(equivalentUrlStem(t.fileUrl))) return true
+    if (curAnimeUrl && equivalentUrlStem(t.animeUrl) === curAnimeUrl) {
+      return !epVer || taskVer === epVer
+    }
+    return (
+      Boolean(curAnimeName) &&
+      (t.animeName || '').trim().toLowerCase() === curAnimeName &&
+      (!epVer || taskVer === epVer)
+    )
+  })
+}
+
+function isEpisodeDownloaded(ep: Episode): boolean {
+  return Boolean(ep.isDownloaded || findCompletedDownloadTask(ep))
+}
+
+function resolvedDownloadTaskId(ep: Episode): string | number | null {
+  if (ep.downloadTaskId != null) return ep.downloadTaskId
+  const match = findCompletedDownloadTask(ep)
+  return match?.id ?? null
+}
+
+function episodeByRowKey(key: string): Episode | undefined {
+  return detail.value?.anime.episodes.find((ep) => rowKey(ep) === key)
+}
+
+function enrichEpisodeForPlayback(ep: Episode): Episode {
+  const taskId = resolvedDownloadTaskId(ep)
+  const downloaded = isEpisodeDownloaded(ep)
+  if (ep.downloadTaskId === taskId && Boolean(ep.isDownloaded) === downloaded) return ep
+  return {
+    ...ep,
+    isDownloaded: downloaded,
+    downloadTaskId: taskId,
+  }
+}
+
 function toggleEpisodeSelection(num: string) {
+  const target = episodeByRowKey(num)
+  if (target && isEpisodeDownloaded(target)) {
+    selectedEpisodes.value.delete(num)
+    return
+  }
   if (selectedEpisodes.value.has(num)) {
     selectedEpisodes.value.delete(num)
   } else {
@@ -918,7 +1086,9 @@ function toggleEpisodeSelection(num: string) {
 function selectAllEpisodes() {
   if (!detail.value) return
   for (const ep of filteredEpisodes.value) {
-    selectedEpisodes.value.add(rowKey(ep))
+    if (!isEpisodeDownloaded(ep)) {
+      selectedEpisodes.value.add(rowKey(ep))
+    }
   }
 }
 
@@ -926,7 +1096,7 @@ function selectUnwatchedEpisodes() {
   if (!detail.value) return
   selectedEpisodes.value.clear()
   for (const ep of filteredEpisodes.value) {
-    if (!isWatched(ep)) {
+    if (!isWatched(ep) && !isEpisodeDownloaded(ep)) {
       selectedEpisodes.value.add(rowKey(ep))
     }
   }
@@ -936,7 +1106,7 @@ function selectNotDownloadedEpisodes() {
   if (!detail.value) return
   selectedEpisodes.value.clear()
   for (const ep of filteredEpisodes.value) {
-    if (!ep.isDownloaded) {
+    if (!isEpisodeDownloaded(ep)) {
       selectedEpisodes.value.add(rowKey(ep))
     }
   }
@@ -946,6 +1116,10 @@ function invertSelection() {
   if (!detail.value) return
   for (const ep of filteredEpisodes.value) {
     const num = rowKey(ep)
+    if (isEpisodeDownloaded(ep)) {
+      selectedEpisodes.value.delete(num)
+      continue
+    }
     if (selectedEpisodes.value.has(num)) {
       selectedEpisodes.value.delete(num)
     } else {
@@ -953,6 +1127,18 @@ function invertSelection() {
     }
   }
 }
+
+watch(
+  () => downloadStore.tasks,
+  () => {
+    if (!detail.value || !selectedEpisodes.value.size) return
+    for (const key of [...selectedEpisodes.value]) {
+      const ep = episodeByRowKey(key)
+      if (ep && isEpisodeDownloaded(ep)) selectedEpisodes.value.delete(key)
+    }
+  },
+  { deep: true },
+)
 
 watch(versionFilter, () => selectedEpisodes.value.clear())
 
@@ -969,6 +1155,27 @@ function fetchDetail() {
   }
 }
 
+async function refreshDetail() {
+  isOverflowMenuOpen.value = false
+  const url = (route.query.url as string) || detail.value?.anime.url
+  const source = (route.query.source as string) || detail.value?.source || 'french-manga'
+  if (!url) return
+  if (typeof animeStore.refreshAnimeDetail !== 'function') {
+    fetchDetail()
+    return
+  }
+  const res = await animeStore.refreshAnimeDetail(url, source, { silent: false })
+  if (res?.updated) {
+    if ((res.addedEpisodes ?? 0) > 0) {
+      showToast(tx(`Fiche mise à jour (+${res.addedEpisodes} épisode(s)).`), 'success')
+    } else {
+      showToast(tx('Fiche mise à jour.'), 'success')
+    }
+  } else if (res?.offline && !res?.challenge) {
+    showToast(tx('Impossible d’actualiser la fiche : affichage de la copie locale.'), 'info')
+  }
+}
+
 watch(
   () => [route.query.url, route.query.source],
   () => fetchDetail(),
@@ -982,14 +1189,15 @@ onUnmounted(() => animeStore.clearDetail())
 
 async function launchEpisodeExternal(ep: Episode): Promise<boolean> {
   if (!detail.value) return false
+  const playbackEp = enrichEpisodeForPlayback(ep)
   try {
     const res = await playerStore.launchEpisodeExternal({
       title: detail.value.anime.title,
       animeUrl: detail.value.anime.url,
       source: detail.value.source,
-      episode: ep,
-      allEpisodes: detail.value.anime.episodes,
-      taskId: ep.isDownloaded ? ep.downloadTaskId : null,
+      episode: playbackEp,
+      allEpisodes: detail.value.anime.episodes.map(enrichEpisodeForPlayback),
+      taskId: playbackEp.isDownloaded ? playbackEp.downloadTaskId : null,
     })
     showToast(`${tx('Ouverture dans')} ${res.player}`, 'info')
     return true
@@ -1011,17 +1219,18 @@ async function playEpisode(ep: Episode) {
   if (playerStore.prefersExternal) {
     if (await launchEpisodeExternal(ep)) return
   }
+  const playbackEp = enrichEpisodeForPlayback(ep)
   playerStore.openPlayer(
     detail.value.anime.title,
     detail.value.anime.url,
     detail.value.source,
-    ep,
-    detail.value.anime.episodes,
+    playbackEp,
+    detail.value.anime.episodes.map(enrichEpisodeForPlayback),
   )
 }
 
 async function downloadEp(ep: Episode) {
-  if (!detail.value) return
+  if (!detail.value || isEpisodeDownloaded(ep)) return
   const numStr = rowKey(ep)
   downloadingEpisodes.value.add(numStr)
   const targetUrl = ep.downloadPageUrl || ep.playerUrl || detail.value.anime.url
@@ -1049,13 +1258,72 @@ async function downloadEp(ep: Episode) {
   }
 }
 
+function promptDeleteDownloaded(ep: Episode) {
+  if (deletingEpisodeKey.value) return
+  pendingDeleteEpisode.value = ep
+}
+
+async function confirmDeleteDownloaded() {
+  const ep = pendingDeleteEpisode.value
+  if (!ep || !detail.value || deletingEpisodeKey.value) return
+  const key = rowKey(ep)
+  deletingEpisodeKey.value = key
+  const taskId = resolvedDownloadTaskId(ep)
+  const ver = ep.version || detail.value.anime.version || ''
+  try {
+    const res = await api.deleteDownloadedEpisode({
+      taskId: taskId != null ? String(taskId) : undefined,
+      animeUrl: detail.value.anime.url,
+      animeName: detail.value.anime.title,
+      episodeUrl: ep.downloadPageUrl || ep.playerUrl || '',
+      episodeNumber: Number(ep.number),
+      version: ver,
+      source: detail.value.source,
+      season: episodeSeason(ep) || undefined,
+    })
+    ep.isDownloaded = false
+    ep.downloadTaskId = null
+    if (Array.isArray(detail.value.downloadedEpisodes)) {
+      detail.value.downloadedEpisodes = detail.value.downloadedEpisodes.filter(
+        (item) => String(item) !== String(ep.number) && String(item) !== `${ep.number}-${ver}`,
+      )
+    }
+    detail.value.downloadedCount = detail.value.anime.episodes.filter((item) =>
+      isEpisodeDownloaded(item),
+    ).length
+    const removedSet = new Set((res.removedTaskIds || []).map((id) => String(id)))
+    if (taskId != null) removedSet.add(String(taskId))
+    downloadStore.tasks = downloadStore.tasks.filter((t) => !removedSet.has(String(t.id)))
+    void downloadStore.fetchTasks()
+    if (
+      playerStore.isOpen &&
+      playerStore.isDownloaded &&
+      playerStore.currentEpisode &&
+      Number(playerStore.currentEpisode.number) === Number(ep.number) &&
+      (playerStore.currentEpisode.version || '') === (ep.version || '')
+    ) {
+      playerStore.closePlayer()
+    }
+    pendingDeleteEpisode.value = null
+    showToast('Épisode téléchargé supprimé.', 'success')
+  } catch (err) {
+    showToast(
+      err instanceof Error ? err.message : 'Impossible de supprimer l’épisode téléchargé.',
+      'error',
+    )
+  } finally {
+    deletingEpisodeKey.value = null
+  }
+}
+
 function previewBatch(targetEps: Episode[]) {
-  if (!detail.value || !targetEps.length || isBatchDownloading.value) return
+  const eligible = targetEps.filter((ep) => !isEpisodeDownloaded(ep))
+  if (!detail.value || !eligible.length || isBatchDownloading.value) return
   pendingBatch.value = {
     animeName: detail.value.anime.title,
     source: detail.value.source,
     preferredQuality: batchQuality.value !== 'auto' ? batchQuality.value : undefined,
-    episodes: targetEps.map((ep) => ({
+    episodes: eligible.map((ep) => ({
       number: ep.number,
       version: ep.version || detail.value!.anime.version || '',
       animeUrl: detail.value!.anime.url,
@@ -1072,7 +1340,9 @@ function previewBatch(targetEps: Episode[]) {
 }
 function downloadSelectedEpisodes() {
   previewBatch(
-    detail.value?.anime.episodes.filter((ep) => selectedEpisodes.value.has(rowKey(ep))) || [],
+    detail.value?.anime.episodes.filter(
+      (ep) => !isEpisodeDownloaded(ep) && selectedEpisodes.value.has(rowKey(ep)),
+    ) || [],
   )
 }
 async function confirmBatchDownload() {
@@ -1095,13 +1365,14 @@ async function confirmBatchDownload() {
 }
 function triggerBatchPreset(mode: string) {
   isBatchMenuOpen.value = false
-  const all = [...filteredEpisodes.value].sort((a, b) => Number(a.number) - Number(b.number))
+  const all = [...filteredEpisodes.value]
+    .filter((ep) => !isEpisodeDownloaded(ep))
+    .sort((a, b) => Number(a.number) - Number(b.number))
   let targets: Episode[] = []
   if (mode.startsWith('next-'))
-    targets = all.filter((ep) => !isWatched(ep) && !ep.isDownloaded).slice(0, Number(mode.slice(5)))
+    targets = all.filter((ep) => !isWatched(ep)).slice(0, Number(mode.slice(5)))
   else if (mode === 'unwatched') targets = all.filter((ep) => !isWatched(ep))
-  else if (mode === 'not-downloaded') targets = all.filter((ep) => !ep.isDownloaded)
-  else if (mode === 'all') targets = all
+  else if (mode === 'not-downloaded' || mode === 'all') targets = all
   if (!targets.length) {
     showToast('Aucun épisode correspondant à télécharger.')
     return
@@ -1497,5 +1768,14 @@ async function markAll(watched: boolean) {
   to {
     transform: rotate(360deg);
   }
+}
+
+.tachiyomi-bar-btn.is-spinning svg {
+  animation: spin 0.8s linear infinite;
+}
+
+.tachiyomi-cache-line {
+  font-size: 12px;
+  opacity: 0.9;
 }
 </style>

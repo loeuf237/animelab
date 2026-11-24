@@ -3,6 +3,7 @@ export const sources = [
   ['voir-anime', 'VoirAnime', 'fr', 'https://voiranime.cx/'],
   ['animepahe', 'AnimePahe', 'en', 'https://animepahe.pw/'],
   ['french-manga', 'French-Manga', 'fr', 'https://w16.french-manga.net/'],
+  ['french-stream', 'French-Stream', 'fr', 'https://fs016.lol/'],
   [
     'aniyomi-long',
     'Aniyomi: Une extension avec un nom particulièrement long',
@@ -14,7 +15,7 @@ export const sources = [
   name,
   lang,
   baseUrl,
-  type: i < 3 ? 'native' : 'imported',
+  type: i < 4 ? 'native' : 'imported',
   isEnabled: true,
   views: [
     { id: 'latest', label: 'Dernières sorties' },
@@ -205,7 +206,7 @@ export async function mockApp(
         data = { sessions: [], browsers: [] }
         break
       case '/api/home/feed':
-        data = { favorites: [], releases: {}, sources: [] }
+        data = { favorites: [], releases: {}, latestFrenchStream: [], sources: [] }
         break
       case '/api/releases/latest':
         data = { releases: [] }
@@ -219,16 +220,30 @@ export async function mockApp(
       case '/api/media/external-player/settings':
         if (route.request().method() === 'POST') {
           const posted = route.request().postDataJSON() || {}
+          const detectedMatch = (externalPlayerSettings.detected || []).find(
+            (item) => item.id === posted.preset,
+          )
+          const resolvedPath =
+            posted.preset === 'none'
+              ? externalPlayerSettings.detected?.[0]?.path || null
+              : posted.preset === 'custom'
+                ? posted.customPath || '/usr/bin/custom-player'
+                : detectedMatch?.path ||
+                  (posted.preset === 'mpv'
+                    ? '/usr/bin/mpv'
+                    : posted.preset === 'vlc'
+                      ? '/usr/bin/vlc'
+                      : posted.preset === 'system'
+                        ? '/usr/bin/xdg-open'
+                        : null)
           data = {
             ...externalPlayerSettings,
             ...posted,
-            configured: Boolean(posted.preset && posted.preset !== 'none'),
-            resolvedPath:
-              posted.preset === 'mpv'
-                ? '/usr/bin/mpv'
-                : posted.preset === 'custom'
-                  ? posted.customPath || '/usr/bin/custom-player'
-                  : null,
+            configured: Boolean(
+              (posted.preset && posted.preset !== 'none') ||
+              (externalPlayerSettings.detected || []).length > 0,
+            ),
+            resolvedPath,
           }
         } else {
           data = externalPlayerSettings

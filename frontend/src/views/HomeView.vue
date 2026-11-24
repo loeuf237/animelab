@@ -261,7 +261,7 @@ const favoritesCount = computed(() => {
 })
 
 const activeSourcesCount = computed(() => {
-  return 3 + enabledExtensions.value.length
+  return 4 + enabledExtensions.value.length
 })
 
 const feedChallenges = computed(() =>
@@ -280,6 +280,9 @@ const currentReleases = computed<AnimeResult[]>(() => {
   if (releaseTab.value === 'french-manga') {
     return feed.latestFrenchManga || []
   }
+  if (releaseTab.value === 'french-stream') {
+    return feed.latestFrenchStream || []
+  }
   if (releaseTab.value === 'voir-anime') {
     return feed.latestVoirAnime || []
   }
@@ -295,6 +298,7 @@ const currentReleases = computed<AnimeResult[]>(() => {
 
 const sourceOptions = computed(() => [
   { id: 'french-manga', name: 'French-Manga' },
+  { id: 'french-stream', name: 'French-Stream' },
   { id: 'voir-anime', name: 'VoirAnime' },
   { id: 'animepahe', name: 'AnimePahe' },
   ...enabledExtensions.value

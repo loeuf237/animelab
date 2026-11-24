@@ -113,6 +113,16 @@ class SourceSettingsService:
                 "description": "Catalogue anime historique Vidzy et lecteurs directs.",
                 "has_custom_settings": False,
             },
+            {
+                "id": "french-stream",
+                "name": "French-Stream",
+                "type": "native",
+                "lang": "fr",
+                "icon": f"{settings.FRENCH_STREAM_URL.rstrip('/')}/favicon.ico",
+                "badge": "Français (VF / VOSTFR)",
+                "description": "Films, séries et animés en streaming (VF / VOSTFR) via le miroir officiel.",
+                "has_custom_settings": False,
+            },
         ]
 
         all_settings: Dict[str, Dict[str, Any]] = {}

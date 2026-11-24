@@ -69,7 +69,9 @@ const imageLoaded = ref(false)
 const useProxyFallback = ref(false)
 const imgEl = ref<HTMLImageElement | null>(null)
 const displayImageUrl = computed(() =>
-  useProxyFallback.value ? proxyImageUrl(props.imageUrl) : resolveImageUrl(props.imageUrl),
+  props.favorite || useProxyFallback.value
+    ? proxyImageUrl(props.imageUrl)
+    : resolveImageUrl(props.imageUrl),
 )
 
 function onImageError() {

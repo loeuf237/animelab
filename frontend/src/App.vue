@@ -93,6 +93,7 @@ watch(
       }
     } else downloadStore.stopSSE()
   },
+  { immediate: true },
 )
 const i18nStore = useI18nStore()
 const isPaletteOpen = ref(false)

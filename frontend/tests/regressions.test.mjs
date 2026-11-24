@@ -195,6 +195,9 @@ test('the actual detail view queues only the checked VF episode', async () => {
   const code = await moduleUrl(
     '../src/views/AnimeDetailView.vue',
     {
+      '@/api/client': inline(
+        'export const api={deleteDownloadedEpisode:async()=>({success:true,deletedFiles:0,removedTaskIds:[]})};',
+      ),
       '@/utils/episodes': episodeUtilsUrl,
       '@/stores/notifications': inline('export const useNotifications=()=>({notify:()=>{}});'),
       '@/stores/searchContext': inline('export const useSearchContext=()=>({restore:()=>{}});'),
@@ -291,6 +294,9 @@ test('duplicate episode rows receive distinct row keys and toggling one selects 
   const code = await moduleUrl(
     '../src/views/AnimeDetailView.vue',
     {
+      '@/api/client': inline(
+        'export const api={deleteDownloadedEpisode:async()=>({success:true,deletedFiles:0,removedTaskIds:[]})};',
+      ),
       '@/utils/episodes': episodeUtilsUrl,
       '@/stores/notifications': inline('export const useNotifications=()=>({notify:()=>{}});'),
       '@/stores/searchContext': inline('export const useSearchContext=()=>({restore:()=>{}});'),
@@ -562,4 +568,103 @@ test('verified media and failed exports retain independent display states', asyn
   )
   assert.match(done, /Exporté vers le stockage/)
   assert.match(done, /Downloads\/AnimeLab/)
+})
+
+test('already downloaded episodes are excluded from selection and re-download presets', async () => {
+  const downloadedEp = {
+    number: 1,
+    title: 'Épisode 1',
+    version: 'VF',
+    downloadPageUrl: 'https://anime/vf/1',
+    playerUrl: 'https://anime/vf/watch-1',
+    isDownloaded: true,
+    isWatched: false,
+    downloadTaskId: 'local-abc123',
+  }
+  const availableEp = {
+    number: 2,
+    title: 'Épisode 2',
+    version: 'VF',
+    downloadPageUrl: 'https://anime/vf/2',
+    playerUrl: 'https://anime/vf/watch-2',
+    isDownloaded: false,
+    isWatched: false,
+  }
+  const detail = {
+    anime: {
+      title: 'One Punch Man (VF)',
+      url: 'https://anime/vf',
+      episodes: [downloadedEp, availableEp],
+    },
+    source: 'voir-anime',
+    watchedEpisodes: [],
+  }
+  const captured = []
+  const singleDownloads = []
+  globalThis.__episodeTest = { detail, captured, singleDownloads }
+  const inline = (source) => `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`
+  const code = await moduleUrl(
+    '../src/views/AnimeDetailView.vue',
+    {
+      '@/api/client': inline(
+        'export const api={deleteDownloadedEpisode:async()=>({success:true,deletedFiles:0,removedTaskIds:[]})};',
+      ),
+      '@/utils/episodes': episodeUtilsUrl,
+      '@/stores/notifications': inline('export const useNotifications=()=>({notify:()=>{}});'),
+      '@/stores/searchContext': inline('export const useSearchContext=()=>({restore:()=>{}});'),
+      vue: inline(
+        `export {ref,computed} from '${import.meta.resolve('vue')}'; export const onMounted=()=>{}; export const onUnmounted=()=>{}; export const watch=()=>{};`,
+      ),
+      'vue-router': inline(
+        `export const useRouter=()=>({push:()=>{}}); export const useRoute=()=>({query:{}});`,
+      ),
+      '@/stores/anime': inline(
+        `export const useAnimeStore=()=>({currentDetail:globalThis.__episodeTest.detail});`,
+      ),
+      '@/stores/player': inline(`export const usePlayerStore=()=>({});`),
+      '@/stores/library': inline(
+        `export const useLibraryStore=()=>({favorites:[],isWatched:()=>undefined});`,
+      ),
+      '@/stores/downloads': inline(
+        `export const useDownloadStore=()=>({tasks:[],startDownload:async p=>{globalThis.__episodeTest.singleDownloads.push(p);return {success:true};},startBatchDownload:async p=>{globalThis.__episodeTest.captured.push(p);return {success:true};}});`,
+      ),
+    },
+    (s) =>
+      s
+        .split('<script setup lang="ts">')[1]
+        .split('</script>')[0]
+        .replace("import ConfirmDialog from '@/components/ConfirmDialog.vue';", '')
+        .replace(
+          "const emit = defineEmits<{(event: 'open-palette'): void}>();",
+          'const emit=()=>{};',
+        ) +
+      '\nexport {rowKey, isEpisodeDownloaded, selectedEpisodes, toggleEpisodeSelection, selectAllEpisodes, selectUnwatchedEpisodes, invertSelection, triggerBatchPreset, downloadSelectedEpisodes, downloadEp, pendingBatch};',
+  )
+  const view = await import(code)
+  assert.equal(view.isEpisodeDownloaded(downloadedEp), true)
+  assert.equal(view.isEpisodeDownloaded(availableEp), false)
+
+  view.toggleEpisodeSelection(view.rowKey(downloadedEp))
+  assert.equal(view.selectedEpisodes.value.size, 0)
+
+  view.selectAllEpisodes()
+  assert.deepEqual([...view.selectedEpisodes.value], [view.rowKey(availableEp)])
+
+  view.selectUnwatchedEpisodes()
+  assert.deepEqual([...view.selectedEpisodes.value], [view.rowKey(availableEp)])
+
+  view.invertSelection()
+  assert.equal(view.selectedEpisodes.value.has(view.rowKey(downloadedEp)), false)
+  assert.equal(view.selectedEpisodes.value.has(view.rowKey(availableEp)), false)
+
+  view.invertSelection()
+  assert.deepEqual([...view.selectedEpisodes.value], [view.rowKey(availableEp)])
+
+  await view.downloadEp(downloadedEp)
+  assert.equal(singleDownloads.length, 0)
+
+  view.triggerBatchPreset('all')
+  assert.equal(view.pendingBatch.value.episodes.length, 1)
+  assert.equal(view.pendingBatch.value.episodes[0].number, 2)
+  delete globalThis.__episodeTest
 })

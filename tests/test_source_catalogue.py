@@ -1,4 +1,5 @@
 from animelab.services.animepahe_service import animepahe_service
+from animelab.services.french_stream_service import french_stream_service
 from animelab.services.scraping_service import scraping_service
 from animelab.services.voiranime_service import voiranime_service
 from unittest.mock import AsyncMock
@@ -50,7 +51,7 @@ def test_catalogue_preserves_source_failure_details(monkeypatch, endpoint, failu
 
 @pytest.fixture
 def providers(monkeypatch):
-    for service in (scraping_service, voiranime_service, animepahe_service):
+    for service in (scraping_service, voiranime_service, animepahe_service, french_stream_service):
         monkeypatch.setattr(service, 'search_anime', AsyncMock(return_value=[]))
     monkeypatch.setattr(extension_service, 'get_enabled_container_sources', lambda: [])
     monkeypatch.setattr(extension_service, 'get_container_source_by_id', lambda sid: None)
@@ -131,7 +132,8 @@ def test_source_list_includes_compiled_extensions_only(catalogue, monkeypatch):
         {'pkg':'disabled','name':'Disabled','lang':'fr','recipe_json':'{}'},
     ])
     sources = catalogue.sources()
-    assert len(sources) == 5
+    assert len(sources) == 6
+    assert any(s['id'] == 'french-stream' for s in sources)
     assert not any(s['id'] == 'available' for s in sources)
     assert next(s for s in sources if s['id'] == 'disabled')['isEnabled'] is False
     assert 'popular' in [v['id'] for v in next(s for s in sources if s['id'] == 'installed')['views']]

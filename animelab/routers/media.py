@@ -34,8 +34,14 @@ from animelab.services.external_player import (
 )
 from animelab.services.proxy_service import proxy_service
 from animelab.services.library_service import library_service
+from animelab.services.local_media import discover_sidecar_subtitles, local_media
 from animelab.services.voiranime_service import voiranime_service, normalize_voiranime_url
 from animelab.services.scraping_service import scraping_service
+from animelab.services.french_stream_service import (
+    french_stream_service,
+    is_french_stream_host,
+    is_french_stream_url,
+)
 from animelab.services.animepahe_service import animepahe_service
 from animelab.services.extension_service import extension_service
 from animelab.services.extractors import extractor_registry
@@ -221,17 +227,25 @@ async def extension_resource(token: str, request: Request):
                 await stream.__aexit__(None, None, None)
             await client.aclose()
 
+def _validate_image_url_policy(url: str, *, require_dns: bool) -> None:
+    if require_dns:
+        validate_media_url(url)
+        return
+    try:
+        validate_media_url(url, require_dns=False)
+    except TypeError:
+        # Preserve compatibility with callers/tests monkeypatching validate_media_url as 1-arg lambda.
+        validate_media_url(url)
+
+
 @router.get("/api/media/image-proxy")
 async def proxy_image(url: str):
     if not url or not url.startswith("http"):
         raise HTTPException(status_code=400, detail="URL d'image invalide")
     url = normalize_voiranime_url(url)
-    await asyncio.to_thread(validate_media_url, url)
-
-    # Protection SSRF
-    if not await is_safe_url_async(url):
-        logger.warning("SSRF blocked on image-proxy for URL: %s", url)
-        raise HTTPException(status_code=400, detail="URL d'image non autorisée ou non sécurisée")
+    # Enforce domain & literal policy before checking local caches so
+    # unapproved shared-mode URLs never leak cached items offline.
+    await asyncio.to_thread(_validate_image_url_policy, url, require_dns=False)
 
     # 1. Cache mémoire ultra-rapide (0 ms)
     mem_data = _get_memory_cached_image(url)
@@ -239,12 +253,18 @@ async def proxy_image(url: str):
         content, ctype = mem_data
         return Response(content=content, media_type=ctype, headers=CACHE_HEADERS)
 
-    # 2. Cache disque persistant (survit aux redémarrages)
+    # 2. Cache disque persistant (survit aux redémarrages et mode hors ligne)
     disk_data = _get_disk_cached_image(url)
     if disk_data:
         content, ctype = disk_data
         _put_memory_cached_image(url, content, ctype)
         return Response(content=content, media_type=ctype, headers=CACHE_HEADERS)
+
+    # Protection SSRF DNS sur cache miss avant toute requête réseau sortante
+    await asyncio.to_thread(validate_media_url, url)
+    if not await is_safe_url_async(url):
+        logger.warning("SSRF blocked on image-proxy for URL: %s", url)
+        raise HTTPException(status_code=400, detail="URL d'image non autorisée ou non sécurisée")
 
     lock_key = (id(asyncio.get_running_loop()), url)
     lock_entry = _IMAGE_FETCH_LOCKS.get(lock_key)
@@ -282,6 +302,8 @@ async def proxy_image(url: str):
                 referer = f"{settings.ANIMEPAHE_URL}/"
             elif any(host == d or host.endswith("." + d) for d in va_domains):
                 referer = f"{settings.VOIR_ANIME_URL.rstrip('/')}/"
+            elif is_french_stream_host(host):
+                referer = f"{french_stream_service.base_url.rstrip('/')}/"
             else:
                 referer = "https://french-manga.net/"
                 for cs in extension_service.get_enabled_container_sources():
@@ -357,16 +379,127 @@ def parse_subtitle_paths(path_field: Optional[str]) -> List[str]:
             pass
     return [path_field]
 
+
+def _exported_android_uris(task) -> list[str]:
+    try:
+        raw = json.loads(getattr(task, "exportUrisJson", "[]") or "[]")
+        if isinstance(raw, list):
+            return [u for u in raw if isinstance(u, str) and u.startswith("content://")]
+    except (TypeError, ValueError):
+        pass
+    return []
+
+
+def _resolve_local_media_record(task_id: str):
+    """Resolve a task from active download manager, persisted DB rows, or disk registry."""
+    task = download_manager.get_task(task_id)
+    if task is not None:
+        return task
+    try:
+        entity = library_service.get_task_entity(task_id)
+        if entity is not None:
+            return entity.to_task()
+    except Exception:
+        pass
+    return local_media.get(task_id)
+
+
+def _is_task_record_playable(task) -> bool:
+    save_path = getattr(task, "savePath", None)
+    if save_path:
+        path = Path(save_path)
+        if is_safe_path(path):
+            try:
+                if path.is_file() and path.stat().st_size > 0:
+                    return True
+            except OSError:
+                pass
+    for uri in _exported_android_uris(task):
+        if platform_events.exported_copy_exists(uri) is True:
+            return True
+    return False
+
+
+def _subtitle_content_type(suffix: str) -> str:
+    ext = suffix.lower()
+    if ext == ".srt":
+        return "text/srt"
+    if ext == ".ass":
+        return "text/ass"
+    if ext == ".ssa":
+        return "text/ssa"
+    return "text/vtt"
+
+
+def _read_exported_bytes(uri: str, offset: int, total_bytes: int, chunk_size: int = 262144):
+    pos = offset
+    remaining = total_bytes
+    while remaining > 0:
+        data = platform_events.read_exported_copy(uri, pos, min(chunk_size, remaining))
+        if not data:
+            break
+        pos += len(data)
+        remaining -= len(data)
+        yield data
+
+
+def _serve_byte_stream(
+    *,
+    request: Request,
+    range_header: Optional[str],
+    file_size: int,
+    content_type: str,
+    iter_full,
+    iter_range,
+) -> Response:
+    if request.method == "HEAD":
+        return Response(
+            media_type=content_type,
+            headers={"Content-Length": str(file_size), "Accept-Ranges": "bytes"},
+        )
+    if not range_header:
+        return StreamingResponse(
+            iter_full(),
+            media_type=content_type,
+            headers={"Content-Length": str(file_size), "Accept-Ranges": "bytes"},
+        )
+    range_match = re.fullmatch(r"bytes=(\d*)-(\d*)", range_header.strip())
+    if not range_match or not any(range_match.groups()) or file_size == 0:
+        return Response(status_code=416, headers={"Content-Range": f"bytes */{file_size}"})
+    first, last = range_match.groups()
+    if first:
+        start = int(first)
+        end = min(int(last), file_size - 1) if last else file_size - 1
+    else:
+        suffix_length = int(last)
+        start = max(0, file_size - suffix_length)
+        end = file_size - 1
+    if start >= file_size or start > end:
+        return Response(status_code=416, headers={"Content-Range": f"bytes */{file_size}"})
+    content_length = end - start + 1
+    return StreamingResponse(
+        iter_range(start, content_length),
+        status_code=206,
+        media_type=content_type,
+        headers={
+            "Content-Range": f"bytes {start}-{end}/{file_size}",
+            "Accept-Ranges": "bytes",
+            "Content-Length": str(content_length),
+        },
+    )
+
+
 @router.get("/api/media/stream/resolve")
 async def resolve_stream(
     animeName: str = Query(...),
     episodeNumber: int = Query(...),
-    episodeUrl: str = Query(...),
+    episodeUrl: str = Query(""),
     animeUrl: Optional[str] = Query(""),
     version: Optional[str] = Query(""),
     source: Optional[str] = Query("voir-anime"),
     server: Optional[str] = Query(None),
     quality: Optional[str] = Query(None),
+    taskId: Optional[str] = Query(None),
 ):
     """
     Résout le flux de lecture pour un épisode :
@@ -376,17 +509,36 @@ async def resolve_stream(
     logger.info("Streaming resolution: %s - Ep %s (source=%s, server=%s, quality=%s)",
                 animeName, episodeNumber, source, server, quality)
 
-    # 1. Vérification si l'épisode est déjà téléchargé sur le disque dur
-    local_task = await asyncio.to_thread(
-        library_service.find_downloaded_episode,
-        anime_name=animeName,
-        episode_number=episodeNumber,
-        version=version or "",
-        episode_url=episodeUrl,
-    )
+    # 1. Vérification si l'épisode est déjà téléchargé (taskId explicite, base de données ou disque dur)
+    local_task = None
+    if taskId:
+        candidate = await asyncio.to_thread(_resolve_local_media_record, taskId)
+        if candidate is not None and await asyncio.to_thread(_is_task_record_playable, candidate):
+            local_task = candidate
+
+    if local_task is None:
+        local_task = await asyncio.to_thread(
+            library_service.find_downloaded_episode,
+            anime_name=animeName,
+            episode_number=episodeNumber,
+            version=version or "",
+            episode_url=episodeUrl,
+            anime_url=animeUrl or "",
+            source=source or "",
+        )
+
+    if local_task is None:
+        local_task = await asyncio.to_thread(
+            local_media.find_and_register,
+            anime_name=animeName,
+            episode_number=episodeNumber,
+            version=version or "",
+            anime_url=animeUrl or "",
+            source=source or "",
+        )
 
     if local_task:
-        logger.info("Episode found on hard disk: %s (task_id=%s)", local_task.savePath, local_task.id)
+        logger.info("Episode found locally: %s (task_id=%s)", local_task.savePath or local_task.fileName, local_task.id)
         # Récupérer les sous-titres locaux s'ils existent
         subtitles = []
         try:
@@ -403,13 +555,25 @@ async def resolve_stream(
             "sourceType": "local",
             "taskId": local_task.id,
             "streamUrl": f"/api/media/stream/{local_task.id}",
-            "filePath": local_task.savePath,
+            "filePath": local_task.savePath or "",
             "title": f"{animeName} - Épisode {episodeNumber}",
             "subtitles": subtitles,
             "serverType": "Disque dur (Local)",
             "selectedQuality": "Original (Local)",
             "qualities": {},
         }
+
+    if not (episodeUrl or "").strip():
+        return JSONResponse(
+            status_code=404,
+            content={
+                "success": False,
+                "error": "Aucun lien de streaming disponible pour cet épisode.",
+                "isDownloaded": False,
+                "sourceType": "remote",
+                "serverType": server or "auto",
+            },
+        )
 
     # 2. Épisode non téléchargé -> Résolution du streaming direct sur les serveurs d'hébergement
     logger.info("Episode not downloaded on hard disk. Extracting remote stream...")
@@ -422,7 +586,7 @@ async def resolve_stream(
     native_media = None
 
     container_source = None
-    if source not in ("voir-anime", "animepahe", "french-manga"):
+    if source not in ("voir-anime", "animepahe", "french-manga", "french-stream"):
         container_source = extension_service.get_container_source_by_id(source)
         if not container_source:
             try:
@@ -608,7 +772,37 @@ async def resolve_stream(
                     target_kwik_url = target_src.get("url", "")
                     if target_kwik_url:
                         video_url = await animepahe_service.extract_kwik_stream(target_kwik_url) or ""
-    elif source == "french-manga" or "french-manga" in episodeUrl:
+    elif source == "french-stream" or is_french_stream_url(episodeUrl):
+        ep_lower = episodeUrl.lower()
+        if any(h in ep_lower for h in ("vidzy", "luluvdo")) or "/d/" in ep_lower:
+            info = await asyncio.to_thread(scraping_service.extract_download_info, episodeUrl)
+            video_url = info.get("videoUrl") or info.get("directUrl") or ""
+            server_type = "vidzy"
+            sub_url = info.get("subtitleUrl")
+            if sub_url:
+                tracks.append({
+                    "kind": "captions",
+                    "label": "Français",
+                    "srclang": "fr",
+                    "src": f"/api/media/subtitle-proxy?url={urllib.parse.quote(sub_url)}",
+                    "default": True,
+                })
+        else:
+            try:
+                resolved = await download_manager.resolve_imported_video_stream(
+                    episodeUrl,
+                    referer=f"{french_stream_service.base_url.rstrip('/')}/",
+                    preferred_quality=quality,
+                )
+                if resolved and resolved.get("videoUrl"):
+                    video_url = resolved["videoUrl"]
+                    server_type = resolved.get("serverType") or "french-stream"
+                    selected_quality = resolved.get("selectedQuality") or "HD"
+            except VerificationRequired:
+                raise
+            except Exception as ex:
+                logger.debug("[media] French-Stream resolve error: %s", ex)
+    elif source == "french-manga" or "french-manga" in episodeUrl or "vidzy" in episodeUrl.lower():
         # french-manga
         info = await asyncio.to_thread(scraping_service.extract_download_info, episodeUrl)
         video_url = info.get("videoUrl") or info.get("directUrl") or ""
@@ -700,147 +894,161 @@ async def resolve_stream(
 
 @router.api_route("/api/media/stream/{task_id}", methods=["GET", "HEAD"])
 async def stream_video(task_id: str, request: Request, range: Optional[str] = Header(None)):
-    task = download_manager.get_task(task_id)
-    if not task or not task.savePath:
+    task = _resolve_local_media_record(task_id)
+    if not task:
         raise HTTPException(status_code=404, detail="Vidéo introuvable")
 
-    file_path = Path(task.savePath)
-    # Protection Path Traversal
-    if not is_safe_path(file_path):
-        logger.warning("Path Traversal blocked on streaming: %s", file_path)
+    safe_disk = True
+    if task.savePath:
+        file_path = Path(task.savePath)
+        safe_disk = is_safe_path(file_path)
+        if safe_disk and file_path.is_file():
+            file_size = file_path.stat().st_size
+            content_type = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
+
+            def iter_full():
+                with open(file_path, "rb") as f:
+                    while chunk := f.read(65536):
+                        yield chunk
+
+            def iter_range(start: int, content_length: int):
+                with open(file_path, "rb") as f:
+                    f.seek(start)
+                    remaining = content_length
+                    chunk_size = 65536
+                    while remaining > 0:
+                        data = f.read(min(chunk_size, remaining))
+                        if not data:
+                            break
+                        remaining -= len(data)
+                        yield data
+
+            return _serve_byte_stream(
+                request=request,
+                range_header=range,
+                file_size=file_size,
+                content_type=content_type,
+                iter_full=iter_full,
+                iter_range=iter_range,
+            )
+
+    # Fallback Android : lecture directe depuis le stockage partagé MediaStore / SAF
+    export_uris = _exported_android_uris(task)
+    if export_uris and platform_events.read_exported_copy_handler is not None:
+        uri = export_uris[0]
+        exported_size = platform_events.exported_copy_size(uri)
+        if exported_size is not None and exported_size > 0:
+            total_export_size = exported_size
+            name_hint = getattr(task, "fileName", None) or task.savePath or ""
+            content_type = mimetypes.guess_type(name_hint)[0] or "application/octet-stream"
+            return _serve_byte_stream(
+                request=request,
+                range_header=range,
+                file_size=total_export_size,
+                content_type=content_type,
+                iter_full=lambda: _read_exported_bytes(uri, 0, total_export_size),
+                iter_range=lambda start, length: _read_exported_bytes(uri, start, length),
+            )
+
+    if task.savePath and not safe_disk:
+        logger.warning("Path Traversal blocked on streaming: %s", task.savePath)
         raise HTTPException(status_code=403, detail="Accès refusé : fichier hors du répertoire autorisé")
 
-    if not file_path.is_file():
-        raise HTTPException(status_code=404, detail="Fichier vidéo introuvable sur le disque")
+    raise HTTPException(status_code=404, detail="Fichier vidéo introuvable sur le disque")
 
-    file_size = file_path.stat().st_size
-    content_type = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
-
-    # Media players may probe metadata without downloading the video body.
-    if request.method == "HEAD":
-        return Response(media_type=content_type, headers={
-            "Content-Length": str(file_size), "Accept-Ranges": "bytes",
-        })
-
-    if not range:
-        def iter_full():
-            with open(file_path, "rb") as f:
-                while chunk := f.read(65536):
-                    yield chunk
-
-        return StreamingResponse(
-            iter_full(),
-            media_type=content_type,
-            headers={
-                "Content-Length": str(file_size),
-                "Accept-Ranges": "bytes",
-            }
-        )
-
-    # HTTP Range handling: "bytes=0-1024" or "bytes=1024-"
-    range_match = re.fullmatch(r"bytes=(\d*)-(\d*)", range.strip())
-    if not range_match or not any(range_match.groups()) or file_size == 0:
-        return Response(status_code=416, headers={"Content-Range": f"bytes */{file_size}"})
-
-    first, last = range_match.groups()
-    if first:
-        start = int(first)
-        end = min(int(last), file_size - 1) if last else file_size - 1
-    else:
-        suffix_length = int(last)
-        start = max(0, file_size - suffix_length)
-        end = file_size - 1
-
-    if start >= file_size or start > end:
-        return Response(
-            status_code=416,
-            headers={"Content-Range": f"bytes */{file_size}"}
-        )
-
-    content_length = end - start + 1
-
-    def iter_range():
-        with open(file_path, "rb") as f:
-            f.seek(start)
-            remaining = content_length
-            chunk_size = 65536
-            while remaining > 0:
-                to_read = min(chunk_size, remaining)
-                data = f.read(to_read)
-                if not data:
-                    break
-                remaining -= len(data)
-                yield data
-
-    return StreamingResponse(
-        iter_range(),
-        status_code=206,
-        media_type=content_type,
-        headers={
-            "Content-Range": f"bytes {start}-{end}/{file_size}",
-            "Accept-Ranges": "bytes",
-            "Content-Length": str(content_length),
-        }
-    )
 
 @router.get("/api/media/subtitles/{task_id}")
 async def get_subtitles_list(task_id: str):
-    task = download_manager.get_task(task_id)
-    if not task or not task.savePathSubtitle:
+    task = _resolve_local_media_record(task_id)
+    if not task:
         return []
 
-    paths = parse_subtitle_paths(task.savePathSubtitle)
-    result = []
+    paths = parse_subtitle_paths(getattr(task, "savePathSubtitle", None))
+    sidecar_exports = _exported_android_uris(task)[1:]
+    if not paths and not sidecar_exports:
+        return []
 
-    video_stem = Path(task.savePath).stem if task.savePath else ""
-    metadata = {item['path']: item for item in json.loads(task.mediaJson).get('outputState', {}).get('sidecarTracks', [])}
-    for idx, p in enumerate(paths):
-        sf = Path(p)
-        if sf.exists():
-            lbl = sf.name.replace(video_stem, "").strip(".")
-            if not lbl:
-                lbl = f"Sous-titres {idx + 1}"
-            track = metadata.get(str(sf), {})
-            lbl = track.get('label') or lbl
-            lang = track.get('lang') or ("fr" if "fr" in lbl.lower() else "und")
-            result.append({
-                "label": lbl,
-                "srclang": lang,
-                "src": f"/api/media/subtitle/{task_id}/{idx}",
-                "default": bool(track.get('default')),
-            })
+    result = []
+    video_stem = (
+        Path(task.savePath).stem
+        if getattr(task, "savePath", None)
+        else (Path(task.fileName).stem if getattr(task, "fileName", None) else "")
+    )
+    try:
+        media_payload = json.loads(getattr(task, "mediaJson", "{}") or "{}")
+    except (TypeError, ValueError):
+        media_payload = {}
+    metadata = {
+        item["path"]: item
+        for item in media_payload.get("outputState", {}).get("sidecarTracks", [])
+        if isinstance(item, dict) and "path" in item
+    }
+
+    total_slots = max(len(paths), len(sidecar_exports))
+    for idx in range(total_slots):
+        raw_path = paths[idx] if idx < len(paths) else ""
+        sf = Path(raw_path) if raw_path else None
+        disk_ok = sf is not None and is_safe_path(sf) and sf.is_file()
+        export_ok = (
+            not disk_ok
+            and idx < len(sidecar_exports)
+            and platform_events.exported_copy_exists(sidecar_exports[idx]) is True
+        )
+        if not disk_ok and not export_ok:
+            continue
+
+        lbl = sf.name.replace(video_stem, "").strip(".") if sf is not None else ""
+        if not lbl:
+            lbl = f"Sous-titres {idx + 1}"
+        track = metadata.get(str(sf), {}) if sf is not None else {}
+        lbl = track.get("label") or lbl
+        lang = track.get("lang") or ("fr" if "fr" in lbl.lower() else "und")
+        result.append({
+            "label": lbl,
+            "srclang": lang,
+            "src": f"/api/media/subtitle/{task_id}/{idx}",
+            "default": bool(track.get("default")) or (len(result) == 0 and idx == 0 and not paths),
+        })
 
     return result
+
 
 @router.get("/api/media/subtitle/{task_id}")
 async def stream_subtitle_default(task_id: str):
     return await stream_subtitle_at_index(task_id, 0)
 
+
 @router.get("/api/media/subtitle/{task_id}/{index}")
 async def stream_subtitle_at_index(task_id: str, index: int):
-    task = download_manager.get_task(task_id)
-    if not task or not task.savePathSubtitle:
+    task = _resolve_local_media_record(task_id)
+    if not task or index < 0:
         raise HTTPException(status_code=404, detail="Sous-titres introuvables")
 
-    paths = parse_subtitle_paths(task.savePathSubtitle)
-    if index < 0 or index >= len(paths):
+    paths = parse_subtitle_paths(getattr(task, "savePathSubtitle", None))
+    sidecar_exports = _exported_android_uris(task)[1:]
+    if index >= max(len(paths), len(sidecar_exports)):
         raise HTTPException(status_code=404, detail="Index de sous-titre invalide")
 
-    file_path = Path(paths[index])
-    if not is_safe_path(file_path):
-        logger.warning("Path Traversal blocked on subtitles: %s", file_path)
+    safe_sub = True
+    if index < len(paths):
+        file_path = Path(paths[index])
+        safe_sub = is_safe_path(file_path)
+        if safe_sub and file_path.is_file():
+            return FileResponse(path=file_path, media_type=_subtitle_content_type(file_path.suffix))
+
+    if index < len(sidecar_exports) and platform_events.read_exported_copy_handler is not None:
+        uri = sidecar_exports[index]
+        sub_size = platform_events.exported_copy_size(uri)
+        if sub_size is not None and sub_size > 0:
+            raw_bytes = b"".join(_read_exported_bytes(uri, 0, min(sub_size, 10 * 1024 * 1024)))
+            suffix = Path(paths[index]).suffix if index < len(paths) else Path(uri).suffix
+            return Response(content=raw_bytes, media_type=_subtitle_content_type(suffix))
+
+    if index < len(paths) and not safe_sub:
+        logger.warning("Path Traversal blocked on subtitles: %s", paths[index])
         raise HTTPException(status_code=403, detail="Accès refusé : fichier de sous-titres hors du répertoire autorisé")
 
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="Fichier de sous-titres introuvable")
-
-    content_type = "text/vtt"
-    if file_path.suffix == ".srt":
-        content_type = "text/srt"
-    elif file_path.suffix == ".ass":
-        content_type = "text/ass"
-
-    return FileResponse(path=file_path, media_type=content_type)
+    raise HTTPException(status_code=404, detail="Fichier de sous-titres introuvable")
 
 @router.get("/api/media/subtitle-proxy")
 async def proxy_subtitle(url: str = Query(...)):
@@ -1186,7 +1394,18 @@ async def stream_proxy(
 
 class ExternalPlayerSettingsBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    preset: Literal["none", "mpv", "vlc", "custom", "system"] = "none"
+    preset: Literal[
+        "none",
+        "system",
+        "mpv",
+        "vlc",
+        "celluloid",
+        "smplayer",
+        "totem",
+        "haruna",
+        "iina",
+        "custom",
+    ] = "none"
     customPath: str = Field(default="", max_length=4096)
     preferExternal: bool = False
 
@@ -1221,16 +1440,6 @@ def _guess_video_mime(filename: str | None) -> str:
     if guessed and guessed.startswith("video/"):
         return guessed
     return "video/*"
-
-
-def _exported_android_uris(task) -> list[str]:
-    try:
-        raw = json.loads(getattr(task, "exportUrisJson", "[]") or "[]")
-        if isinstance(raw, list):
-            return [u for u in raw if isinstance(u, str) and u.startswith("content://")]
-    except (TypeError, ValueError):
-        pass
-    return []
 
 
 async def _resolve_remote_or_local_subtitles(
@@ -1306,7 +1515,7 @@ async def launch_external_player(body: ExternalPlayerLaunchBody, request: Reques
 
     if is_android:
         if effective_task_id:
-            task = download_manager.get_task(effective_task_id)
+            task = _resolve_local_media_record(effective_task_id)
             if not task:
                 raise HTTPException(status_code=404, detail="Vidéo introuvable")
             title = clean_title or sanitize_title(f"{task.animeName} - Épisode {task.episodeNumber}")
@@ -1397,8 +1606,13 @@ async def launch_external_player(body: ExternalPlayerLaunchBody, request: Reques
         }
 
     # Desktop launch branch
+    is_local_target = bool(effective_task_id)
     try:
-        resolved_player = external_player.resolve_configured_executable(is_android=False)
+        resolved_player = external_player.resolve_configured_executable(
+            is_android=False,
+            allow_auto_fallback=True,
+            for_stream=not is_local_target,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if resolved_player is None:
@@ -1406,7 +1620,7 @@ async def launch_external_player(body: ExternalPlayerLaunchBody, request: Reques
     player_label, exe_path = resolved_player
 
     if effective_task_id:
-        task = download_manager.get_task(effective_task_id)
+        task = _resolve_local_media_record(effective_task_id)
         if not task or not task.savePath:
             raise HTTPException(status_code=404, detail="Vidéo introuvable")
         file_path = Path(task.savePath)
@@ -1465,6 +1679,219 @@ async def launch_external_player(body: ExternalPlayerLaunchBody, request: Reques
         "mode": "desktop_process",
         "player": player_label,
         "targetKind": "stream",
+    }
+
+
+class DeleteDownloadedEpisodeBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    taskId: str | None = Field(default=None, max_length=128)
+    animeUrl: str = Field(default="", max_length=4096)
+    animeName: str = Field(default="", max_length=500)
+    episodeUrl: str = Field(default="", max_length=4096)
+    episodeNumber: int | None = Field(default=None, ge=0)
+    version: str = Field(default="", max_length=40)
+    source: str = Field(default="", max_length=255)
+    season: int | None = Field(default=None, ge=1)
+
+
+def _prune_empty_download_dirs(candidate_dirs: set[Path], download_root: Path) -> None:
+    try:
+        resolved_root = download_root.resolve()
+    except OSError:
+        return
+    ordered = sorted(candidate_dirs, key=lambda p: len(p.parts), reverse=True)
+    for directory in ordered:
+        cur = directory
+        while cur != resolved_root and cur.parent != cur and is_safe_path(cur, [resolved_root]):
+            try:
+                cur.rmdir()
+            except OSError:
+                break
+            cur = cur.parent
+
+
+@router.post("/api/media/downloaded/delete")
+async def delete_downloaded_episode(body: DeleteDownloadedEpisodeBody):
+    """Delete local files, sidecar subtitles, DB tasks, and downloaded flag for one episode."""
+    req_task_id = (body.taskId or "").strip()
+    db_records: dict[str, Any] = {}
+    local_entries: dict[str, Any] = {}
+
+    if req_task_id:
+        resolved = await asyncio.to_thread(_resolve_local_media_record, req_task_id)
+        if resolved is not None:
+            if req_task_id.startswith("local-"):
+                local_entries[req_task_id] = resolved
+            else:
+                db_records[str(resolved.id)] = resolved
+
+    eff_name = (body.animeName or "").strip()
+    eff_url = (body.animeUrl or "").strip()
+    eff_ep = body.episodeNumber
+    eff_version = body.version or ""
+    eff_ep_url = (body.episodeUrl or "").strip()
+    eff_source = (body.source or "").strip()
+
+    first_rec = next(iter(db_records.values()), None) or next(iter(local_entries.values()), None)
+    if first_rec is not None:
+        eff_name = eff_name or (getattr(first_rec, "animeName", "") or "").strip()
+        eff_url = eff_url or (getattr(first_rec, "animeUrl", "") or "").strip()
+        if eff_ep is None:
+            eff_ep = getattr(first_rec, "episodeNumber", None)
+        eff_version = eff_version or (getattr(first_rec, "version", "") or "")
+        eff_source = eff_source or (getattr(first_rec, "source", "") or "")
+
+    if eff_ep is not None and (eff_name or eff_url or eff_ep_url):
+        matching_entities = await asyncio.to_thread(
+            library_service.find_all_downloaded_episode_tasks,
+            anime_name=eff_name,
+            episode_number=eff_ep,
+            version=eff_version,
+            episode_url=eff_ep_url,
+            anime_url=eff_url,
+            source=eff_source,
+        )
+        for entity in matching_entities:
+            tid = str(entity.id)
+            if tid not in db_records:
+                db_records[tid] = entity.to_task()
+
+    extra_disk_files: list[Path] = []
+    if eff_ep is not None and eff_name:
+        extra_disk_files = await asyncio.to_thread(
+            local_media.find_all_on_disk,
+            anime_name=eff_name,
+            episode_number=eff_ep,
+            version=eff_version,
+            season=body.season,
+        )
+
+    if not db_records and not local_entries and not extra_disk_files:
+        raise HTTPException(status_code=404, detail="Épisode téléchargé introuvable")
+
+    for tid in db_records:
+        if download_manager._export_in_progress(tid):
+            raise HTTPException(
+                status_code=409,
+                detail="Attendez la fin de l’export en cours avant de supprimer cet épisode",
+            )
+
+    all_records = [*db_records.values(), *local_entries.values()]
+    for rec in all_records:
+        save_path = getattr(rec, "savePath", None)
+        if save_path and not is_safe_path(Path(save_path)):
+            logger.warning("Path traversal blocked on downloaded delete: %s", save_path)
+            raise HTTPException(
+                status_code=403,
+                detail="Accès refusé : fichier hors du répertoire autorisé",
+            )
+
+    download_root = Path(settings.DOWNLOAD_DIR).resolve()
+    candidate_files: dict[Path, Path] = {}
+    candidate_dirs: set[Path] = set()
+    export_uris: list[str] = []
+
+    def _add_file_target(raw_path: str | Path | None) -> None:
+        if not raw_path:
+            return
+        try:
+            p = Path(raw_path)
+        except Exception:
+            return
+        if not is_safe_path(p):
+            return
+        try:
+            resolved_p = p.resolve()
+        except OSError:
+            return
+        candidate_files[resolved_p] = resolved_p
+
+    for rec in all_records:
+        for uri in _exported_android_uris(rec):
+            if uri not in export_uris:
+                export_uris.append(uri)
+        save_path = getattr(rec, "savePath", None)
+        if save_path:
+            vp = Path(save_path)
+            _add_file_target(vp)
+            _add_file_target(f"{save_path}.part")
+            _add_file_target(f"{save_path}.part.resume.json")
+            _add_file_target(vp.with_suffix(".tmp.mp4"))
+            if vp.parent.is_dir():
+                for sc in discover_sidecar_subtitles(vp, download_root):
+                    _add_file_target(sc)
+        for sub_path in parse_subtitle_paths(getattr(rec, "savePathSubtitle", None)):
+            _add_file_target(sub_path)
+        try:
+            media_payload = json.loads(getattr(rec, "mediaJson", "{}") or "{}")
+            out_state = media_payload.get("outputState", {}) if isinstance(media_payload, dict) else {}
+            if isinstance(out_state, dict):
+                _add_file_target(out_state.get("source"))
+                for sc in out_state.get("sidecars") or []:
+                    _add_file_target(sc)
+        except (TypeError, ValueError):
+            pass
+
+    for dp in extra_disk_files:
+        _add_file_target(dp)
+        if dp.parent.is_dir():
+            for sc in discover_sidecar_subtitles(dp, download_root):
+                _add_file_target(sc)
+
+    deleted_files = 0
+    for file_target in candidate_files.values():
+        try:
+            if file_target.is_file():
+                file_target.unlink()
+                deleted_files += 1
+                candidate_dirs.add(file_target.parent)
+        except OSError as exc:
+            logger.warning("Unable to delete local media file %s: %s", file_target, exc)
+
+    if candidate_dirs:
+        await asyncio.to_thread(_prune_empty_download_dirs, candidate_dirs, download_root)
+
+    for uri in export_uris:
+        try:
+            await asyncio.to_thread(platform_events.delete_exported_copy, uri)
+        except Exception as exc:
+            logger.debug("Unable to delete exported Android URI %s: %s", uri, exc)
+
+    removed_task_ids: list[str] = []
+    for tid in list(db_records):
+        try:
+            if await asyncio.to_thread(download_manager.remove_task, tid):
+                removed_task_ids.append(tid)
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    for lid in list(local_entries):
+        if local_media.remove(lid) is not None:
+            removed_task_ids.append(lid)
+
+    if candidate_files:
+        with local_media._lock:
+            stale_ids = [
+                eid
+                for eid, entry in local_media._entries.items()
+                if Path(entry.savePath).resolve() in candidate_files
+            ]
+            for eid in stale_ids:
+                local_media._entries.pop(eid, None)
+
+    if eff_ep is not None and (eff_url or eff_name):
+        await asyncio.to_thread(
+            library_service.clear_downloaded,
+            eff_url,
+            eff_ep,
+            eff_version,
+            eff_name,
+        )
+
+    return {
+        "success": True,
+        "deletedFiles": deleted_files,
+        "removedTaskIds": removed_task_ids,
     }
 
 

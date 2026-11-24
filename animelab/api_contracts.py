@@ -427,7 +427,18 @@ class ExternalPlayerSettingsResponse(WireModel):
     available: bool
     platform: Literal['desktop', 'android']
     clientLocal: bool
-    preset: Literal['none', 'mpv', 'vlc', 'custom', 'system'] = 'none'
+    preset: Literal[
+        'none',
+        'system',
+        'mpv',
+        'vlc',
+        'celluloid',
+        'smplayer',
+        'totem',
+        'haruna',
+        'iina',
+        'custom',
+    ] = 'none'
     customPath: str = ''
     preferExternal: bool = False
     configured: bool = False
@@ -505,7 +516,7 @@ for name in ('start_download', 'start_batch_download', 'set_global_speed_limit',
              'delete_history_entry', 'clear_history', 'trigger_watchdog_check', 'import_repo_api',
              'toggle_extension_api', 'refresh_extensions_api', 'check_updates_api', 'update_extension_api',
              'update_all_extensions_api', 'recompile_extension_api', 'configure_extension_api', 'diagnose_extension_api',
-             'set_language', 'cancel', 'rotate_proxy'):
+             'set_language', 'cancel', 'rotate_proxy', 'delete_downloaded_episode'):
     RESPONSES[name] = Result
 
 BINARY = {'proxy_image', 'stream_video', 'stream_subtitle_default', 'stream_subtitle_at_index',

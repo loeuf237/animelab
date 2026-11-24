@@ -55,6 +55,9 @@ class PlaybackService:
             db.connection().exec_driver_sql('BEGIN IMMEDIATE')
             if body.taskId:
                 task=db.get(DownloadTaskEntity,body.taskId)
+                if not task:
+                    from animelab.services.local_media import local_media
+                    task=local_media.get(body.taskId)
                 if not task: raise APIProblem('playback_task_missing',status=404,category='not_found')
                 source=task.source or 'french-manga';url=task.animeUrl or 'task:'+task.id
                 number=task.episodeNumber;version=episode_version(task.version)

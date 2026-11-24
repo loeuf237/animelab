@@ -1,4 +1,5 @@
 from animelab.services.animepahe_service import animepahe_service
+from animelab.services.french_stream_service import french_stream_service
 from animelab.services.scraping_service import scraping_service
 from animelab.services.voiranime_service import voiranime_service
 import pytest
@@ -13,7 +14,7 @@ def client():
     from animelab.routers import anime
     # Page rendering tests should not depend on a live source challenge.
     with pytest.MonkeyPatch.context() as patch:
-        for source in (scraping_service, voiranime_service, animepahe_service):
+        for source in (scraping_service, voiranime_service, animepahe_service, french_stream_service):
             patch.setattr(source, "get_latest_releases", AsyncMock(return_value=[]))
         with TestClient(app, headers={"Accept-Language": "fr"}) as c:
             yield c
@@ -200,10 +201,12 @@ def test_search_api_contextual_and_grouping(client, monkeypatch):
     from animelab.services.scraping_service import scraping_service
     from animelab.services.voiranime_service import voiranime_service
     from animelab.services.animepahe_service import animepahe_service
+    from animelab.services.french_stream_service import french_stream_service
     from animelab.services.extension_service import extension_service
     monkeypatch.setattr(scraping_service, "search_anime", mock_fm_search)
     monkeypatch.setattr(voiranime_service, "search_anime", mock_va_search)
     monkeypatch.setattr(animepahe_service, "search_anime", mock_ap_search)
+    monkeypatch.setattr(french_stream_service, "search_anime", AsyncMock(return_value=[]))
     monkeypatch.setattr(extension_service, "get_enabled_container_sources", lambda: [])
 
     # 1. source=all -> Multi-sources grouped: French-Manga, VoirAnime, AnimePahe
