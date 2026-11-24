@@ -13,20 +13,24 @@ welcome.
 
 To participate, open or join an
 [issue](https://github.com/loeuf237/animelab/issues), mention the relevant work
-area and describe what you would like to take on. To contact the maintainer
-directly: **[Telegram — @loeuf237](https://t.me/loeuf237)**. Record technical
-decisions and test results in the issue or PR so other contributors can find them.
+area and describe what you would like to take on. You can also connect with the
+community in **[Telegram — AnimeLab Group](https://t.me/AnimeLabGroup)** or
+contact the maintainer directly at **[Telegram — @loeuf237](https://t.me/loeuf237)**.
+Record technical decisions and test results in the issue or PR so other
+contributors can find them.
 
 See the [contribution guide](../CONTRIBUTING.en.md) for setup, checks and pull
 requests.
 
-## Current starting points — 6 November 2026
+## Current starting points — 24 November 2026 (post-v0.2.0)
+
+Release [`v0.2.0`](releases/v0.2.0.md) delivered in-app release download/verification/installation, duplicate-download and path fixes, Anime-Sama BDD support, Codeberg-compatible headers, and light/dark hero contrast fixes.
 
 Start with the [three practical briefs](first-contribution.en.md):
-Android offline report #32, Linux walkthrough #21, or theme palette #28.
+Linux walkthrough #21, theme palette #28, or focused `good first issue` tasks such as #51, #57, #58, #60, #62, #68, #71, #74, or #78.
 Ask for help in the chosen issue; an annotated report or mockup is a valid contribution.
-Version comparison (#14) and the library title filter (#31) are already implemented.
-The thirteen areas below include both existing functionality and remaining work;
+Version comparison (#14), the library title filter (#31), and the Android offline report (#32) are already completed.
+The sixteen areas below include both existing functionality and remaining work;
 read their status before proposing an implementation.
 
 ## 1. Redesign the Android loading screen
@@ -47,13 +51,17 @@ Android. Starting point:
 ## 2. Detect and automatically download new versions
 
 **Already available:** version checks, numeric version comparison, stable/beta
-filtering and release links are implemented in
-[`app_updates.py`](../animelab/services/app_updates.py), with offline tests in
+filtering, release links, in-app download with progress, `SHA256SUMS.txt`
+verification, Android `PackageInstaller` self-updates, and desktop archive
+extraction landed in `v0.2.0` in
+[`app_updates.py`](../animelab/services/app_updates.py) and
+[`startup.py`](../animelab/routers/startup.py), with tests in
 [`test_app_startup.py`](../tests/test_app_startup.py). See
-[setup and updates](startup-and-updates.md). The former helper task #14 is completed.
-**Remaining:** optional package downloading, architecture selection, integrity
-and signing checks, interruption handling and installation handoff. Extend the
-existing service; do not build a second version comparator.
+[setup and updates](startup-and-updates.md).
+**Remaining (#54):** atomic in-place replacement for frozen desktop builds
+(with backup/rollback), automatic cleanup of older downloaded update packages,
+and an Android "Wi-Fi only" update toggle. Extend the existing service; do not
+build a second version comparator.
 
 **Goal:** provide an in-app update flow inspired by Mihon/Aniyomi, starting on
 Android: detect a new version, show its changes, offer configurable automatic
@@ -94,10 +102,23 @@ and output profiles. Do not identify an episode solely by its filename, number
 or a temporary video URL. Add cases for French-Manga and the other affected
 paths; keep an explicit action for users who want to download again.
 
-## 4. Validate Aniyomi/Anikku extension integration
+## 4. Improve Aniyomi / Anikku / Animiru extension compatibility (Android & PC)
 
-**Goal:** verify and improve compatibility with original extension APKs on
-Android, with reproducible results.
+**Already available:** isolated Android APK execution via `:extension-runtime`,
+and the cross-platform DEX-to-recipe translation engine for PC/Server/Web in
+[`aniyomi_dex_parser.py`](../animelab/services/aniyomi_dex_parser.py),
+[`recipe_plans.py`](../animelab/services/recipe_plans.py),
+[`recipe_runtime.py`](../animelab/services/recipe_runtime.py), and
+[`aniyomi_container.py`](../animelab/services/aniyomi_container.py) (including
+Anime-Sama’s new `lien:` / `epsJeton` BDD format added in `v0.2.0`).
+**Remaining (#61, #62):** fix broken **Anikku**, **Animiru**, and **Aniyomi**
+extensions by improving DEX bytecode/inheritance decoding and recipe operations
+(#61 — JSON/GraphQL APIs, POST payloads, filters, external subtitles) and
+expanding video hoster extractors (#62).
+
+**Goal:** improve real-world compatibility with Aniyomi/Anikku/Animiru
+repositories and extensions across both the Android APK runtime and the
+PC/Server recipe translation engine, with reproducible results.
 
 Test already installed packages, repository installation and updates, trust,
 multiple sources, search, catalogues, episodes, filters, preferences, video
@@ -115,7 +136,11 @@ Start with the [existing study](studies/aniyomi-anikku/README.md) and
 [validation guide](studies/aniyomi-anikku/UTILISATION.md). Test APKs are built
 in GitHub Actions; physical-device testing is still needed.
 
-## 5. Create the Tools tab and a subtitle workspace
+## 5. Create the Tools tab and a subtitle workspace (#17, #18, #66)
+
+**Related issues:** #17 (Tools navigation entry), #18 (subtitle UI mockup),
+and **#66** (full Subtitle Workshop). See also area **16 (#67)** for the
+PC audio-to-subtitle transcription workshop.
 
 **Goal:** add **Tools** to the navigation bar and bring media tools
 together there. The first area is a complete subtitle tool for series or
@@ -171,7 +196,8 @@ extending the tool.
 pins, search, package preferences and update actions.
 **Remaining:** audit the current screens for concrete accessibility, small-screen
 or state-clarity problems. #20 now starts from this implementation, rather than
-a blank redesign.
+a blank redesign. See also **#52** (source health dashboard and anonymized
+broken-source diagnostics) and **#53** (periodic new-episode checks).
 
 **Goal:** improve usability and appearance with inspiration from Mihon/Aniyomi:
 clear navigation, readable lists and easy-to-find actions.
@@ -254,6 +280,10 @@ media; any migration needs an explicit, verified user flow.
 
 ## 11. Improve the Android video player
 
+**Related issues:** #25, #30 (portrait/landscape controls audit), **#49**
+(external players: mpv, VLC, Android Intent), **#50** (Skip Intro/Outro &
+auto-play next), and **#51** (Desktop/Web keyboard shortcuts & Picture-in-Picture).
+
 **Goal:** make playback more comfortable on phones, for streaming and downloaded
 files, with accessible touch controls.
 
@@ -274,7 +304,9 @@ and preserve desktop/web behavior.
 landed in PR #34; #31 is completed.
 **Remaining:** choose one separate improvement such as source/watch-state filters,
 sorting or verified local availability. Preserve the current filter and avoid
-introducing a broad library migration as a first task.
+introducing a broad library migration as a first task. Related workstreams:
+**#46** (full portable backup/restore), **#47** (migrate series across sources),
+and **#48** (optional AniList / MyAnimeList progress tracking).
 
 **Goal:** make series, episodes and downloaded media easier to find and organize
 as the library grows.
@@ -307,7 +339,74 @@ Also test a deleted file, unavailable external folder and partial download
 without advertising them as available. Distinguish private media, exports and
 authorized folder URIs; do not promise support for every format.
 
-Issues and first tasks for all thirteen areas are linked from the
+## 14. Make the Seanime extension engine work reliably on Android (#63)
+
+**Already available:** Seanime JS/TS extensions run on Desktop/Server via
+`mini-racer` (V8), and an initial offscreen `WebView` bridge exists in
+[`SeanimeJsBridge.kt`](../android/app/src/main/java/com/animan/app/SeanimeJsBridge.kt),
+[`seanime_runtime.py`](../animelab/services/seanime_runtime.py), and
+[`android_runtime.py`](../android_runtime.py).
+
+**Goal (#63):** fix Kotlin/Chaquopy interop (`@JvmStatic` on `SeanimeJsBridge`
+entry points), stabilize the offscreen `WebView` sandbox across Android API
+29–35 including R8/ProGuard release builds, ensure full shim parity with
+[`seanime_shim.js`](../animelab/services/seanime_shim.js) (`fetch` round-trips,
+`store`, TypeScript transpilation), and keep 100% of outbound HTTP traffic
+routed through `android_runtime.seanime_fetch`.
+
+**Expected validation:** `seanime_runtime.is_available()` returns `True` in
+optimized Android release builds, importing/searching/resolving streams works
+on Android, and instrumentation tests validate a Seanime fixture in CI.
+
+## 15. Decode and run CloudStream (.cs3) extensions on PC and Android (#64, #65)
+
+**Goal:** add repository indexing (`repo.json` / `plugins.json`) and `.cs3`
+plugin support across platforms:
+
+- **Desktop/Server / PC (#64):** inspect `.cs3` packages (`manifest.json` +
+  `classes.dex`) and design/build a safe PC decoding or sandboxed execution
+  engine (extending [`aniyomi_dex_parser.py`](../animelab/services/aniyomi_dex_parser.py) /
+  [`recipe_runtime.py`](../animelab/services/recipe_runtime.py) or a constrained
+  interpreter) without arbitrary host code execution, routing all HTTP requests
+  through [`source_http.py`](../animelab/services/source_http.py).
+- **Android (#65):** execute verified `.cs3` plugins natively inside the
+  isolated `:extension-runtime` worker process behind explicit user trust and
+  SHA-256 verification, implementing a `com.lagradost.cloudstream3.*` shim
+  bridged to `IExtensionHttp`.
+
+**Expected validation:** short architecture RFC for PC security boundaries,
+consistent repository/source metadata across PC and Android, offline fixture
+tests for `search` / `load` / `loadLinks`, and an Android instrumentation
+fixture test.
+
+## 16. Audio-to-Subtitle transcription workshop on PC — TurboScribe / Whisper (#67)
+
+**Goal (#67):** inside the PC (Desktop/Server) **Tools** workspace (#17), allow
+generating time-synced `.srt`/`.vtt`/`.ass` subtitles from downloaded episode
+audio tracks using FFmpeg extraction ([`media_tools.py`](../animelab/media_tools.py),
+[`output_processor.py`](../animelab/services/output_processor.py)) paired with
+pluggable transcription backends:
+
+- **Local offline Whisper** (`faster-whisper`, `whisper.cpp`, or user CLI)
+  kept as an optional dependency without bloating PyInstaller or Android packages.
+- **External / TurboScribe workflows** (TurboScribe audio export / `.srt`
+  re-import flow or Whisper-compatible BYOK API endpoints).
+
+Jobs run in the background with cancellation support and hand off generated
+files directly into the Subtitle Workshop (#66).
+
+**Expected validation:** PC-only visibility guard, unchanged original media,
+cancellable background jobs, and automated tests with mocked/fixture backends.
+
+## Other open post-v0.2.0 issues
+
+- **Backup, Library & Discovery:** #46 (portable backup/import), #47 (migrate series across sources), #48 (AniList / MyAnimeList sync), #68 (auto-add anime card to library on press — `good first issue`), #75 (weekly Airing Schedule calendar), #77 (local folder / NAS scanner)
+- **Player & Navigation:** #49 (external players), #50 (Skip Intro/Outro & auto-next), #51 (keyboard shortcuts & PiP — `good first issue`), #72 (native `.ass`/`.ssa` rendering via JASSUB/libass WASM), #73 (Android TV / D-Pad / gamepad navigation), #74 (opt-in Desktop Discord Rich Presence — `good first issue`)
+- **Sources, WebView Verification & Updates:** #52 (source health & anonymized diagnostics), #53 (periodic episode checks & notifications), #54 (atomic desktop updates, cleanup & Wi-Fi only), #69 (Anikku/Mihon-style temporary system WebView verification with auto cookie capture), #70 (PC source verification via WebKitGTK/WebView2/WKWebView & Chromium fallback)
+- **Storage, Naming & Community:** #71 (Telegram group prompt on first launch & Settings > About link — `good first issue`), #76 (disk-space dashboard, low-space guard & watched cleanup), #78 (Plex / Jellyfin / Kodi naming templates — `good first issue`)
+- **Distribution, Android & Quality:** #55 (macOS hardware validation & `.dmg`), #56 (AppImage/Flatpak & Windows installer), #57 (Vite bundle code-splitting — `good first issue`), #58 (automated i18n checks — `good first issue`), #59 (split oversized core modules), #60 (roadmap docs refresh — `good first issue`), #79 (Android release APK size reduction)
+
+Issues and first tasks for all sixteen areas are linked from the
 [contribution tracker #12](https://github.com/loeuf237/animelab/issues/12).
 
 ## Propose another idea

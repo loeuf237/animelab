@@ -13,21 +13,24 @@ Les propositions de fonctionnalités et d’architecture sont les bienvenues.
 
 Pour participer, ouvrez ou rejoignez une
 [issue](https://github.com/loeuf237/animelab/issues) en indiquant le chantier
-concerné et ce que vous souhaitez prendre en charge. Pour échanger directement
-avec le mainteneur : **[Telegram — @loeuf237](https://t.me/loeuf237)**.
+concerné et ce que vous souhaitez prendre en charge. Vous pouvez aussi échanger
+avec la communauté sur **[Telegram — AnimeLab Group](https://t.me/AnimeLabGroup)**
+ou directement avec le mainteneur sur **[Telegram — @loeuf237](https://t.me/loeuf237)**.
 Consignez les décisions techniques et les résultats de tests dans l’issue ou
 la PR afin que les autres contributeurs puissent les retrouver.
 
 Consultez le [guide de contribution](../CONTRIBUTING.md) pour l’installation,
 les vérifications et les pull requests.
 
-## Points de départ — 6 novembre 2026
+## Points de départ — 24 novembre 2026 (après v0.2.0)
+
+La version [`v0.2.0`](releases/v0.2.0.md) a livré la comparaison, le téléchargement, la vérification SHA-256 et l’installation intégrée des releases, les correctifs de duplication et de dossiers de téléchargement, la prise en charge du format BDD d’Anime-Sama, les en-têtes adaptés à Codeberg et la lisibilité de la fiche animé en modes clair et sombre.
 
 Commencez par les [trois fiches pratiques](first-contribution.md) :
-rapport Android hors ligne #32, guide Linux #21 ou palette de thème #28.
+guide Linux #21, palette de thème #28 ou chantiers ciblés (`good first issue`) comme #51, #57, #58, #60, #62, #68, #71, #74 ou #78.
 Demandez de l’aide dans l’issue choisie ; un rapport ou une maquette annotée est utile.
-La comparaison des versions (#14) et le filtre de bibliothèque (#31) sont déjà implémentés.
-Les treize chantiers ci-dessous précisent fonctions existantes et travail restant ;
+La comparaison des versions (#14), le filtre de bibliothèque (#31) et le rapport hors ligne Android (#32) sont déjà terminés.
+Les seize chantiers ci-dessous précisent fonctions existantes et travail restant ;
 lisez leur état avant de proposer une implémentation.
 
 ## 1. Repenser l’écran de chargement Android
@@ -48,13 +51,17 @@ erreur sur Android. Point d’entrée :
 ## 2. Détecter et télécharger automatiquement les nouvelles versions
 
 **Disponible :** vérification des versions, comparaison numérique, canaux
-stable/bêta et liens de release dans
-[`app_updates.py`](../animelab/services/app_updates.py), avec tests hors ligne dans
+stable/bêta, liens de release, téléchargement in-app avec barre de progression,
+vérification `SHA256SUMS.txt`, relais vers Android `PackageInstaller` et
+extraction d’archives Desktop livrés en `v0.2.0` dans
+[`app_updates.py`](../animelab/services/app_updates.py) et
+[`startup.py`](../animelab/routers/startup.py), avec tests dans
 [`test_app_startup.py`](../tests/test_app_startup.py). Voir le
-[guide de démarrage et mises à jour](startup-and-updates.md). L’ancienne tâche #14 est terminée.
-**Reste à faire :** téléchargement facultatif du paquet adapté, vérification
-d’intégrité et de signature, gestion des interruptions et relais d’installation.
-Étendre le service existant sans créer un second comparateur de versions.
+[guide de démarrage et mises à jour](startup-and-updates.md).
+**Reste à faire (#54) :** remplacement atomique sur place pour les builds
+Desktop figés (avec sauvegarde/restauration), nettoyage automatique du cache
+des anciens paquets et réglage « Wi-Fi uniquement » sur Android. Étendre le
+service existant sans créer un second comparateur de versions.
 
 **Objectif :** proposer dans l’application un parcours de mise à jour inspiré
 de Mihon/Aniyomi, en commençant par Android : détection d’une nouvelle version,
@@ -98,10 +105,24 @@ nom de fichier, son numéro ou une URL vidéo temporaire. Ajouter des cas pour
 French-Manga et les autres chemins concernés ; conserver une action explicite
 si l’utilisateur veut retélécharger.
 
-## 4. Vérifier l’intégration des extensions Aniyomi/Anikku
+## 4. Améliorer la compatibilité des extensions Aniyomi / Anikku / Animiru (Android & PC)
 
-**Objectif :** vérifier et améliorer la compatibilité des véritables APK
-d’extensions sur Android, avec des résultats reproductibles.
+**Disponible :** exécution isolée des APK Android via `:extension-runtime`,
+et moteur multiplateforme de traduction de bytecode DEX en recettes sûres sur
+PC/Serveur/Web dans
+[`aniyomi_dex_parser.py`](../animelab/services/aniyomi_dex_parser.py),
+[`recipe_plans.py`](../animelab/services/recipe_plans.py),
+[`recipe_runtime.py`](../animelab/services/recipe_runtime.py) et
+[`aniyomi_container.py`](../animelab/services/aniyomi_container.py) (avec prise
+en charge du nouveau format BDD `lien:` / `epsJeton` d’Anime-Sama en `v0.2.0`).
+**Reste à faire (#61, #62) :** résoudre les extensions **Anikku**, **Animiru**
+et **Aniyomi** encore défaillantes en améliorant le parseur DEX/héritage et les
+opérations de recettes (#61 — API JSON/GraphQL, POST, filtres, sous-titres
+externes) et en enrichissant les extracteurs d’hébergeurs vidéo (#62).
+
+**Objectif :** améliorer la compatibilité réelle des dépôts et extensions
+Aniyomi/Anikku/Animiru aussi bien sur le moteur APK Android que sur le moteur
+de traduction de recettes PC/Serveur, avec des résultats reproductibles.
 
 Tester les paquets déjà installés, l’installation et la mise à jour depuis un
 dépôt, la confiance, les sources multiples, la recherche, les catalogues,
@@ -119,7 +140,11 @@ Partir de l’[étude existante](studies/aniyomi-anikku/README.md) et du
 [guide de validation](studies/aniyomi-anikku/UTILISATION.md). Les APK de test sont
 construits dans GitHub Actions ; les essais sur téléphone restent nécessaires.
 
-## 5. Créer l’onglet Outils et un atelier de sous-titrage
+## 5. Créer l’onglet Outils et un atelier de sous-titrage (#17, #18, #66)
+
+**Issues liées :** #17 (entrée de navigation Outils), #18 (maquette sous-titres)
+et **#66** (atelier complet de sous-titrage). Voir aussi la section **16 (#67)**
+pour l’atelier de transcription audio sur PC.
 
 **Objectif :** ajouter **Outils** dans la barre de navigation et y
 regrouper des outils multimédias. Le premier chantier est un outil complet de
@@ -176,6 +201,8 @@ petites étapes testables avant d’étendre l’outil.
 recherche, préférences des paquets et actions de mise à jour dans bêta.5.
 **Reste à faire :** identifier des problèmes concrets d’accessibilité, de petits
 écrans ou de compréhension des états. #20 part désormais de ces écrans existants.
+Voir aussi **#52** (tableau de bord de santé des sources et diagnostics anonymisés)
+et **#53** (vérification périodique des nouveaux épisodes).
 
 **Objectif :** améliorer son ergonomie et son apparence en s’inspirant de
 Mihon/Aniyomi : navigation claire, listes lisibles et actions faciles à repérer.
@@ -261,6 +288,11 @@ doit avoir son parcours explicite et vérifié.
 
 ## 11. Améliorer le lecteur vidéo Android
 
+**Issues liées :** #25, #30 (audit portrait/paysage), **#49** (lecteurs
+externes : mpv, VLC, Intent Android), **#50** (bouton Passer l’intro/outro et
+enchaînement auto) et **#51** (raccourcis clavier et Picture-in-Picture sur
+Desktop/Web).
+
 **Objectif :** rendre la lecture plus confortable sur téléphone, pour le
 streaming et les fichiers téléchargés, avec des commandes tactiles accessibles.
 
@@ -282,7 +314,9 @@ Inclure une lecture locale sans réseau et préserver le comportement desktop/we
 accents a été intégré par la PR #34 ; #31 est terminée.
 **Reste à faire :** choisir une amélioration distincte : filtre de source ou d’état
 de lecture, tri ou disponibilité locale vérifiée. Conserver le filtre actuel et
-éviter une migration générale de bibliothèque comme première tâche.
+éviter une migration générale de bibliothèque comme première tâche. Pistes liées :
+**#46** (sauvegarde/restauration portable complète), **#47** (migration d’une
+série vers une autre source) et **#48** (suivi optionnel AniList / MyAnimeList).
 
 **Objectif :** faciliter la recherche et l’organisation des séries, des épisodes
 et des médias téléchargés dans une bibliothèque qui grandit.
@@ -318,7 +352,78 @@ un dossier externe indisponible et un média partiellement téléchargé, sans l
 présenter comme disponibles. Distinguer les médias privés, les exports et les
 URI de dossiers autorisés ; ne pas promettre la lecture de tous les formats.
 
-Les issues et premières tâches des treize chantiers sont regroupées dans le
+## 14. Faire fonctionner le moteur d’extensions Seanime sur Android (#63)
+
+**Disponible :** les extensions Seanime JS/TS fonctionnent déjà sur PC/Serveur
+via `mini-racer` (V8), et un premier pont `WebView` hors écran existe dans
+[`SeanimeJsBridge.kt`](../android/app/src/main/java/com/animan/app/SeanimeJsBridge.kt),
+[`seanime_runtime.py`](../animelab/services/seanime_runtime.py) et
+[`android_runtime.py`](../android_runtime.py).
+
+**Objectif (#63) :** corriger l’interopérabilité Kotlin/Chaquopy (`@JvmStatic`
+sur les points d’entrée de `SeanimeJsBridge`), stabiliser la sandbox `WebView`
+hors écran sur Android API 29–35 y compris sur les builds release optimisés R8,
+garantir la parité complète avec [`seanime_shim.js`](../animelab/services/seanime_shim.js)
+(appels `fetch`, persistance `store`, transpilation TypeScript) et maintenir 100 %
+du trafic réseau routé via `android_runtime.seanime_fetch`.
+
+**Validation attendue :** `seanime_runtime.is_available()` retourne `True` sur
+APK release optimisé, l’import, la recherche et la résolution de flux réussissent
+sur Android, et des tests d’instrumentation valident une extension Seanime en CI.
+
+## 15. Créer un moteur pour décoder et exécuter les extensions CloudStream sur PC et Android (#64, #65)
+
+**Objectif :** prendre en charge les dépôts CloudStream (`repo.json` / `plugins.json`)
+et les paquets `.cs3` sur toutes les plateformes :
+
+- **Desktop / Serveur / PC (#64) :** inspecter les archives `.cs3`
+  (`manifest.json` + `classes.dex`) et concevoir/implémenter un moteur sûr sur
+  PC (extension du traducteur statique DEX vers recettes dans
+  [`aniyomi_dex_parser.py`](../animelab/services/aniyomi_dex_parser.py) /
+  [`recipe_runtime.py`](../animelab/services/recipe_runtime.py) ou interpréteur
+  isolé) sans exécution de code arbitraire sur l’hôte, en routant toutes les
+  requêtes HTTP via [`source_http.py`](../animelab/services/source_http.py).
+- **Android (#65) :** exécuter nativement les plugins `.cs3` vérifiés dans le
+  processus isolé `:extension-runtime` après approbation explicite et contrôle
+  SHA-256, via une couche de compatibilité `com.lagradost.cloudstream3.*`
+  pontée vers `IExtensionHttp`.
+
+**Validation attendue :** courte RFC d’architecture pour les garde-fous PC,
+métadonnées de dépôts/sources cohérentes entre PC et Android, tests hors ligne
+sur `search` / `load` / `loadLinks`, et test d’instrumentation Android avec une
+fixture `.cs3`.
+
+## 16. Atelier de transcription audio en sous-titres sur PC — TurboScribe / Whisper (#67)
+
+**Objectif (#67) :** dans l’espace **Outils** sur PC (Desktop/Serveur, #17),
+permettre de générer des sous-titres synchronisés (`.srt`/`.vtt`/`.ass`) à
+partir de la piste audio d’un épisode téléchargé grâce à l’extraction FFmpeg
+([`media_tools.py`](../animelab/media_tools.py),
+[`output_processor.py`](../animelab/services/output_processor.py)) associée à
+des moteurs de transcription modulaires :
+
+- **Whisper local hors ligne** (`faster-whisper`, `whisper.cpp` ou binaire
+  utilisateur) en dépendance optionnelle sans alourdir les paquets PyInstaller
+  ni Android.
+- **Workflows externes / TurboScribe** (export audio optimisé + réimport `.srt`
+  guidé pour TurboScribe ou API compatibles Whisper avec clé personnelle BYOK).
+
+Les tâches tournent en arrière-plan avec annulation possible et transmettent
+directement le fichier généré vers l’Atelier de sous-titrage (#66).
+
+**Validation attendue :** restriction explicite aux environnements PC, médias
+originaux préservés, annulation propre des tâches longues et tests automatisés
+avec moteurs simulés/fixtures.
+
+## Autres issues ouvertes après la v0.2.0
+
+- **Sauvegarde, Bibliothèque & Découverte :** #46 (export/import portable complet), #47 (migration d’une série entre sources), #48 (synchronisation AniList / MyAnimeList), #68 (ajout auto à la bibliothèque au clic sur une carte — `good first issue`), #75 (calendrier hebdomadaire de diffusion), #77 (scanner de dossiers locaux / NAS)
+- **Lecteur vidéo & Navigation :** #49 (lecteurs externes mpv/VLC/Intent Android), #50 (Passer l’intro/outro & enchaînement auto), #51 (raccourcis clavier & Picture-in-Picture — `good first issue`), #72 (rendu natif `.ass`/`.ssa` via JASSUB/libass WASM), #73 (navigation D-Pad / télécommande / Android TV), #74 (Discord Rich Presence optionnel sur Desktop — `good first issue`)
+- **Sources, Vérification WebView & Mises à jour :** #52 (santé des sources & diagnostics anonymisés), #53 (vérification périodique & notifications), #54 (mise à jour atomique Desktop, nettoyage du cache & option Wi-Fi uniquement), #69 (refonte vérification WebView système style Anikku/Mihon avec capture auto des cookies), #70 (vérification PC WebKitGTK/WebView2/WKWebView & repli Chromium)
+- **Stockage, Nommage & Communauté :** #71 (invitation au groupe Telegram au premier lancement & section À propos — `good first issue`), #76 (tableau d’espace disque, seuil libre & nettoyage des épisodes vus), #78 (modèles de nommage Plex / Jellyfin / Kodi — `good first issue`)
+- **Distribution, Android & Qualité :** #55 (validation matérielle macOS & `.dmg`), #56 (AppImage/Flatpak & installeur Windows), #57 (code-splitting Vite — `good first issue`), #58 (vérification automatique i18n en CI — `good first issue`), #59 (découpage des gros modules), #60 (actualisation de la feuille de route — `good first issue`), #79 (réduction de la taille de l’APK Android)
+
+Les issues et premières tâches des seize chantiers sont regroupées dans le
 [suivi des contributions #12](https://github.com/loeuf237/animelab/issues/12).
 
 ## Proposer une autre idée
