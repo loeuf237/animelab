@@ -1,52 +1,66 @@
-# AnimeLab
+<div align="center">
 
-See the [first-run setup and update guide (French)](docs/startup-and-updates.md)
-for appearance, storage selection, Android permissions and release checks.
+<img src="docs/branding/animelab-wordmark.png" alt="AnimeLab" width="320" />
 
-[English](README.md) | [Français](README.fr.md)
+<h3>A cross-platform application for discovering, watching, downloading, and organizing anime.</h3>
 
-<img src="docs/branding/animelab-wordmark.png" alt="AnimeLab" width="360" />
+<p>
+  <a href="README.md"><strong>English</strong></a> · <a href="README.fr.md">Français</a>
+</p>
 
-[![CI](https://github.com/loeuf237/animelab/actions/workflows/ci.yml/badge.svg)](https://github.com/loeuf237/animelab/actions/workflows/ci.yml)
-[![Beta release](https://img.shields.io/github/v/release/loeuf237/animelab?include_prereleases)](https://github.com/loeuf237/animelab/releases)
-[![License: GPLv3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
+<p>
+  <a href="https://github.com/loeuf237/animelab/actions/workflows/ci.yml"><img src="https://github.com/loeuf237/animelab/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/loeuf237/animelab/releases/latest"><img src="https://img.shields.io/github/v/release/loeuf237/animelab" alt="Latest Release" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--only-blue.svg" alt="License: GPL-3.0-only" /></a>
+  <a href="https://t.me/AnimeLabGroup"><img src="https://img.shields.io/badge/Telegram-Community_Group-26A5E4?logo=telegram&logoColor=white" alt="Telegram Community Group" /></a>
+  <a href="https://t.me/animelabchannel"><img src="https://img.shields.io/badge/Telegram-Announcements-26A5E4?logo=telegram&logoColor=white" alt="Telegram Announcements" /></a>
+</p>
 
-**AnimeLab** lets you discover, watch, download and organize anime episodes from supported sources. It combines a **Python / FastAPI** engine with a **Vue 3 / TypeScript** interface, available on desktop, Android and in a browser.
+</div>
 
-## Contribute to AnimeLab
+**AnimeLab** combines a **Python / FastAPI** engine with a **Vue 3 / TypeScript** interface and integrated media tooling (FFmpeg / ffprobe), running natively on **Windows**, **Linux**, **macOS**, **Android**, or as a self-hosted **Docker / Web / PWA** server.
 
-**Three ways to start:** [test Android offline playback (#32)](https://github.com/loeuf237/animelab/issues/32),
-[improve the Linux walkthrough (#21)](https://github.com/loeuf237/animelab/issues/21), or
-[design a theme palette (#28)](https://github.com/loeuf237/animelab/issues/28).
-Code, testing, design and documentation contributions are welcome in English or French.
+> New to AnimeLab? See the [first-run setup and update guide (French)](docs/startup-and-updates.md) for onboarding, themes, storage selection, Android permissions, and in-app updates.
 
-[First contribution: steps and deliverables](docs/first-contribution.en.md) ·
-[Contribution guide](CONTRIBUTING.en.md) ·
-[Questions and ideas](https://github.com/loeuf237/animelab/discussions) ·
-[Telegram updates](https://t.me/animelabchannel)
+---
+
+## What's New in v0.2.0
+
+**[`v0.2.0`](docs/releases/v0.2.0.md)** is the **first major release** of AnimeLab:
+
+- **In-app release updates & SHA-256 verification:** check for updates from startup onboarding or **Settings → General**, verify downloads against `SHA256SUMS.txt`, trigger Android `PackageInstaller` self-updates, or download & extract desktop archives right inside the app.
+- **Dual Aniyomi/Anikku & Seanime JS/V8 extension engines:** run Aniyomi APK repositories alongside JavaScript/TypeScript Seanime extensions via an embedded V8 (`mini-racer`) runtime on Desktop/Server, plus full support for Anime-Sama's `lien:` / `epsJeton` / `/api/lien.php` episode database and Bot-Guard-compatible headers (e.g., Codeberg).
+- **Reworked Dark & Light Anime Detail Hero Card:** blurred ambient cover backdrop and high-contrast theme tokens across all 5 palettes (`Classic`, `Teal`, `Lavender`, `Amber`, `AMOLED`).
+- **Cleaner batch downloads & path isolation:** strict VF / VOSTFR / VO identity separation, duplicate-download prevention, and improved multi-season resolution.
+
+---
 
 ## Visual Overview
 
 <p align="center">
-  <img src="docs/showcase/animelab-overview.gif" alt="AnimeLab Full Walkthrough Demo" width="900" />
+  <img src="docs/showcase/animelab-overview.gif" alt="AnimeLab v0.2.0 Walkthrough" width="900" />
 </p>
 
 <p align="center">
-  <em>End-to-end walkthrough: Startup → Home Dashboard → Instant Search (<code>Ctrl+K</code>) → Batch VF/Subtitled Download → Live Transfer Queue → Library Auto-DL → Aniyomi Extensions Explorer (<a href="docs/showcase/animelab-demo.mp4">watch HD MP4 video</a>).</em>
+  <em>v0.2.0 Walkthrough: Library & Auto-DL → Instant Search (<code>Ctrl+K</code>) → Batch VF & Subtitles Download → Live Queue → Built-in Video Player → Themes, In-App Updates & Diagnostics → Aniyomi & Seanime Extensions → Light Mode, EN/FR Switcher & v0.2.0 Hero Card — <a href="docs/showcase/animelab-demo.mp4"><strong>Watch full HD MP4 video</strong></a>.</em>
 </p>
 
 <details>
-<summary><strong>Screenshots: desktop, mobile and Android</strong></summary>
+<summary><strong>Screenshots: Desktop, Themes, Extensions & Android</strong></summary>
 
-| Home & Latest Releases | Quick Search (`Ctrl + K`) |
+| Home Dashboard (Dark) | Quick Search (`Ctrl + K`) |
 | :---: | :---: |
 | ![Home Dashboard](docs/showcase/03-home-dashboard.png) | ![Quick Search](docs/showcase/04-quick-search.png) |
-| **Batch Episode Selection (VF / VOSTFR / Subtitles)** | **Live Download Queue & Transfer Speed** |
-| ![Batch Download Modal](docs/showcase/06-batch-download-modal.png) | ![Active Downloads](docs/showcase/07a-downloads-overview.png) |
-| **Library & Automatic Tracking (`Auto-DL`)** | **Sources & Aniyomi Extensions Explorer** |
-| ![Library Auto-DL](docs/showcase/08-library-autodl.png) | ![Aniyomi Extensions](docs/showcase/09b-extensions-actions.png) |
-| **Themes (Turquoise, Violet, Amber, AMOLED) & Plex/Jellyfin** | **Desktop Administration Console** |
-| ![Themes and Settings](docs/showcase/11-themes-palettes.png) | ![Desktop Admin](docs/showcase/01-desktop-admin.png) |
+| **v0.2.0 Light Hero Card (Ambient Cover)** | **Batch Selection (VF / VOSTFR / Subtitles)** |
+| ![v0.2.0 Light Hero Card](docs/showcase/13-anime-detail-light-hero.png) | ![Batch Download Modal](docs/showcase/06-batch-download-modal.png) |
+| **Live Download Queue & Progress** | **Library & Automatic Tracking (`Auto-DL`)** |
+| ![Active Downloads](docs/showcase/07a-downloads-overview.png) | ![Library Auto-DL](docs/showcase/08-library-autodl.png) |
+| **Seanime JS/V8 & Aniyomi Extensions Explorer** | **Dark & Light Theme Palettes** |
+| ![Extensions Explorer](docs/showcase/09b-extensions-actions.png) | ![Themes and Palettes](docs/showcase/11-themes-palettes.png) |
+
+| Desktop Administration Console |
+| :---: |
+| ![Desktop Admin Console](docs/showcase/01-desktop-admin.png) |
 
 ### Mobile & Android UI
 
@@ -57,126 +71,123 @@ Code, testing, design and documentation contributions are welcome in English or 
 </details>
 
 <details>
-<summary><strong>🎬 View feature-specific GIFs</strong></summary>
+<summary><strong>Feature-specific GIFs</strong></summary>
 
-#### 1. Quick Search, Batch VF/Subtitle Selection & Live Downloads
-![Search and Download GIF](docs/showcase/animelab-search-download.gif)
+#### 1. Instant Search, Batch VF/Subtitle Selection, Queue & Playback
+![Search, Download and Playback GIF](docs/showcase/animelab-search-download.gif)
 
-#### 2. Library Auto-DL & Aniyomi Extensions Explorer
-![Library and Extensions GIF](docs/showcase/animelab-library-extensions.gif)
+#### 2. Themes, Diagnostics, Proxies, Aniyomi & Seanime Extensions & Light Mode
+![Themes, Extensions and Light Mode GIF](docs/showcase/animelab-library-extensions.gif)
 
 </details>
 
-## Downloads
+---
 
-Choose a build from [GitHub Releases](https://github.com/loeuf237/animelab/releases). Android and desktop downloads are grouped in the same release.
+## Downloads & In-App Updates
 
-**All current versions are beta.** The [v0.1.6-beta.5 notes](docs/releases/v0.1.6-beta.5.md)
-describe the redesigned Sources/Extensions explorer, Android APK download fixes, WebView session changes and remaining limitations.
+Download packages from **[GitHub Releases (`v0.2.0`)](https://github.com/loeuf237/animelab/releases/latest)** ([v0.2.0 release notes](docs/releases/v0.2.0.md)). All desktop, Android, and checksum assets (`SHA256SUMS.txt`) are published together in the same release.
 
-| Platform | Package | Getting started |
+| Platform | Package (`v0.2.0`) | Getting started |
 | --- | --- | --- |
-| Windows x64 | ZIP archive | Extract the entire archive and launch `AnimeLab.exe`. |
-| Linux x64 | TAR.GZ archive | Extract and launch `./AnimeLab`. Requires glibc 2.35+. |
-| macOS Intel / Apple Silicon | ZIP containing an application | Choose your CPU architecture and open `AnimeLab.app`. **UNTESTED on real Mac hardware; unsigned and not notarized.** |
-| Android 10+ / ARM64 | Signed APK, beta | Install the APK. The Python engine and interface are included; no desktop server is required. |
-| Browser / mobile web | Web interface | Start the server or Docker container and open its address. |
+| **Windows** x64 | `AnimeLab-v0.2.0-Windows-x64.zip` | Extract the entire ZIP archive and run `AnimeLab.exe`. |
+| **Linux** x64 | `AnimeLab-v0.2.0-Linux-x64.tar.gz` | Extract the archive and run `./AnimeLab` (requires glibc 2.35+, e.g. Ubuntu 22.04+). |
+| **macOS** Apple Silicon / Intel | `AnimeLab-v0.2.0-macOS-arm64-UNTESTED.zip`<br>`AnimeLab-v0.2.0-macOS-x64-UNTESTED.zip` | Choose your CPU architecture and open `AnimeLab.app`. **UNTESTED on real Apple hardware; unsigned and not notarized.** |
+| **Android** 10+ ARM64 | `AnimeLab-v0.2.0-Android-arm64.apk` | Signed self-contained APK (embedded Python engine + Vue UI); no desktop server required. |
+| **Browser / Docker / PWA** | Self-hosted server | Start `python run.py` or `docker compose up -d --build --wait` and open `http://localhost:8080/app/`. |
 
-Desktop packages include Python, the compiled interface, FFmpeg and ffprobe. Windows uses WebView2; Linux uses GTK/WebKit, with an installed-browser fallback when a native window is unavailable.
+### Platform & Update Details
 
-Desktop builds open a native tabbed launcher. Choose your interface, port, folders and download settings, then click **Launch**. It also provides diagnostics, proxy settings, backups and graceful shutdown. See the [0.1.4 release notes](docs/releases/v0.1.4.md) and [desktop tools and recovery](docs/desktop-distribution.md).
+- **Desktop bundles:** include Python, compiled Vue frontend, `curl_cffi`, `yt-dlp`, FFmpeg, and ffprobe. Windows uses Edge WebView2; Linux uses GTK/WebKit, with automatic fallback to your installed browser if a native window cannot be created. See [desktop tools and recovery](docs/desktop-distribution.md).
+- **Android standalone app:** includes its Python 3.13 / Chaquopy engine and interface offline. Completed videos are exported to shared storage (`Downloads/AnimeLab` or user-picked SAF folder) and failed exports can be retried without re-downloading. See [Android distribution and storage](docs/android-distribution.md).
+- **In-app updates (`v0.2.0`):** AnimeLab checks releases at startup (if enabled) or on demand under **Settings → General**, supports stable and beta release channels, verifies downloaded files against `SHA256SUMS.txt`, hands off signed APK upgrades to Android's `PackageInstaller`, and downloads/extracts desktop update archives automatically.
+- **PWA support:** in supporting desktop or mobile browsers, install the web interface via **Install** / **Add to Home Screen** (the AnimeLab server must remain running).
 
-Android device coverage remains **beta**. The [0.1.6-beta.5 release notes](docs/releases/v0.1.6-beta.5.md) explain the experimental APK runtime, emulator coverage and pending physical-device validation. Release assets include checksums and build information.
+---
 
-In supporting browsers, install the web interface as a PWA using the browser's install or **Add to Home Screen** option. The AnimeLab server must remain available.
+## Start the Desktop Application
 
-## Start the desktop application
-
-**If your folder contains `desktop.py`, `pyproject.toml` and an `animelab/` directory, you have the source code.** Open a terminal in that folder and run:
+**If your folder contains `desktop.py`, `pyproject.toml`, and an `animelab/` directory, you have a source checkout.** Open a terminal in that folder and run:
 
 ```bash
 uv run --locked --group desktop python desktop.py
 ```
 
-This command works on Linux and Windows and installs the locked desktop dependencies if needed. The `animelab/` directory is the Python package, not an executable. See [Run from source](#run-from-source) for prerequisites and the frontend build required before starting the engine.
+On Linux, you can also run **`./launcher.sh`** from the repository root (`./launcher.sh --help` for status, stop, and self-test commands). It installs locked desktop dependencies and builds the frontend automatically when missing. See [Run from source](#run-from-source) for prerequisites.
 
-On Linux, you can also run **`./launcher.sh`** from the repository root. The script opens the launcher, installs the locked desktop Python dependencies if needed, and builds the frontend if it is missing (requires Node.js/npm). Run `./launcher.sh --help` for startup, status, shutdown and launcher self-test options.
-
-The following Linux and Windows instructions apply to **downloaded release archives**, which contain an `AnimeLab` executable or `AnimeLab.exe`.
-
-Download the package for your platform from [GitHub Releases](https://github.com/loeuf237/animelab/releases) and **extract the entire archive**. Keep the executable beside its bundled files and folders. These packages include their Python dependencies and compiled interface; you do not need to install Python, Node.js or uv.
+The sections below apply to **downloaded release archives** (which already include Python and the built UI):
 
 ### Linux
 
-Extract the Linux x64 TAR.GZ archive, then open a terminal in the extracted folder containing `AnimeLab` and run:
+Extract `AnimeLab-v0.2.0-Linux-x64.tar.gz`, open a terminal inside the extracted folder containing `AnimeLab`, and run:
 
 ```bash
 chmod +x AnimeLab
 ./AnimeLab
 ```
 
-Linux builds require glibc 2.35 or newer (for example, Ubuntu 22.04 or newer).
-
 ### Windows
 
-Extract the Windows x64 ZIP archive and double-click **`AnimeLab.exe`** inside the extracted folder. Alternatively, open PowerShell in that folder and run:
+Extract `AnimeLab-v0.2.0-Windows-x64.zip` and double-click **`AnimeLab.exe`**, or run in PowerShell from the extracted folder:
 
 ```powershell
 .\AnimeLab.exe
 ```
 
-### Use the launcher
+### Using the Launcher
 
-The launcher opens first. Choose your interface, port and download folder, then click **Launch** to start the engine and open the application. Choose browser mode to use your installed browser; an embedded native window requires the platform's WebView libraries.
+1. The native tabbed **AnimeLab Desktop Launcher** opens first (`General`, `Downloads`, `Sources`, `Extensions`, `Authentication`, `Proxies`, `Backups`, `Diagnostics`).
+2. Choose your UI mode (**Native window** or installed **Browser**), port, download directory, and options, then click **Launch**.
+3. Use the URL shown by the launcher (if the requested port is busy, AnimeLab binds to an available port automatically).
+4. Closing the configuration window keeps the running server alive; use **Stop** for graceful shutdown.
+5. Reopen the launcher later via `./AnimeLab --admin` (Linux) or `.\AnimeLab.exe --admin` (Windows), or use `--launch` to start directly with your saved preferences.
 
-Use the application address shown by the launcher. If the requested port is occupied, AnimeLab selects a free port, so the address may differ from `http://localhost:8080/`.
+---
 
-Closing the configuration window leaves a started server running. Use **Stop** to stop it. To reopen the launcher, run `./AnimeLab --admin` on Linux or `.\AnimeLab.exe --admin` in Windows PowerShell. Use `--launch` instead to start directly with your saved preferences.
+## Main Features
 
-For a source checkout, follow [Run from source](#run-from-source) below, including the frontend build and desktop dependency installation. See [desktop tools and recovery](docs/desktop-distribution.md) for troubleshooting and additional commands.
+- **Browse & Global Search (`Ctrl+K` / `Cmd+K`):** built-in **French-Manga**, **VoirAnime**, and **AnimePahe** sources alongside imported Aniyomi and Seanime sources, live **Latest Releases** carousels per source, genre/tag filters, and instant search across any enabled provider.
+- **Built-in Video Player:** stream directly or play local downloaded files with quality switching, audio/subtitle track menus, saved resume positions, and quick **Next Episode** controls.
+- **Parallel Batch Downloads & Queue:** queue individual episodes or full seasons (`VF`, `VOSTFR`, `VO`), pick hardsubbed MP4 / softsubbed MKV output profiles, drag-reorder queue priority, pause/resume anytime, cap global transfer speed, and verify file integrity.
+- **Strict Edition Isolation & Duplicate Protection:** VF, VOSTFR, and VO editions keep separate identities and filenames so different versions never overwrite one another.
+- **Library & Automatic Tracking (`Auto-DL`):** favorites, quick resume history cards, per-series automatic episode monitoring (`Auto-DL`), optional Plex / Jellyfin folder naming layouts, and resilient Android shared storage export.
+- **Personalization, Diagnostics & Proxy Pool:** system / light / dark themes with **5 color palettes** (`Classic`, `Teal`, `Lavender`, `Amber`, `AMOLED`), instant **EN / FR** language switcher, built-in diagnostics bundle export & disk usage monitor, and automatic public HTTPS proxy pool + custom `SOCKS5` / `HTTP` routing.
 
-## Main features
+---
 
-- **Browse and search:** built-in French-Manga, VoirAnime and AnimePahe sources, plus supported imported sources. Latest releases, popular titles, genres and tags depend on each source's capabilities.
-- **Watch:** streaming and local playback, subtitles, available quality options and saved episode progress.
-- **Download:** individual or batch downloads, queue management, pause/resume, bandwidth limits, subtitle processing and integrity checks.
-- **Keep versions separate:** VF, VOSTFR and VO selections have distinct identities and filenames to avoid overwriting each other.
-- **Organize:** favorites, viewing history, automatic episode tracking and optional Plex/Jellyfin folder layouts.
-- **Use on mobile:** responsive screens, English/French interface, light/dark themes and global search with **Ctrl+K / Cmd+K**.
+## Sources and Extensions
 
-On Android, completed videos can be exported to shared storage. Export failures can be retried without downloading the video again.
+AnimeLab supports multiple extension ecosystems under **Sources → Extensions**:
 
-## Shared server and accounts
+1. **Aniyomi / Anikku / Animiru repositories:**
+   - Import one or multiple repositories concurrently; refreshing catalogues preserves installed versions and customized recipes.
+   - **Desktop / Server:** extracts DEX selectors, URLs, and request constants from APKs and executes serializable `SourceRecipe` plans through a shared Python runtime (including AJAX episodes, JSON catalogues, literal player arrays, HTML extraction, and Anime-Sama's `lien:` / `epsJeton` database). Arbitrary compiled Kotlin bytecode or encrypted logic cannot be executed directly on PC — see [recipe execution and limitations](docs/extension-recipes.md).
+   - **Android:** validation builds run an isolated `:extension-runtime` APK worker host with explicit trust approval; see [extension usage and validation status](docs/studies/aniyomi-anikku/UTILISATION.md).
+2. **Seanime extensions (JavaScript / TypeScript):**
+   - Built-in **V8 (`mini-racer`)** JavaScript/TypeScript execution engine on Desktop/Server (`seanime_runtime.py`) for browsing Seanime marketplaces, installing extensions, running local search/health tests, and streaming/downloading.
+   - An initial Android offscreen `WebView` bridge exists and is actively being stabilized in [#63](https://github.com/loeuf237/animelab/issues/63).
+3. **CloudStream (`.cs3`) & Host Extractors (Roadmap):**
+   - `.cs3` support for PC ([#64](https://github.com/loeuf237/animelab/issues/64)) and Android ([#65](https://github.com/loeuf237/animelab/issues/65)), expanded Anikku DEX compatibility ([#61](https://github.com/loeuf237/animelab/issues/61)), and multi-hoster video extractors ([#62](https://github.com/loeuf237/animelab/issues/62)).
 
-An optional shared-server mode provides administrator-managed accounts, invitation
-and recovery codes, permissions and private libraries, source sessions and downloads.
-It runs from source or Docker; the desktop launcher's Authentication tab also
-enables accounts locally. Personal desktop/Android mode remains the default.
-See [shared-server setup and security](docs/shared-server.md) for bootstrap commands,
-HTTPS deployment, resource limits and manual tests.
+If a website returns anti-bot verification, AnimeLab offers controlled verification flows with cookie capture (`docs/browser-verification.md`), as well as proxy configuration in **Settings → Proxy & Network**. Next-generation Mihon/Anikku-style temporary system WebView verification on Android and embedded PC verification are tracked in [#69](https://github.com/loeuf237/animelab/issues/69) and [#70](https://github.com/loeuf237/animelab/issues/70).
 
-## Sources and extensions
+---
 
-Import an Aniyomi-compatible repository from **Sources → Extensions**, then enable the sources you want to use. Source health checks and recipe configuration help diagnose failures.
+## Shared Server and Accounts
 
-Multiple repositories now coexist and refreshing their catalogues preserves installed versions and recipes. The original Android APK runtime is available in validation builds while its interoperability tests are completed. See the [extension usage and validation status](docs/studies/aniyomi-anikku/UTILISATION.md) for installation, trust, shared packages and current limits.
+An optional multi-user shared-server mode provides administrator-managed accounts, invitation and recovery codes, role permissions, and private per-user libraries, source sessions, and download queues. It runs from source or Docker, and can also be enabled locally from the desktop launcher's **Authentication** tab. Personal single-user mode remains the default. See [shared-server setup and security](docs/shared-server.md).
 
-On desktop/server, AnimeLab extracts selectors and request constants from APKs and runs serializable recipes through a shared Python interpreter. There are no per-source runtime adapters. Recipes can describe HTML, JSON catalogues, AJAX episodes, literal player arrays and redirects. Some known sources use declarative compatibility plans to supplement extracted constants.
+---
 
-An APK contains compiled Kotlin code, **not a portable scraping recipe**. The desktop/server recipe engine does not run Android bytecode: arbitrary Kotlin logic, encrypted requests and unsupported parsers cannot automatically be converted into complete recipes. Compatibility therefore depends on the operations the interpreter supports and on the external website. Android validation builds use a separate native host for original installed APKs, subject to the validation limits linked above. See [recipe execution and limitations](docs/extension-recipes.md).
-
-If a site blocks access or requests verification, AnimeLab offers a manual website link and retry controls. Supported verification windows can capture cookies after you complete verification. Opening an ordinary browser tab alone does not transfer cookies to AnimeLab. Proxy configuration and optional rotation are available in Settings; they do not guarantee access.
-
-## Run from source
+## Run from Source
 
 Requirements:
 
-- **Python 3.12 or 3.13**; these versions are covered by CI.
-- **Node.js 22 LTS (22.13+) and npm** to build and check the interface.
-- **FFmpeg and ffprobe** on `PATH` for media processing and verified subtitle muxing.
-- **uv 0.13.1**, the Python dependency manager ([installation](https://docs.astral.sh/uv/getting-started/installation/)).
+- **Python 3.12 or 3.13** (both validated in CI; `.python-version` defaults to `3.13`)
+- **Node.js 22 LTS (22.13+)** and **npm**
+- **FFmpeg** and **ffprobe** on `PATH`
+- **uv 0.13.1** ([installation guide](https://docs.astral.sh/uv/getting-started/installation/))
 
-Clone the repository and install the locked Python environment:
+Clone and install the locked Python environment:
 
 ```bash
 git clone https://github.com/loeuf237/animelab.git
@@ -184,9 +195,7 @@ cd animelab
 uv sync --locked
 ```
 
-uv selects Python 3.13 from `.python-version` and downloads it if necessary. No virtual-environment activation is needed; the same commands work in PowerShell.
-
-Install dependencies and build the interface:
+Install frontend dependencies and compile the Vue SPA:
 
 ```bash
 cd frontend
@@ -195,111 +204,98 @@ npm run build
 cd ..
 ```
 
-Then choose how to start the application from the repository root. Rebuild the interface after changing its source files.
+Rebuild the frontend (`npm run build`) whenever you edit files under `frontend/`.
 
-### Desktop launcher (Linux and Windows)
-
-Install the desktop dependencies and open the launcher. These commands work in a Linux terminal and Windows PowerShell:
+### Desktop Launcher from Source (Linux & Windows)
 
 ```bash
 uv sync --locked --group desktop
 uv run --locked --group desktop python desktop.py
 ```
 
-Choose your settings and click **Launch**. Browser mode uses your installed browser. For an embedded native window, see the platform's WebView prerequisites in [desktop package details](docs/desktop-distribution.md).
-
-### Web server
-
-To start the server directly:
+### Web Server from Source
 
 ```bash
 uv run --locked python run.py
 ```
 
-Open **[http://localhost:8080/app/](http://localhost:8080/app/)**.
+Open **[http://localhost:8080/app/](http://localhost:8080/app/)**. Legacy bookmark paths (`/downloads`, `/settings`, `/anime`, `/search`, etc.) automatically redirect to the Vue SPA with query parameters preserved.
 
-Vue is the only web frontend. Old bookmarks (`/downloads`, `/settings`, `/anime`,
-`/search`, etc.) redirect to the corresponding SPA screen, preserving their query
-parameters. The former Jinja pages, scripts and styles are no longer shipped.
+### Configuration and Environment Variables
 
-The default locked environment runs the web server; it does not install native desktop or Android build dependencies.
-
-### Configuration and data
-
-Settings controls language, downloads, sources and proxies. For a source checkout, environment variables also configure the server:
+Settings in the UI manage language, themes, downloads, sources, and proxies. For source or server deployments, environment variables override defaults:
 
 | Variable | Purpose | Default |
 | --- | --- | --- |
 | `ANIMELAB_HOST` | Server bind address | `127.0.0.1` |
-| `ANIMELAB_CHROMIUM_PATH` | Installed Chromium-family executable for source verification | Automatic detection |
-| `ANIMELAB_CHROMIUM_HEADLESS` | Run verification Chromium without a display | `false` |
-| `ANIMELAB_ALLOWED_HOSTS` | Accepted HTTP hosts, comma-separated, without schemes or ports | `127.0.0.1,localhost` |
-| `ANIMELAB_PORT` | HTTP port | `8080` |
-| `ANIMELAB_RELOAD` | Reload the development server after code changes | `true` |
-| `ANIMELAB_DOWNLOAD_DIR` | Download destination | `~/Downloads/AnimeLab` on desktop |
+| `ANIMELAB_PORT` | HTTP server port | `8080` |
+| `ANIMELAB_ALLOWED_HOSTS` | Accepted HTTP `Host` headers (comma-separated, no scheme/port) | `127.0.0.1,localhost` |
+| `ANIMELAB_DOWNLOAD_DIR` | Default download directory | `~/Downloads/AnimeLab` |
+| `ANIMELAB_RELOAD` | Auto-reload development server on code changes | `true` |
+| `ANIMELAB_CHROMIUM_PATH` | Chromium-family binary for manual source verification | Automatic detection |
+| `ANIMELAB_CHROMIUM_HEADLESS` | Launch verification Chromium headlessly | `false` |
 
-Only local HTTP hosts are accepted by default; other hosts receive HTTP 400. For LAN access or a reverse proxy, explicitly list the IP addresses or domain names used to reach AnimeLab, for example `ANIMELAB_ALLOWED_HOSTS=127.0.0.1,localhost,192.168.1.50,anime.example.org`. This also works with Docker Compose. Setting `ANIMELAB_HOST=0.0.0.0` alone does not authorize other hosts. Subdomains can be allowed with `*.example.org`; `*` disables host validation and should be avoided. These are incoming application hosts, not anime source domains.
+> **Host security:** requests from unlisted HTTP hosts receive HTTP 400. For LAN or reverse-proxy setups, list explicit IPs or hostnames in `ANIMELAB_ALLOWED_HOSTS` (e.g. `127.0.0.1,localhost,192.168.1.50,anime.example.org`). Wildcard subdomains (`*.example.org`) are supported; avoid `*`.
+>
+> **Legacy compatibility:** AnimeLab was previously named **Animan**. The Python package is `animelab`, `ANIMELAB_*` variables are preferred, and legacy `ANIMAN_*` aliases remain accepted. `.animan` data directories (`~/.animan`) and the Android package ID `com.animan.app` are intentionally retained so existing libraries and APK upgrades stay seamless (`docs/legacy-identifiers.md`).
 
-For local-only use without automatic reload, on Linux/macOS:
+For a non-reloading local run on Linux/macOS:
 
 ```bash
 ANIMELAB_HOST=127.0.0.1 ANIMELAB_RELOAD=false uv run --locked python run.py
 ```
 
-AnimeLab was previously named **Animan**. The Python package is now `animelab`. The runtime prefers `ANIMELAB_*` variables and accepts legacy `ANIMAN_*` aliases. `.animan` data folders and Android ID `com.animan.app` are retained for compatibility. Desktop settings and the library live under `~/.animan`; Android uses private app storage and exports completed media separately.
-
-New downloads and Android shared exports default to `Downloads/AnimeLab`.
-Existing files, saved task paths and custom destinations are preserved.
-See [remaining legacy identifiers and migration options](docs/legacy-identifiers.md).
+---
 
 ## Docker
 
-From the cloned repository, with Docker Compose installed:
+With Docker Engine & Compose installed:
 
 ```bash
 docker compose up -d --build --wait
 ```
 
-Open **[http://localhost:8080/app/](http://localhost:8080/app/)**. The container includes the compiled interface and media tools. Named volumes preserve the library, settings and downloads.
+Open **[http://localhost:8080/app/](http://localhost:8080/app/)**. The container bundles the Python backend, compiled Vue UI, FFmpeg, and named persistent volumes. Stop it with `docker compose down`. See the [Docker guide](docs/docker.md) for host-mounted download paths, backups, ports, and remote access.
 
-Stop it with `docker compose down`. See the [Docker guide](docs/docker.md) for visible download folders, backups, ports and network access.
+---
 
-## Development and contributions
+## Community & Contribute to AnimeLab
 
-Start with the contribution guide ([English](CONTRIBUTING.en.md) /
-[Français](CONTRIBUTING.md)) for bug reports, setup, validation and pull requests.
-Contributions in French and English are welcome.
+Contributions in **English or French** are warmly welcome — whether code, Android device testing, UI mockups, bug reports, source recipes, or documentation!
 
-Start with the [three current first-contribution briefs](docs/first-contribution.en.md):
-Android offline testing, the Linux guide and a theme palette. Comment on the
-chosen issue with your proposed scope; the maintainer can help identify files,
-reproduce a problem and review a small first change.
+- **Support & Community Chat:** **[Telegram — AnimeLab Group](https://t.me/AnimeLabGroup)**
+- **Release Announcements:** **[Telegram — AnimeLab Channel](https://t.me/animelabchannel)**
+- **Ideas & Q&A:** **[GitHub Discussions](https://github.com/loeuf237/animelab/discussions)**
+- **Maintainer Direct Contact:** [Telegram — @loeuf237](https://t.me/loeuf237) *(keep technical decisions public on GitHub)*
 
-The [detailed contribution priorities](docs/contribution-priorities.en.md) distinguish
-existing features from remaining work, including extension validation, player
-usability, subtitle tools and multi-audio workflows. The
-[contribution tracker #12](https://github.com/loeuf237/animelab/issues/12) records progress.
-Use [Discussions](https://github.com/loeuf237/animelab/discussions) for questions and
-ideas, and issues for bounded tasks and reproducible bugs. Private contact:
-[Telegram — @loeuf237](https://t.me/loeuf237); keep useful technical decisions public.
+### Post-v0.2.0 Priority Roadmap
 
-The Python engine lives in `animelab/`; desktop packaging uses `animelab.spec`.
-See the [package namespace and compatibility notes](docs/package-namespace.md).
+See **[Tracker Issue #12](https://github.com/loeuf237/animelab/issues/12)** and the **[Detailed Contribution Priorities](docs/contribution-priorities.en.md)** for full specs. High-impact focus areas right now:
 
-Bug reports, translations, source adapters, UI improvements and device testing are welcome. [Open an issue](https://github.com/loeuf237/animelab/issues) with reproduction steps, platform and application version; discuss substantial changes before submitting a pull request. Remove cookies, credentials and private URLs from diagnostic material.
+- **Extensions & Extractors:** fix Anikku/Animiru DEX translation & recipe coverage ([#61](https://github.com/loeuf237/animelab/issues/61)), expand video hoster extractors ([#62](https://github.com/loeuf237/animelab/issues/62)), stabilize Seanime JS/V8 on Android ([#63](https://github.com/loeuf237/animelab/issues/63)), and build the CloudStream (`.cs3`) engine for PC ([#64](https://github.com/loeuf237/animelab/issues/64)) & Android ([#65](https://github.com/loeuf237/animelab/issues/65)).
+- **Source Verification:** Mihon/Anikku-style temporary system WebView verification on Android ([#69](https://github.com/loeuf237/animelab/issues/69)) and PC verification improvements ([#70](https://github.com/loeuf237/animelab/issues/70)).
+- **PC Tools Workspace:** full Subtitle Workshop ([#66](https://github.com/loeuf237/animelab/issues/66)) and PC Audio-to-Subtitle transcription with Whisper / TurboScribe ([#67](https://github.com/loeuf237/animelab/issues/67)).
+- **Great `good first issue` starting points:**
+  - Telegram group prompt on first launch & Settings > About link ([#71](https://github.com/loeuf237/animelab/issues/71))
+  - Auto-add anime card to library on press ([#68](https://github.com/loeuf237/animelab/issues/68))
+  - Player keyboard shortcuts & Picture-in-Picture ([#51](https://github.com/loeuf237/animelab/issues/51)) · Opt-in Desktop Discord Rich Presence ([#74](https://github.com/loeuf237/animelab/issues/74))
+  - Plex / Jellyfin / Kodi naming templates ([#78](https://github.com/loeuf237/animelab/issues/78)) · Automated i18n audit ([#58](https://github.com/loeuf237/animelab/issues/58)) · Vite code-splitting ([#57](https://github.com/loeuf237/animelab/issues/57))
+  - Linux source guide ([#21](https://github.com/loeuf237/animelab/issues/21)) · Extra theme palette ([#28](https://github.com/loeuf237/animelab/issues/28))
 
-For frontend development, keep the Python server running and launch Vite in another terminal:
+Read **[First contribution guide](docs/first-contribution.en.md)** and **[CONTRIBUTING.en.md](CONTRIBUTING.en.md)** ([Français](CONTRIBUTING.md)) before opening a PR.
+
+### Local Development & CI Checks
+
+To develop the Vue frontend with hot reload while keeping the Python API running on port `8080`:
 
 ```bash
 cd frontend
 npm run dev
 ```
 
-Vite serves the interface at **http://localhost:5173** and proxies API requests to port **8080**.
+Vite serves the frontend at **http://localhost:5173** and proxies `/api` requests to port `8080`.
 
-[CI](.github/workflows/ci.yml) runs on pushes and pull requests. It checks Python, the frontend build and responsive layouts, Docker persistence and Android resources. It also enforces Ruff, incremental mypy checks, ESLint, Prettier and Vue/TypeScript checks. The unified release workflow calls the Android build and publishes all platforms together after validation.
-
-After the source installation above, run all development checks from the repository root:
+To run the full validation suite matching [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (Ruff, mypy, ESLint, Prettier, Vue/TypeScript build, Python 3.12/3.13 tests, and Playwright UI tests):
 
 ```bash
 cd frontend
@@ -308,24 +304,27 @@ cd ..
 uv run --locked python scripts/check.py all
 ```
 
-The runner executes linting, typing, unit tests, the interface build, Python tests and browser tests. Python tests use a temporary home, database, cache and download directory. To run only the backend suite, after building the interface, use **`uv run --locked python scripts/check.py python`**; CI uses the same command with a JUnit report option.
+To run only the Python test suite (requires `frontend/dist` to be built):
 
-Tests share an offline DNS fixture in `tests/conftest.py`; numeric addresses and loopback connections remain usable, and DNS security cases can override it. Direct `python -m pytest tests` runs skip the SPA serving test if `frontend/dist/index.html` is absent. The isolated runner and CI still require the frontend build, so a missing build fails validation.
+```bash
+uv run --locked python scripts/check.py python
+```
 
-Python dependencies, including development tools, are pinned in `uv.lock`; `requirements.txt` is a generated runtime-only export for pip and Docker. Frontend dependencies are pinned in `frontend/package-lock.json`. See the [development guide](docs/development.md) for system prerequisites, individual checks, dependency updates and the current typing/linting scope.
+Python dependencies are locked in `uv.lock` (runtime export in `requirements.txt`), and frontend dependencies in `frontend/package-lock.json`. The backend engine lives in `animelab/` and desktop packaging uses `animelab.spec` — see [package namespace notes](docs/package-namespace.md) and the [development guide](docs/development.md).
 
-## Documentation
+---
 
-- [Desktop distribution](docs/desktop-distribution.md) and [Android build and storage guide](docs/android-distribution.md)
-- [Aniyomi/Anikku extension management study and validation status](docs/studies/aniyomi-anikku/README.md)
-- [Docker setup](docs/docker.md)
-- [Mobile UI validation](docs/mobile-ui.md) and [proxy provider study](docs/proxy-providers.md)
-- [Release notes](docs/releases/) and [branding assets](docs/branding/README.md)
+## Documentation Index
+
+- **Setup & Platforms:** [First-run & updates](docs/startup-and-updates.md) · [Desktop distribution](docs/desktop-distribution.md) · [Android distribution & storage](docs/android-distribution.md) · [Docker guide](docs/docker.md) · [Shared server](docs/shared-server.md)
+- **Extensions & Networking:** [Extension recipes & limits](docs/extension-recipes.md) · [Aniyomi/Anikku study & status](docs/studies/aniyomi-anikku/README.md) · [Browser verification & cookies](docs/browser-verification.md) · [Proxy provider evaluation](docs/proxy-providers.md)
+- **Contributing & Architecture:** [Contribution priorities (EN)](docs/contribution-priorities.en.md) · [First contribution (EN)](docs/first-contribution.en.md) · [Development guide](docs/development.md) · [Mobile UI checks](docs/mobile-ui.md) · [Architecture UML diagrams](docs/architecture/README.md)
+- **Releases & Assets:** [All release notes](docs/releases/) · [Branding assets](docs/branding/README.md) · [Legacy identifiers](docs/legacy-identifiers.md)
+
+---
 
 ## License
 
-AnimeLab is free software licensed under the **GNU General Public License, version 3 only** (`GPL-3.0-only`). You may use, modify and redistribute it under those terms. Redistributed versions based on AnimeLab must comply with GPLv3, including its corresponding-source requirements. The software is provided without warranty.
+AnimeLab is free software licensed under the **GNU General Public License, version 3 only** (`GPL-3.0-only`). You may use, modify, and redistribute it under those terms; redistributed modified versions must comply with GPLv3, including corresponding source requirements. The software is provided without warranty.
 
-See [LICENSE](LICENSE) for the full terms and [NOTICE](NOTICE) for the project notice and source location. Third-party components retain their own licenses; see the [Android third-party notices](android/app/src/main/assets/THIRD-PARTY-NOTICES.txt) and the notices included in release packages.
-
-For browser session sharing, Chromium paths and headless server setup, see [Browser verification](docs/browser-verification.md).
+See [LICENSE](LICENSE), [NOTICE](NOTICE), and [Android third-party notices](android/app/src/main/assets/THIRD-PARTY-NOTICES.txt) for complete licensing terms.
