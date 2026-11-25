@@ -202,9 +202,10 @@ def start(data_dir, cache_dir, port, token, test_mode=False):
         str(hooks.readExportedCopyBase64(uri, int(offset), int(length)))
     )
     platform_events.delete_exported_copy_handler = lambda uri: bool(hooks.deleteExportedCopy(uri))
-    platform_events.app_update_install_handler = lambda path: json.loads(str(hooks.installAppUpdate(path)))
-    platform_events.app_update_status_handler = lambda op_id: json.loads(str(hooks.appUpdateStatus(op_id or "")))
-    platform_events.app_update_confirm_handler = lambda op_id, path: json.loads(str(hooks.confirmAppUpdate(op_id or "", path or "")))
+    extension_bridge = jclass("com.animan.app.ExtensionBridge")
+    platform_events.app_update_install_handler = lambda path: json.loads(str(extension_bridge.installAppUpdate(path)))
+    platform_events.app_update_status_handler = lambda op_id: json.loads(str(extension_bridge.appUpdateStatus(op_id or "")))
+    platform_events.app_update_confirm_handler = lambda op_id, path: json.loads(str(extension_bridge.confirmAppUpdate(op_id or "", path or "")))
     import run
     from animelab.android_security import AndroidSessionMiddleware
     from animelab.models.download_task import DownloadStatus, ExportStatus

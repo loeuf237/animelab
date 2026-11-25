@@ -41,8 +41,17 @@ object ExtensionBridge {
     @JvmStatic fun operations(): String = ExtensionPackages.operations(context).toString()
     @JvmStatic fun cancelInstallation(id: String): String = ExtensionPackages.cancel(context,id).toString()
     @JvmStatic fun confirmOperation(id: String): String = ExtensionPackages.openConfirmation(context, id).toString()
+    private fun appContext(): Context = if (::context.isInitialized) context else EngineHost.context
+
     @JvmStatic fun installAppUpdate(path: String): String =
-        ExtensionPackages.installSelfUpdate(if (::context.isInitialized) context else EngineHost.context, path).toString()
+        ExtensionPackages.installSelfUpdate(appContext(), path).toString()
+
+    @JvmStatic fun appUpdateStatus(operationId: String): String =
+        ExtensionPackages.operationStatus(appContext(), operationId).toString()
+
+    @JvmStatic fun confirmAppUpdate(operationId: String, path: String): String =
+        ExtensionPackages.confirmOrLaunchSelfUpdate(appContext(), operationId, path).toString()
+
     @JvmStatic fun resumePendingInstalls() {
         if (::context.isInitialized) {
             ExtensionPackages.resume(context)

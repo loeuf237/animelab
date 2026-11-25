@@ -319,7 +319,7 @@ class EmbeddedEngineTest {
                     probeApk,
                 )
                 assertEquals("content", contentUri.scheme)
-                assertEquals(0, JSONObject(NativeHooks.appUpdateStatus("nonexistent-probe")).length())
+                assertEquals(0, JSONObject(ExtensionBridge.appUpdateStatus("nonexistent-probe")).length())
                 val eventsModule = Python.getInstance().getModule("animelab.platform_events")
                 assertNotNull(eventsModule["app_update_install_handler"])
                 assertNotNull(eventsModule["app_update_status_handler"])
