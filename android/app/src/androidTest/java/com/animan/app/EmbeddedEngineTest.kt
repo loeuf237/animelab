@@ -310,14 +310,10 @@ class EmbeddedEngineTest {
             probeApk.parentFile?.mkdirs()
             try {
                 File(context.applicationInfo.sourceDir).copyTo(probeApk, overwrite = true)
-                val inspectedSelf = ExtensionPackages.inspect(context, probeApk.path, allowSelfUpdate = true)
+                val inspectedSelf = JSONObject(ExtensionBridge.inspectSelfUpdate(probeApk.path))
                 assertEquals(context.packageName, inspectedSelf.getString("pkg"))
                 assertTrue(inspectedSelf.getString("signer").isNotBlank())
-                val contentUri = androidx.core.content.FileProvider.getUriForFile(
-                    context,
-                    "${context.packageName}.fileprovider",
-                    probeApk,
-                )
+                val contentUri = Uri.parse(ExtensionBridge.selfUpdateUri(probeApk.path))
                 assertEquals("content", contentUri.scheme)
                 assertEquals(0, JSONObject(ExtensionBridge.appUpdateStatus("nonexistent-probe")).length())
                 val eventsModule = Python.getInstance().getModule("animelab.platform_events")

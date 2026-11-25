@@ -2,9 +2,11 @@ package com.animan.app
 
 import android.content.Context
 import android.os.ParcelFileDescriptor
+import androidx.core.content.FileProvider
 import com.animan.extensions.IExtensionHttp
 import com.animan.extensions.ExtensionHostClient
 import com.chaquo.python.Python
+import java.io.File
 import java.util.concurrent.*
 
 /** Python talks only to this small, kept facade; extension classes live in :extensions. */
@@ -51,6 +53,14 @@ object ExtensionBridge {
 
     @JvmStatic fun confirmAppUpdate(operationId: String, path: String): String =
         ExtensionPackages.confirmOrLaunchSelfUpdate(appContext(), operationId, path).toString()
+
+    @JvmStatic fun inspectSelfUpdate(path: String): String =
+        ExtensionPackages.inspect(appContext(), path, allowSelfUpdate = true).toString()
+
+    @JvmStatic fun selfUpdateUri(path: String): String {
+        val ctx = appContext()
+        return FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", File(path)).toString()
+    }
 
     @JvmStatic fun resumePendingInstalls() {
         if (::context.isInitialized) {
