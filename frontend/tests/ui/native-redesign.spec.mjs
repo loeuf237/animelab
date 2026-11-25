@@ -426,3 +426,185 @@ test('VoirAnime posters route through image-proxy and direct cover errors fall b
     .poll(() => detailCover.evaluate((el) => el.complete && el.naturalWidth > 0))
     .toBe(true)
 })
+
+test('AppUpdateSettings exposes Android confirmation and launch actions without re-downloading', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await mockApp(page)
+  const calls = []
+  let applyCount = 0
+
+  const releasePayload = {
+    version: 'v0.3.1',
+    notes: '# AnimeLab v0.3.1',
+    url: 'https://github.com/loeuf237/animelab/releases/tag/v0.3.1',
+    assets: [
+      {
+        name: 'AnimeLab-v0.3.1-Android-arm64.apk',
+        label: 'AnimeLab-v0.3.1-Android-arm64.apk',
+        url: 'https://github.com/loeuf237/animelab/releases/download/v0.3.1/AnimeLab-v0.3.1-Android-arm64.apk',
+        size: 1024,
+      },
+    ],
+  }
+
+  await page.route('**/api/app/updates**', async (route) => {
+    const parsed = new URL(route.request().url())
+    const pathname = parsed.pathname
+    calls.push({ method: route.request().method(), pathname })
+    if (pathname === '/api/app/updates') {
+      const refreshed = parsed.searchParams.get('refresh') === 'true'
+      return route.fulfill({
+        json: refreshed
+          ? {
+              status: 'available',
+              currentVersion: '0.3.0',
+              channel: 'beta',
+              release: releasePayload,
+            }
+          : { status: 'current', currentVersion: '0.3.0', channel: 'beta', release: null },
+      })
+    }
+    if (pathname === '/api/app/updates/install' && route.request().method() === 'POST') {
+      return route.fulfill({
+        json: {
+          state: 'waiting_user',
+          version: 'v0.3.1',
+          assetName: 'AnimeLab-v0.3.1-Android-arm64.apk',
+          downloadedBytes: 1024,
+          totalBytes: 1024,
+          percent: 100,
+          filePath: '/data/app-updates/AnimeLab-v0.3.1-Android-arm64.apk',
+          installDir: null,
+          executablePath: null,
+          operationId: 'op-1',
+          restartRequired: false,
+          message: 'Confirmez l’installation de la mise à jour dans la boîte de dialogue Android.',
+          error: null,
+        },
+      })
+    }
+    if (pathname === '/api/app/updates/install' && route.request().method() === 'GET') {
+      const currentState =
+        applyCount >= 3
+          ? 'completed'
+          : applyCount === 2
+            ? 'ready'
+            : applyCount === 1
+              ? 'permission_required'
+              : 'waiting_user'
+      return route.fulfill({
+        json: {
+          state: currentState,
+          version: 'v0.3.1',
+          assetName: 'AnimeLab-v0.3.1-Android-arm64.apk',
+          downloadedBytes: 1024,
+          totalBytes: 1024,
+          percent: 100,
+          filePath: '/data/app-updates/AnimeLab-v0.3.1-Android-arm64.apk',
+          installDir: applyCount >= 2 ? '/tmp/installed' : null,
+          executablePath: applyCount >= 2 ? '/tmp/installed/AnimeLab' : null,
+          operationId: applyCount >= 2 ? null : 'op-1',
+          restartRequired: currentState === 'ready',
+          message:
+            currentState === 'permission_required'
+              ? 'Autorisez l’installation d’applications dans les paramètres Android puis réessayez.'
+              : 'Confirmez l’installation de la mise à jour dans la boîte de dialogue Android.',
+          error: null,
+        },
+      })
+    }
+    if (pathname === '/api/app/updates/apply' && route.request().method() === 'POST') {
+      applyCount += 1
+      if (applyCount === 1) {
+        return route.fulfill({
+          json: {
+            state: 'permission_required',
+            version: 'v0.3.1',
+            assetName: 'AnimeLab-v0.3.1-Android-arm64.apk',
+            downloadedBytes: 1024,
+            totalBytes: 1024,
+            percent: 100,
+            filePath: '/data/app-updates/AnimeLab-v0.3.1-Android-arm64.apk',
+            installDir: null,
+            executablePath: null,
+            operationId: 'op-1',
+            restartRequired: false,
+            message:
+              'Autorisez l’installation d’applications dans les paramètres Android puis réessayez.',
+            error: null,
+          },
+        })
+      }
+      if (applyCount === 2) {
+        return route.fulfill({
+          json: {
+            state: 'ready',
+            version: 'v0.3.1',
+            assetName: 'AnimeLab-v0.3.1-Android-arm64.apk',
+            downloadedBytes: 1024,
+            totalBytes: 1024,
+            percent: 100,
+            filePath: '/data/app-updates/AnimeLab-v0.3.1-Android-arm64.apk',
+            installDir: '/tmp/installed',
+            executablePath: '/tmp/installed/AnimeLab',
+            operationId: null,
+            restartRequired: true,
+            message:
+              'Mise à jour installée et prête. Cliquez sur Lancer la nouvelle version pour redémarrer.',
+            error: null,
+          },
+        })
+      }
+      return route.fulfill({
+        json: {
+          state: 'completed',
+          version: 'v0.3.1',
+          assetName: 'AnimeLab-v0.3.1-Android-arm64.apk',
+          downloadedBytes: 1024,
+          totalBytes: 1024,
+          percent: 100,
+          filePath: '/data/app-updates/AnimeLab-v0.3.1-Android-arm64.apk',
+          installDir: '/tmp/installed',
+          executablePath: '/tmp/installed/AnimeLab',
+          operationId: null,
+          restartRequired: false,
+          message: 'Nouvelle version lancée.',
+          error: null,
+        },
+      })
+    }
+    return route.continue()
+  })
+
+  await page.goto('/app/settings')
+  await page.getByRole('button', { name: 'Vérifier maintenant' }).click()
+  const installBtn = page.getByRole('button', { name: /Télécharger et installer v0\.3\.1/ })
+  await expect(installBtn).toBeVisible()
+  await installBtn.click()
+
+  const reopenBtn = page.getByRole('button', { name: 'Ouvrir l’installeur' })
+  await expect(reopenBtn).toBeVisible()
+  await expect(reopenBtn).toBeEnabled()
+  await reopenBtn.click()
+
+  const allowBtn = page.getByRole('button', { name: 'Autoriser l’installation' })
+  await expect(allowBtn).toBeVisible()
+  await expect(allowBtn).toBeEnabled()
+  await allowBtn.click()
+
+  const launchBtn = page.getByRole('button', { name: 'Lancer la nouvelle version' })
+  await expect(launchBtn).toBeVisible()
+  await launchBtn.click()
+
+  await expect(page.getByText('Nouvelle version lancée.')).toBeVisible()
+  const postInstalls = calls.filter(
+    (c) => c.method === 'POST' && c.pathname === '/api/app/updates/install',
+  )
+  const postApplies = calls.filter(
+    (c) => c.method === 'POST' && c.pathname === '/api/app/updates/apply',
+  )
+  expect(postInstalls).toHaveLength(1)
+  expect(postApplies).toHaveLength(3)
+})

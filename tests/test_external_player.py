@@ -350,7 +350,14 @@ def test_android_manifest_declares_non_exported_fileprovider():
 
     paths_xml = ET.parse(root / 'android' / 'app' / 'src' / 'main' / 'res' / 'xml' / 'file_paths.xml').getroot()
     entries = paths_xml.findall('./files-path')
-    assert [(e.attrib.get('name'), e.attrib.get('path')) for e in entries] == [('downloads', 'downloads/')]
+    assert [(e.attrib.get('name'), e.attrib.get('path')) for e in entries] == [
+        ('downloads', 'downloads/'),
+        ('app_updates', 'engine-state/app-updates/'),
+    ]
+    cache_entries = paths_xml.findall('./cache-path')
+    assert [(e.attrib.get('name'), e.attrib.get('path')) for e in cache_entries] == [
+        ('cache_updates', 'app-updates/'),
+    ]
 
 
 @pytest.mark.asyncio

@@ -70,7 +70,7 @@ class NetworkHelper(context: Context) {
     }
 
     val cloudflareClient: OkHttpClient get() = client
-    fun defaultUserAgentProvider(): String = if(gateway==null) "AnimeLab/0.3.0"
+    fun defaultUserAgentProvider(): String = if(gateway==null) "AnimeLab/0.3.1"
         else exchange(JSONObject().put("action","user_agent"),65536).getString("userAgent")
 
     private fun exchange(payload: JSONObject, maximum: Int=16_000_000): JSONObject {

@@ -357,3 +357,64 @@ def test_linux_open_window_delegates_to_system_gtk_subprocess_when_inprocess_una
 
     with pytest.raises(RuntimeError, match='GTK3/WebKit2GTK'):
         window.open_window(url='http://127.0.0.1:8080/spa/')
+
+
+def test_desktop_replace_instance_stops_running_supervisor_and_starts_new_instance(tmp_path):
+    env = {key: value for key, value in os.environ.items() if not key.startswith('ANIMAN_')}
+    env.update(
+        HOME=str(tmp_path),
+        USERPROFILE=str(tmp_path),
+        ANIMAN_STARTUP_REFRESH='false',
+        ANIMAN_DB_PATH=str(tmp_path / 'library.sqlite3'),
+        ANIMAN_CACHE_DIR=str(tmp_path / 'cache'),
+        ANIMAN_DOWNLOAD_DIR=str(tmp_path / 'downloads'),
+        ANIMAN_ALLOWED_HOSTS='127.0.0.1,localhost',
+    )
+    base = [sys.executable, str(ROOT / 'desktop.py')]
+    runtime = tmp_path / '.animan/desktop/runtime.json'
+
+    def wait_ready(min_instance_not=None):
+        deadline = time.monotonic() + 45
+        while time.monotonic() < deadline:
+            try:
+                info = remote_call(read_json(runtime))
+                if info['ready'] and info['instanceId'] != min_instance_not:
+                    return info
+            except (OSError, ValueError):
+                pass
+            time.sleep(.15)
+        pytest.fail('Desktop supervisor did not become ready')
+
+    first_proc = subprocess.Popen(
+        base + ['--headless', '--port', str(choose_port(0))],
+        cwd=ROOT,
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    second_proc = None
+    try:
+        first_info = wait_ready()
+        second_proc = subprocess.Popen(
+            base + ['--launch', '--headless', '--replace-instance'],
+            cwd=ROOT,
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        assert first_proc.wait(timeout=45) == 0
+        second_info = wait_ready(min_instance_not=first_info['instanceId'])
+        assert second_info['instanceId'] != first_info['instanceId']
+        assert second_proc.poll() is None
+    finally:
+        for proc in (second_proc, first_proc):
+            if proc is not None and proc.poll() is None:
+                try:
+                    remote_call(read_json(runtime), '/api/action', {'action': 'stop'})
+                except (OSError, ValueError):
+                    pass
+                try:
+                    proc.wait(timeout=30)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait(timeout=5)

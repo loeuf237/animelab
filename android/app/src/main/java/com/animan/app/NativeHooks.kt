@@ -15,6 +15,15 @@ object NativeHooks {
     private var lastNotification = 0L
     internal val exportLock = Any()
     private val taskStates = ConcurrentHashMap<String, String>()
+    @JvmStatic fun installAppUpdate(path: String): String =
+        ExtensionPackages.installSelfUpdate(EngineHost.context, path).toString()
+
+    @JvmStatic fun appUpdateStatus(operationId: String): String =
+        ExtensionPackages.operationStatus(EngineHost.context, operationId).toString()
+
+    @JvmStatic fun confirmAppUpdate(operationId: String, path: String): String =
+        ExtensionPackages.confirmOrLaunchSelfUpdate(EngineHost.context, operationId, path).toString()
+
     @JvmStatic fun ready() {
         EngineHost.ready = true
         EngineHost.main.post { DownloadService.finishIdle(EngineHost.context) }

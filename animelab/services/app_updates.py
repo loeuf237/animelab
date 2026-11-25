@@ -1,19 +1,21 @@
 """Bounded, cached update metadata and user-initiated in-app release installer."""
 import asyncio
 import hashlib
-import json
 import ipaddress
+import json
+import logging
 import os
 import platform
 import re
 import shutil
 import stat
 import subprocess
+import sys
 import tarfile
 import time
-import sys
 import zipfile
 from pathlib import Path
+from typing import Any
 from urllib.parse import urljoin, urlsplit
 import httpx
 from animelab import __version__, platform_events
@@ -21,6 +23,8 @@ from animelab.config import IS_ANDROID, settings
 from animelab.diagnostics import telemetry
 from animelab.environment import getenv
 from animelab.security import is_safe_url_async
+
+logger = logging.getLogger(__name__)
 
 GITHUB_FEED = 'https://api.github.com/repos/loeuf237/animelab/releases?per_page=10'
 MAX_FEED_BYTES = 512 * 1024
@@ -130,6 +134,52 @@ def select_platform_asset(assets, runtime=None, os_name=None, arch=None):
     return assets[0]
 
 
+def _archive_member_target(root_resolved: Path, relative_name: str, error_message: str) -> Path:
+    cleaned = relative_name.replace('\\', '/')
+    if not cleaned or '\x00' in cleaned or cleaned.startswith('/'):
+        raise ValueError(error_message)
+    candidate = Path(os.path.normpath(str(root_resolved / cleaned)))
+    if candidate != root_resolved and root_resolved not in candidate.parents:
+        raise ValueError(error_message)
+    return candidate
+
+
+def _ensure_no_symlink_parent(root_resolved: Path, target: Path, error_message: str) -> None:
+    for parent in target.parents:
+        if parent == root_resolved:
+            break
+        if parent.is_symlink():
+            raise ValueError(error_message)
+
+
+def _validate_internal_link_target(root_resolved: Path, link_path: Path, link_target: str) -> Path:
+    if not link_target or '\x00' in link_target:
+        raise ValueError('Unsafe symlink inside release archive')
+    if link_target.startswith(('/', '\\')) or Path(link_target).is_absolute():
+        raise ValueError('Unsafe symlink inside release archive')
+    lexical = Path(os.path.normpath(str(link_path.parent / link_target)))
+    if lexical != root_resolved and root_resolved not in lexical.parents:
+        raise ValueError('Unsafe symlink inside release archive')
+    real = lexical.resolve(strict=False)
+    if real != root_resolved and root_resolved not in real.parents:
+        raise ValueError('Unsafe symlink inside release archive')
+    return lexical
+
+
+def _place_symlink(target: Path, link_target: str, resolved_target: Path) -> None:
+    if target.is_symlink() or target.exists():
+        if target.is_dir() and not target.is_symlink():
+            shutil.rmtree(target)
+        else:
+            target.unlink()
+    if os.name == 'posix':
+        os.symlink(link_target, target)
+    elif resolved_target.is_file():
+        shutil.copy2(resolved_target, target)
+    elif resolved_target.is_dir():
+        shutil.copytree(resolved_target, target)
+
+
 def _extract_release_archive(archive_path: Path, destination: Path) -> Path:
     if destination.exists():
         shutil.rmtree(destination)
@@ -137,39 +187,85 @@ def _extract_release_archive(archive_path: Path, destination: Path) -> Path:
     root_resolved = destination.resolve()
     lower = archive_path.name.lower()
     if lower.endswith('.zip'):
+        deferred_symlinks: list[tuple[zipfile.ZipInfo, Path]] = []
         with zipfile.ZipFile(archive_path, 'r') as zf:
             for member in zf.infolist():
-                target = (destination / member.filename).resolve()
-                if target != root_resolved and root_resolved not in target.parents:
+                target = _archive_member_target(
+                    root_resolved, member.filename, 'Unsafe path inside release ZIP archive'
+                )
+                if target == root_resolved:
+                    if member.is_dir():
+                        continue
                     raise ValueError('Unsafe path inside release ZIP archive')
+                mode = member.external_attr >> 16
+                if stat.S_ISLNK(mode):
+                    deferred_symlinks.append((member, target))
+                    continue
                 if member.is_dir():
+                    _ensure_no_symlink_parent(root_resolved, target, 'Unsafe path inside release ZIP archive')
                     target.mkdir(parents=True, exist_ok=True)
                     continue
                 target.parent.mkdir(parents=True, exist_ok=True)
+                _ensure_no_symlink_parent(root_resolved, target, 'Unsafe path inside release ZIP archive')
                 with zf.open(member, 'r') as src, target.open('wb') as dst:
                     shutil.copyfileobj(src, dst)
-                unix_mode = (member.external_attr >> 16) & 0o777
+                unix_mode = mode & 0o777
                 if unix_mode and os.name == 'posix':
                     target.chmod(unix_mode)
+            for member, target in deferred_symlinks:
+                link_target = zf.read(member).decode('utf-8', errors='strict').strip('\x00')
+                resolved = _validate_internal_link_target(root_resolved, target, link_target)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                _ensure_no_symlink_parent(root_resolved, target, 'Unsafe symlink inside release archive')
+                _place_symlink(target, link_target, resolved)
     elif lower.endswith('.tar.gz'):
+        deferred_links: list[tuple[tarfile.TarInfo, Path]] = []
         with tarfile.open(archive_path, 'r:gz') as tf:
             for member in tf.getmembers():
-                if member.issym() or member.islnk() or member.isdev():
+                if member.isdev() or member.ischr() or member.isblk() or member.isfifo():
                     continue
-                target = (destination / member.name).resolve()
-                if target != root_resolved and root_resolved not in target.parents:
+                target = _archive_member_target(
+                    root_resolved, member.name, 'Unsafe path inside release TAR archive'
+                )
+                if target == root_resolved:
+                    if member.isdir():
+                        continue
                     raise ValueError('Unsafe path inside release TAR archive')
+                if member.issym() or member.islnk():
+                    deferred_links.append((member, target))
+                    continue
                 if member.isdir():
+                    _ensure_no_symlink_parent(root_resolved, target, 'Unsafe path inside release TAR archive')
                     target.mkdir(parents=True, exist_ok=True)
                     continue
                 if member.isfile():
                     target.parent.mkdir(parents=True, exist_ok=True)
+                    _ensure_no_symlink_parent(root_resolved, target, 'Unsafe path inside release TAR archive')
                     extracted = tf.extractfile(member)
                     if extracted is not None:
                         with extracted, target.open('wb') as dst:
                             shutil.copyfileobj(extracted, dst)
                     if os.name == 'posix' and (member.mode & 0o111):
                         target.chmod(target.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP)
+            for member, target in deferred_links:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                _ensure_no_symlink_parent(root_resolved, target, 'Unsafe symlink inside release archive')
+                if member.issym():
+                    resolved = _validate_internal_link_target(root_resolved, target, member.linkname)
+                    _place_symlink(target, member.linkname, resolved)
+                elif member.islnk():
+                    hard_target = _archive_member_target(
+                        root_resolved, member.linkname, 'Unsafe symlink inside release archive'
+                    )
+                    if hard_target == root_resolved or hard_target.is_symlink() or not hard_target.exists():
+                        raise ValueError('Unsafe symlink inside release archive')
+                    _ensure_no_symlink_parent(root_resolved, hard_target, 'Unsafe symlink inside release archive')
+                    if target.is_symlink() or target.exists():
+                        target.unlink()
+                    try:
+                        os.link(hard_target, target)
+                    except OSError:
+                        shutil.copy2(hard_target, target)
     else:
         raise ValueError('Unsupported archive format')
     children = [p for p in destination.iterdir() if not p.name.startswith('.')]
@@ -182,13 +278,81 @@ def _find_extracted_executable(folder: Path) -> Path | None:
         folder / 'AnimeLab',
         folder / 'AnimeLab.app' / 'Contents' / 'MacOS' / 'AnimeLab',
     ]
+    found: Path | None = None
     for candidate in candidates:
         if candidate.is_file():
-            return candidate
-    for depth_candidate in folder.glob('*/AnimeLab*'):
-        if depth_candidate.is_file() and depth_candidate.name in ('AnimeLab', 'AnimeLab.exe'):
-            return depth_candidate
-    return None
+            found = candidate
+            break
+    if found is None:
+        for depth_candidate in folder.glob('*/AnimeLab*'):
+            if depth_candidate.is_file() and depth_candidate.name in ('AnimeLab', 'AnimeLab.exe'):
+                found = depth_candidate
+                break
+    if found is not None and os.name == 'posix' and found.suffix.lower() != '.exe':
+        found.chmod(found.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP)
+    return found
+
+
+def _clean_update_launch_env(base_env: dict[str, str] | None = None) -> dict[str, str]:
+    env = dict(os.environ if base_env is None else base_env)
+    is_frozen = getattr(sys, 'frozen', False)
+    for var in ('LD_LIBRARY_PATH', 'DYLD_LIBRARY_PATH', 'DYLD_FRAMEWORK_PATH', 'LIBPATH'):
+        orig_key = f'{var}_ORIG'
+        if orig_key in env:
+            env[var] = env.pop(orig_key)
+        elif is_frozen:
+            env.pop(var, None)
+    for var in (
+        '_MEIPASS2',
+        'TCL_LIBRARY',
+        'TK_LIBRARY',
+        'QT_PLUGIN_PATH',
+        'QML2_IMPORT_PATH',
+        'ANIMELAB_RELEASE_VERSION',
+        'ANIMAN_DESKTOP_PREFERENCES',
+        'ANIMAN_PORT',
+        'ANIMAN_HOST',
+        'ANIMAN_RELOAD',
+        'ANIMAN_ALLOWED_HOSTS',
+        'ANIMELAB_DESKTOP_AUTH',
+    ):
+        env.pop(var, None)
+    if is_frozen and hasattr(sys, '_MEIPASS'):
+        meipass_bin = os.path.normcase(os.path.normpath(str(Path(sys._MEIPASS) / 'bin')))
+        raw_path = env.get('PATH', '')
+        if raw_path:
+            parts = [
+                entry
+                for entry in raw_path.split(os.pathsep)
+                if entry and os.path.normcase(os.path.normpath(entry)) != meipass_bin
+            ]
+            env['PATH'] = os.pathsep.join(parts)
+    return env
+
+
+def _desktop_launch_command(exe_path: Path, platform_name: str | None = None) -> list[str]:
+    target_platform = platform_name or sys.platform
+    if target_platform == 'darwin':
+        if (
+            exe_path.parent.name == 'MacOS'
+            and len(exe_path.parents) >= 3
+            and exe_path.parents[2].suffix == '.app'
+            and shutil.which('open')
+        ):
+            return ['open', '-n', str(exe_path.parents[2]), '--args', '--launch', '--replace-instance']
+        if exe_path.suffix.lower() == '.dmg' and shutil.which('open'):
+            return ['open', str(exe_path)]
+    if exe_path.name in ('AnimeLab', 'AnimeLab.exe'):
+        return [str(exe_path), '--launch', '--replace-instance']
+    return [str(exe_path)]
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open('rb') as handle:
+        while chunk := handle.read(65536):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 class AppUpdates:
@@ -196,7 +360,7 @@ class AppUpdates:
         self.cache = {}
         self.lock = asyncio.Lock()
         self._install_task: asyncio.Task | None = None
-        self._install_state = {
+        self._install_state: dict[str, Any] = {
             'state': 'idle',
             'version': None,
             'assetName': None,
@@ -206,12 +370,56 @@ class AppUpdates:
             'filePath': None,
             'installDir': None,
             'executablePath': None,
+            'operationId': None,
             'restartRequired': False,
             'message': None,
             'error': None,
         }
 
+    def _apply_android_operation(self, op: dict) -> None:
+        if op.get('id'):
+            self._install_state['operationId'] = str(op['id'])
+        op_state = op.get('state') or 'installing'
+        if op_state == 'permission_required':
+            self._install_state['state'] = 'permission_required'
+            self._install_state['error'] = None
+            self._install_state['message'] = (
+                'Autorisez l’installation d’applications dans les paramètres Android puis réessayez.'
+            )
+        elif op_state in ('waiting_user', 'installing', 'preparing'):
+            self._install_state['state'] = 'waiting_user'
+            self._install_state['error'] = None
+            self._install_state['message'] = (
+                'Confirmez l’installation de la mise à jour dans la boîte de dialogue Android.'
+            )
+        elif op_state == 'installed':
+            self._install_state['state'] = 'completed'
+            self._install_state['error'] = None
+            self._install_state['message'] = 'Mise à jour installée avec succès.'
+        elif op_state == 'cancelled':
+            self._install_state['state'] = 'cancelled'
+            self._install_state['error'] = str(op.get('error')) if op.get('error') else None
+            self._install_state['message'] = (
+                'Installation annulée. Vous pouvez rouvrir l’installeur Android.'
+            )
+        else:
+            self._install_state['state'] = 'failed'
+            self._install_state['error'] = str(op.get('error') or 'package_installer_failed')
+            self._install_state['message'] = 'L’installation Android a échoué.'
+
     def install_status(self):
+        op_id = self._install_state.get('operationId')
+        if (
+            op_id
+            and self._install_state.get('state') in ('installing', 'waiting_user', 'permission_required')
+            and platform_events.app_update_status_handler is not None
+        ):
+            try:
+                op = platform_events.app_update_status(str(op_id))
+                if isinstance(op, dict) and op.get('state'):
+                    self._apply_android_operation(op)
+            except Exception:
+                logger.exception('Failed to refresh native app update status')
         return dict(self._install_state)
 
     async def _download_redirect_checked(self, url: str, max_bytes: int, on_chunk=None) -> bytes:
@@ -240,6 +448,16 @@ class AppUpdates:
                             on_chunk(chunk, content_length)
                     return bytes(buf)
         raise ValueError('Too many redirects while downloading update')
+
+    async def _fetch_expected_sha256(self, checksums_url: str, asset_name: str) -> str | None:
+        raw_sums = (await self._download_redirect_checked(checksums_url, 64 * 1024)).decode(
+            'utf-8', errors='replace'
+        )
+        for line in raw_sums.splitlines():
+            parts = line.strip().split()
+            if len(parts) >= 2 and parts[-1].lstrip('*') == asset_name:
+                return parts[0].lower()
+        return None
 
     async def start_install(self, url: str | None = None, channel: str = 'beta') -> dict:
         if self._install_task is not None and not self._install_task.done():
@@ -273,6 +491,7 @@ class AppUpdates:
             'filePath': None,
             'installDir': None,
             'executablePath': None,
+            'operationId': None,
             'restartRequired': False,
             'message': 'Téléchargement de la mise à jour…',
             'error': None,
@@ -287,58 +506,71 @@ class AppUpdates:
     async def _run_install(self, asset: dict, release: dict, dest_path: Path, updates_dir: Path):
         part_path = dest_path.with_name(dest_path.name + '.part')
         digest = hashlib.sha256()
+        checksums_url = release.get('checksumsUrl')
+        expected_sha256: str | None = None
         try:
-            current_url = asset['url']
-            redirect_hops = 0
-            while True:
-                if not public_https(current_url) or not await is_safe_url_async(current_url):
-                    raise ValueError('Update asset URL must be public HTTPS')
-                async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=10.0), follow_redirects=False) as client:
-                    async with client.stream('GET', current_url, headers={'User-Agent': 'AnimeLab-update-installer'}) as response:
-                        if response.status_code in (301, 302, 303, 307, 308):
-                            redirect_hops += 1
-                            if redirect_hops > 6:
-                                raise ValueError('Too many redirects while downloading update')
-                            location = response.headers.get('Location', '')
-                            if not location:
-                                raise ValueError('Redirect missing Location header')
-                            current_url = urljoin(current_url, location)
-                            continue
-                        response.raise_for_status()
-                        header_total = int(response.headers.get('Content-Length') or 0)
-                        total = header_total or int(asset.get('size') or 0)
-                        if total > MAX_ASSET_BYTES:
-                            raise ValueError('Update asset is too large')
-                        self._install_state['totalBytes'] = total
-                        downloaded = 0
-                        with part_path.open('wb') as out:
-                            async for chunk in response.aiter_bytes():
-                                downloaded += len(chunk)
-                                if downloaded > MAX_ASSET_BYTES:
-                                    raise ValueError('Update asset exceeded maximum size')
-                                out.write(chunk)
-                                digest.update(chunk)
-                                self._install_state['downloadedBytes'] = downloaded
-                                if total > 0:
-                                    self._install_state['percent'] = min(99, int((downloaded * 100) / total))
-                        break
-
-            actual_sha256 = digest.hexdigest()
-            checksums_url = release.get('checksumsUrl')
-            if checksums_url:
+            already_verified = False
+            if checksums_url and dest_path.is_file() and dest_path.stat().st_size > 0:
                 self._install_state['state'] = 'verifying'
                 self._install_state['message'] = 'Vérification de l’intégrité du paquet…'
-                raw_sums = (await self._download_redirect_checked(checksums_url, 64 * 1024)).decode('utf-8', errors='replace')
-                expected_sha256 = None
-                for line in raw_sums.splitlines():
-                    parts = line.strip().split()
-                    if len(parts) >= 2 and parts[-1].lstrip('*') == asset['name']:
-                        expected_sha256 = parts[0].lower()
-                        break
-                if expected_sha256 and actual_sha256.lower() != expected_sha256:
-                    raise ValueError('Checksum verification failed for downloaded update')
+                expected_sha256 = await self._fetch_expected_sha256(checksums_url, asset['name'])
+                if expected_sha256:
+                    existing_sha = await asyncio.to_thread(_file_sha256, dest_path)
+                    if existing_sha.lower() == expected_sha256:
+                        already_verified = True
+                        size = dest_path.stat().st_size
+                        self._install_state['downloadedBytes'] = size
+                        self._install_state['totalBytes'] = size
 
-            part_path.replace(dest_path)
+            if not already_verified:
+                self._install_state['state'] = 'downloading'
+                self._install_state['message'] = 'Téléchargement de la mise à jour…'
+                current_url = asset['url']
+                redirect_hops = 0
+                while True:
+                    if not public_https(current_url) or not await is_safe_url_async(current_url):
+                        raise ValueError('Update asset URL must be public HTTPS')
+                    async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=10.0), follow_redirects=False) as client:
+                        async with client.stream('GET', current_url, headers={'User-Agent': 'AnimeLab-update-installer'}) as response:
+                            if response.status_code in (301, 302, 303, 307, 308):
+                                redirect_hops += 1
+                                if redirect_hops > 6:
+                                    raise ValueError('Too many redirects while downloading update')
+                                location = response.headers.get('Location', '')
+                                if not location:
+                                    raise ValueError('Redirect missing Location header')
+                                current_url = urljoin(current_url, location)
+                                continue
+                            response.raise_for_status()
+                            header_total = int(response.headers.get('Content-Length') or 0)
+                            total = header_total or int(asset.get('size') or 0)
+                            if total > MAX_ASSET_BYTES:
+                                raise ValueError('Update asset is too large')
+                            self._install_state['totalBytes'] = total
+                            downloaded = 0
+                            with part_path.open('wb') as out:
+                                async for chunk in response.aiter_bytes():
+                                    downloaded += len(chunk)
+                                    if downloaded > MAX_ASSET_BYTES:
+                                        raise ValueError('Update asset exceeded maximum size')
+                                    out.write(chunk)
+                                    digest.update(chunk)
+                                    self._install_state['downloadedBytes'] = downloaded
+                                    if total > 0:
+                                        self._install_state['percent'] = min(99, int((downloaded * 100) / total))
+                            break
+
+                actual_sha256 = digest.hexdigest()
+                if checksums_url:
+                    self._install_state['state'] = 'verifying'
+                    self._install_state['message'] = 'Vérification de l’intégrité du paquet…'
+                    if expected_sha256 is None:
+                        expected_sha256 = await self._fetch_expected_sha256(checksums_url, asset['name'])
+                    if expected_sha256 and actual_sha256.lower() != expected_sha256:
+                        raise ValueError('Checksum verification failed for downloaded update')
+
+                part_path.replace(dest_path)
+
             self._install_state['filePath'] = str(dest_path)
             self._install_state['percent'] = 100
             self._install_state['state'] = 'installing'
@@ -346,25 +578,10 @@ class AppUpdates:
 
             lower_name = dest_path.name.lower()
             if IS_ANDROID or (lower_name.endswith('.apk') and platform_events.app_update_install_handler is not None):
-                op = await asyncio.to_thread(platform_events.install_app_update, str(dest_path)) or {}
-                op_state = op.get('state') or 'installing'
-                if op_state == 'permission_required':
-                    self._install_state['state'] = 'permission_required'
-                    self._install_state['message'] = (
-                        'Autorisez l’installation d’applications dans les paramètres Android puis réessayez.'
-                    )
-                elif op_state in ('waiting_user', 'installing', 'preparing'):
-                    self._install_state['state'] = 'waiting_user'
-                    self._install_state['message'] = (
-                        'Confirmez l’installation de la mise à jour dans la boîte de dialogue Android.'
-                    )
-                elif op_state == 'installed':
-                    self._install_state['state'] = 'completed'
-                    self._install_state['message'] = 'Mise à jour installée avec succès.'
-                else:
-                    self._install_state['state'] = 'failed'
-                    self._install_state['error'] = str(op.get('error') or 'package_installer_failed')
-                    self._install_state['message'] = 'L’installation Android a échoué.'
+                op = await asyncio.to_thread(platform_events.install_app_update, str(dest_path))
+                if not isinstance(op, dict):
+                    raise RuntimeError('Android installer handler returned no status')
+                self._apply_android_operation(op)
             elif lower_name.endswith(('.zip', '.tar.gz')):
                 version_slug = re.sub(r'[^A-Za-z0-9._-]', '_', str(release['version']))
                 target_root = updates_dir / f'installed-{version_slug}'
@@ -388,6 +605,9 @@ class AppUpdates:
                     part_path.unlink()
             except OSError:
                 pass
+            logger.exception('In-app update installation failed')
+            if dest_path.is_file() and not self._install_state.get('filePath'):
+                self._install_state['filePath'] = str(dest_path)
             telemetry.event('update_install_failed', code=type(exc).__name__)
             self._install_state['state'] = 'failed'
             self._install_state['error'] = type(exc).__name__
@@ -399,30 +619,58 @@ class AppUpdates:
             file_path = state.get('filePath')
             if not file_path or not Path(file_path).is_file():
                 raise ValueError('No downloaded APK update is available')
-            if platform_events.app_update_install_handler is not None:
-                op = await asyncio.to_thread(platform_events.install_app_update, str(file_path)) or {}
-                op_state = op.get('state') or 'waiting_user'
-                self._install_state['state'] = 'completed' if op_state == 'installed' else op_state
+            if (
+                platform_events.app_update_confirm_handler is not None
+                or platform_events.app_update_install_handler is not None
+            ):
+                op = await asyncio.to_thread(
+                    platform_events.confirm_app_update,
+                    state.get('operationId'),
+                    str(file_path),
+                )
+                if isinstance(op, dict) and op:
+                    self._apply_android_operation(op)
             return self.install_status()
 
         exe_raw = state.get('executablePath') or state.get('filePath')
         if not exe_raw or not Path(exe_raw).exists():
             raise ValueError('No installed update binary is ready to launch')
         exe_path = Path(exe_raw)
-        kwargs: dict = {'cwd': str(exe_path.parent)}
+        if os.name == 'posix' and exe_path.suffix.lower() in ('', '.appimage', '.sh'):
+            exe_path.chmod(exe_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP)
+        command = _desktop_launch_command(exe_path)
+        kwargs: dict[str, Any] = {
+            'cwd': str(exe_path.parent),
+            'env': _clean_update_launch_env(),
+            'stdin': subprocess.DEVNULL,
+            'stdout': subprocess.DEVNULL,
+            'stderr': subprocess.DEVNULL,
+        }
         if os.name == 'nt':
             kwargs['creationflags'] = getattr(subprocess, 'DETACHED_PROCESS', 0x00000008) | getattr(
                 subprocess, 'CREATE_NEW_PROCESS_GROUP', 0x00000200
             )
         else:
             kwargs['start_new_session'] = True
-        subprocess.Popen([str(exe_path)], **kwargs)
+        try:
+            subprocess.Popen(command, **kwargs)
+        except OSError as exc:
+            raise ValueError(f'Unable to launch installed update: {type(exc).__name__}') from exc
         self._install_state['state'] = 'completed'
         self._install_state['restartRequired'] = False
+        self._install_state['error'] = None
         self._install_state['message'] = 'Nouvelle version lancée.'
-        if getattr(sys, 'frozen', False):
+        has_supervisor = False
+        try:
+            from animelab.desktop.control import running_record
+            from animelab.desktop.state import state_directory
+
+            has_supervisor = bool(running_record(state_directory()))
+        except Exception:
+            has_supervisor = False
+        if getattr(sys, 'frozen', False) and not has_supervisor:
             loop = asyncio.get_running_loop()
-            loop.call_later(0.4, lambda: os._exit(0))
+            loop.call_later(0.6, lambda: os._exit(0))
         return self.install_status()
 
     async def check(self, channel='beta', refresh=False):

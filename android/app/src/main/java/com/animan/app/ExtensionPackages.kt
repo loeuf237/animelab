@@ -1,5 +1,6 @@
 package com.animan.app
 
+import android.app.Activity
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -8,6 +9,8 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import org.json.JSONArray
 import org.json.JSONObject
@@ -15,6 +18,9 @@ import java.io.File
 import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
 /** Android's package installer owns shared APKs; recipes never count as installation. */
@@ -30,7 +36,61 @@ internal object ExtensionPackages {
     private val ACTIVE_STATES = setOf("preparing", "permission_required", "waiting_user", "installing")
     private val TERMINAL_STATES = setOf("installed", "uninstalled", "failed", "cancelled")
     private val pendingConfirmations = ConcurrentHashMap<String, Intent>()
+    private val mainHandler = Handler(Looper.getMainLooper())
+    @Volatile var activityProvider: (() -> Activity?)? = null
+    @Volatile var apkUriProvider: ((Context, File) -> Uri?)? = null
     private fun store(context: Context) = context.getSharedPreferences("extension_package_operations", Context.MODE_PRIVATE)
+
+    private fun launchSystemUi(context: Context, intent: Intent): Pair<Boolean, Boolean> {
+        fun tryLaunch(): Pair<Boolean, Boolean> {
+            val activity = activityProvider?.invoke()?.takeIf { !it.isFinishing && !it.isDestroyed }
+            if (activity != null) {
+                try {
+                    activity.startActivity(Intent(intent))
+                    return true to true
+                } catch (_: Exception) {
+                }
+            }
+            return try {
+                context.startActivity(Intent(intent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                true to false
+            } catch (_: Exception) {
+                false to false
+            }
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            return tryLaunch()
+        }
+        val latch = CountDownLatch(1)
+        val launched = AtomicBoolean(false)
+        val fromForeground = AtomicBoolean(false)
+        mainHandler.post {
+            try {
+                val (ok, fg) = tryLaunch()
+                launched.set(ok)
+                fromForeground.set(fg)
+            } finally {
+                latch.countDown()
+            }
+        }
+        latch.await(5, TimeUnit.SECONDS)
+        return launched.get() to fromForeground.get()
+    }
+
+    private fun launchUnknownSourcesSettings(context: Context): Pair<Boolean, Boolean> =
+        launchSystemUi(
+            context,
+            Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}")),
+        )
+
+    private fun launchSelfUpdateInstaller(context: Context, value: File): Pair<Boolean, Boolean> {
+        val uri = try { apkUriProvider?.invoke(context, value) } catch (_: Exception) { null } ?: return false to false
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        return launchSystemUi(context, intent)
+    }
 
     private fun file(context: Context, path: String, allowSelfUpdate: Boolean = false): File {
         val value = File(path).canonicalFile
@@ -42,10 +102,15 @@ internal object ExtensionPackages {
 
     @Suppress("DEPRECATION")
     private fun archive(context: Context, value: File, allowSelfUpdate: Boolean = false): PackageInfo {
-        val info = requireNotNull(context.packageManager.getPackageArchiveInfo(value.path,
-            PackageManager.GET_META_DATA or PackageManager.GET_CONFIGURATIONS or PackageManager.GET_SIGNING_CERTIFICATES or PackageManager.GET_SIGNATURES)) { "Invalid APK" }
+        val info = requireNotNull(
+            context.packageManager.getPackageArchiveInfo(
+                value.path,
+                PackageManager.GET_META_DATA or PackageManager.GET_CONFIGURATIONS or PackageManager.GET_SIGNING_CERTIFICATES,
+            )
+        ) { "Invalid APK" }
         requireNotNull(info.signingInfo) { "APK has no signatures" }
-        if (allowSelfUpdate && info.packageName == context.packageName) {
+        if (allowSelfUpdate) {
+            require(info.packageName == context.packageName) { "APK package does not match installed application" }
             val installed = requireNotNull(installedInfo(context, context.packageName)) { "Host package unavailable" }
             require(signer(info) == signer(installed)) { "APK signing certificate differs from existing installation" }
         } else {
@@ -68,13 +133,12 @@ internal object ExtensionPackages {
             .put("sha256", digest.digest().joinToString("") { "%02x".format(it) })
     }
 
-    @Suppress("DEPRECATION")
     private fun installedInfo(context: Context, pkg: String): PackageInfo? {
         if (pkg.isBlank()) return null
         return try {
             context.packageManager.getPackageInfo(
                 pkg,
-                PackageManager.GET_SIGNING_CERTIFICATES or PackageManager.GET_SIGNATURES,
+                PackageManager.GET_SIGNING_CERTIFICATES,
             )
         } catch (_: PackageManager.NameNotFoundException) {
             null
@@ -126,6 +190,18 @@ internal object ExtensionPackages {
                         }
                     }
                     "installing", "waiting_user" -> {
+                        if (op.optString("launchMethod") == "file_provider") {
+                            if (isInstalledForOperation(context, op)) {
+                                op.put("state", "installed").remove("error")
+                                pendingConfirmations.remove(id)
+                                save(context, op)
+                            } else if (age >= STALE_INSTALL_TIMEOUT_MS) {
+                                op.put("state", "cancelled").put("error", "package_installer_session_expired")
+                                pendingConfirmations.remove(id)
+                                save(context, op)
+                            }
+                            continue
+                        }
                         val sessionId = if (op.has("sessionId")) op.getInt("sessionId") else -1
                         val sessionAlive = sessionId >= 0 && try {
                             installer.getSessionInfo(sessionId) != null
@@ -190,13 +266,58 @@ internal object ExtensionPackages {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE).intentSender
     }
 
-    @Synchronized fun installSelfUpdate(context: Context, path: String): JSONObject =
-        install(context, path, context.packageName, allowSelfUpdate = true)
+    @Synchronized fun installSelfUpdate(context: Context, path: String): JSONObject {
+        reconcile(context)
+        val value = file(context, path, allowSelfUpdate = true)
+        val inspected = inspect(context, value.path, allowSelfUpdate = true)
+        val pkg = inspected.getString("pkg")
+        val sha256 = inspected.getString("sha256")
+        val active = store(context).all.values.filterIsInstance<String>().map(::JSONObject)
+            .filter { it.optString("state") in ACTIVE_STATES }
+        val existing = active.firstOrNull { it.getString("pkg") == pkg }
+        if (existing != null) {
+            if (existing.optString("sha256") == sha256) {
+                return confirmOrLaunchSelfUpdate(context, existing.getString("id"), value.path)
+            }
+            if (existing.has("sessionId")) {
+                try { context.packageManager.packageInstaller.abandonSession(existing.getInt("sessionId")) }
+                catch (_: Exception) { }
+            }
+            pendingConfirmations.remove(existing.getString("id"))
+            existing.put("state", "cancelled")
+            save(context, existing)
+        }
+        val beforeUpdateTime = installedInfo(context, pkg)?.lastUpdateTime ?: -1L
+        val operation = JSONObject().put("id", UUID.randomUUID().toString()).put("action", "install")
+            .put("pkg", pkg).put("versionCode", inspected.getString("versionCode"))
+            .put("signer", inspected.getString("signer")).put("sha256", sha256)
+            .put("path", value.path).put("beforeUpdateTime", beforeUpdateTime)
+            .put("selfUpdate", true).put("state", "preparing")
+        if (!context.packageManager.canRequestPackageInstalls()) {
+            operation.put("state", "permission_required")
+            save(context, operation)
+            launchUnknownSourcesSettings(context)
+            return publicOperation(operation)
+        }
+        val (launched, fromFg) = launchSelfUpdateInstaller(context, value)
+        if (launched) {
+            operation.put("launchMethod", "file_provider")
+                .put("state", "waiting_user")
+                .put("needsPromptOnResume", !fromFg)
+            save(context, operation)
+            return publicOperation(operation)
+        }
+        operation.put("launchMethod", "package_installer")
+        save(context, operation)
+        commit(context, operation)
+        return publicOperation(operation)
+    }
 
     @Synchronized fun install(context: Context, path: String, expectedPackage: String, allowSelfUpdate: Boolean = false): JSONObject {
+        if (allowSelfUpdate) return installSelfUpdate(context, path)
         reconcile(context)
-        val value = file(context, path, allowSelfUpdate)
-        val inspected = inspect(context, path, allowSelfUpdate)
+        val value = file(context, path, false)
+        val inspected = inspect(context, path, false)
         require(expectedPackage.isEmpty() || inspected.getString("pkg") == expectedPackage) { "APK package differs from repository" }
         val active=store(context).all.values.filterIsInstance<String>().map(::JSONObject)
             .filter { it.optString("state") in ACTIVE_STATES }
@@ -209,20 +330,14 @@ internal object ExtensionPackages {
                         commit(context, existing)
                     } else {
                         save(context, existing)
-                        context.startActivity(
-                            Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
-                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                        )
+                        launchUnknownSourcesSettings(context)
                     }
                 }
                 "waiting_user" -> {
                     val confirmation = pendingConfirmations[id]
                     if (confirmation != null) {
                         save(context, existing)
-                        try {
-                            context.startActivity(Intent(confirmation).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                        } catch (_: Exception) {
-                        }
+                        launchSystemUi(context, confirmation)
                     }
                 }
             }
@@ -234,10 +349,10 @@ internal object ExtensionPackages {
             .put("pkg", inspected.getString("pkg")).put("versionCode", inspected.getString("versionCode"))
             .put("signer", inspected.getString("signer")).put("sha256", inspected.getString("sha256"))
             .put("path", value.path).put("beforeUpdateTime", beforeUpdateTime)
-            .put("selfUpdate", allowSelfUpdate).put("state", "preparing")
+            .put("selfUpdate", false).put("state", "preparing")
         if (!context.packageManager.canRequestPackageInstalls()) {
             operation.put("state", "permission_required"); save(context, operation)
-            context.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            launchUnknownSourcesSettings(context)
             return publicOperation(operation)
         }
         commit(context, operation)
@@ -255,6 +370,7 @@ internal object ExtensionPackages {
         val installer = context.packageManager.packageInstaller
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
         params.setAppPackageName(operation.getString("pkg"))
+        params.setSize(value.length())
         val sessionId = installer.createSession(params)
         operation.put("sessionId", sessionId).put("state", "installing"); save(context, operation)
         try {
@@ -277,13 +393,56 @@ internal object ExtensionPackages {
             reconcile(context)
         } catch (_: Exception) {
         }
-        if (!context.packageManager.canRequestPackageInstalls()) return
+        val canInstall = context.packageManager.canRequestPackageInstalls()
         thread(name="AnimeLabExtensionPermissions") {
-            store(context).all.values.filterIsInstance<String>().forEach { raw ->
-                val operation = JSONObject(raw)
-                if (operation.optString("state") == "permission_required") {
-                    try { commit(context,operation) }
+            resumePendingWork(context, canInstall)
+        }
+    }
+
+    @Synchronized private fun resumePendingWork(context: Context, canInstall: Boolean) {
+        val rawEntries = store(context).all.values.filterIsInstance<String>()
+        for (raw in rawEntries) {
+            val operation = JSONObject(raw)
+            val state = operation.optString("state")
+            val selfUpdate = operation.optBoolean("selfUpdate", false)
+            if (state == "permission_required" && canInstall) {
+                if (selfUpdate) {
+                    try {
+                        val value = file(context, operation.optString("path"), true)
+                        val (launched, fromFg) = launchSelfUpdateInstaller(context, value)
+                        if (launched) {
+                            operation.put("launchMethod", "file_provider")
+                                .put("state", "waiting_user")
+                                .put("needsPromptOnResume", !fromFg)
+                            operation.remove("error")
+                            save(context, operation)
+                        } else {
+                            operation.put("launchMethod", "package_installer")
+                            commit(context, operation)
+                        }
+                    } catch (failure: Exception) {
+                        operation.put("state", "failed").put("error", failure.javaClass.simpleName)
+                        save(context, operation)
+                    }
+                } else {
+                    try { commit(context, operation) }
                     catch (failure: Exception) { operation.put("state","failed").put("error",failure.javaClass.simpleName); save(context,operation) }
+                }
+            } else if (selfUpdate && state == "waiting_user" && operation.optBoolean("needsPromptOnResume", false)) {
+                operation.put("needsPromptOnResume", false)
+                save(context, operation)
+                if (isInstalledForOperation(context, operation)) {
+                    operation.put("state", "installed").remove("error")
+                    save(context, operation)
+                } else if (canInstall) {
+                    try {
+                        val value = file(context, operation.optString("path"), true)
+                        val (launched, _) = launchSelfUpdateInstaller(context, value)
+                        if (!launched && operation.has("sessionId")) {
+                            openConfirmation(context, operation.getString("id"))
+                        }
+                    } catch (_: Exception) {
+                    }
                 }
             }
         }
@@ -315,8 +474,78 @@ internal object ExtensionPackages {
         return JSONObject(value.toString()).apply {
             remove("path")
             remove("beforeUpdateTime")
+            remove("needsPromptOnResume")
             put("canConfirm", canConfirm)
         }
+    }
+
+    @Synchronized fun operationStatus(context: Context, id: String): JSONObject {
+        if (id.isBlank()) return JSONObject()
+        reconcile(context)
+        val raw = store(context).getString(id, null) ?: return JSONObject()
+        return publicOperation(JSONObject(raw))
+    }
+
+    @Synchronized fun confirmOrLaunchSelfUpdate(context: Context, id: String, path: String): JSONObject {
+        reconcile(context)
+        val operation = if (id.isNotBlank()) store(context).getString(id, null)?.let(::JSONObject) else null
+        if (operation == null) {
+            require(path.isNotBlank()) { "No pending app update operation" }
+            return installSelfUpdate(context, path)
+        }
+        if (operation.optString("state") == "installed") {
+            return publicOperation(operation)
+        }
+        val apkPath = path.ifBlank { operation.optString("path") }
+        if (!context.packageManager.canRequestPackageInstalls()) {
+            operation.put("state", "permission_required")
+            save(context, operation)
+            launchUnknownSourcesSettings(context)
+            return publicOperation(operation)
+        }
+        if (apkPath.isNotBlank() && File(apkPath).isFile) {
+            val value = file(context, apkPath, allowSelfUpdate = true)
+            val inspected = inspect(context, value.path, allowSelfUpdate = true)
+            if (inspected.getString("sha256") != operation.optString("sha256")) {
+                if (operation.has("sessionId")) {
+                    try { context.packageManager.packageInstaller.abandonSession(operation.getInt("sessionId")) }
+                    catch (_: Exception) { }
+                }
+                pendingConfirmations.remove(id)
+                operation.put("state", "cancelled")
+                save(context, operation)
+                return installSelfUpdate(context, value.path)
+            }
+            val (launched, fromFg) = launchSelfUpdateInstaller(context, value)
+            if (launched) {
+                operation.put("path", value.path)
+                    .put("launchMethod", "file_provider")
+                    .put("state", "waiting_user")
+                    .put("needsPromptOnResume", !fromFg)
+                operation.remove("error")
+                save(context, operation)
+                return publicOperation(operation)
+            }
+            if (operation.optString("state") == "waiting_user" && (pendingConfirmations[id] != null || operation.has("sessionId"))) {
+                return openConfirmation(context, id)
+            }
+            if (operation.has("sessionId")) {
+                try { context.packageManager.packageInstaller.abandonSession(operation.getInt("sessionId")) }
+                catch (_: Exception) { }
+                operation.remove("sessionId")
+            }
+            operation.put("path", value.path)
+                .put("launchMethod", "package_installer")
+                .put("state", "preparing")
+            operation.remove("error")
+            save(context, operation)
+            commit(context, operation)
+            return publicOperation(operation)
+        }
+        if (operation.optString("state") in ACTIVE_STATES) {
+            return openConfirmation(context, id)
+        }
+        throw IllegalArgumentException("No pending app update operation")
     }
 
     fun operations(context: Context): JSONArray {
@@ -346,10 +575,7 @@ internal object ExtensionPackages {
                 commit(context, operation)
             } else {
                 save(context, operation)
-                context.startActivity(
-                    Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                )
+                launchUnknownSourcesSettings(context)
             }
             return publicOperation(operation)
         }
@@ -357,12 +583,11 @@ internal object ExtensionPackages {
             val confirmation = pendingConfirmations[id]
             if (confirmation != null) {
                 save(context, operation)
-                try {
-                    context.startActivity(Intent(confirmation).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                val (launched, _) = launchSystemUi(context, confirmation)
+                if (launched) {
                     return publicOperation(operation)
-                } catch (_: Exception) {
-                    pendingConfirmations.remove(id)
                 }
+                pendingConfirmations.remove(id)
             }
             if (action == "install") {
                 val path = operation.optString("path")
@@ -375,10 +600,7 @@ internal object ExtensionPackages {
                     if (!context.packageManager.canRequestPackageInstalls()) {
                         operation.put("state", "permission_required")
                         save(context, operation)
-                        context.startActivity(
-                            Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
-                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                        )
+                        launchUnknownSourcesSettings(context)
                         return publicOperation(operation)
                     }
                     operation.put("state", "preparing")
@@ -413,11 +635,14 @@ internal object ExtensionPackages {
                     return
                 }
                 pendingConfirmations[id] = confirmation
-                try { context.startActivity(Intent(confirmation).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-                catch (_: Exception) {
+                val (launched, fromFg) = launchSystemUi(context, confirmation)
+                if (!launched) {
                     pendingConfirmations.remove(id)
                     operation.put("state","failed").put("error","package_installer_confirmation_unavailable")
                     save(context,operation)
+                } else if (operation.optBoolean("selfUpdate", false) && !fromFg) {
+                    operation.put("needsPromptOnResume", true)
+                    save(context, operation)
                 }
                 return
             }

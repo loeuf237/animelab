@@ -83,7 +83,8 @@ async def check_application_updates(refresh: bool = False):
 
 @router.get('/updates/install')
 async def get_update_install_status(request: Request):
-    return _public_install_status(app_updates.install_status(), is_local(request))
+    status = await asyncio.to_thread(app_updates.install_status)
+    return _public_install_status(status, is_local(request))
 
 
 @router.post('/updates/install')

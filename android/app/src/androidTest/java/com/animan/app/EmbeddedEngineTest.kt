@@ -306,6 +306,30 @@ class EmbeddedEngineTest {
             assertEquals("Probe Naruto", seanimeResult.getJSONArray("result").getJSONObject(0).getString("title"))
             assertEquals("Naruto", seanimeResult.getJSONObject("store").getString("lastQuery"))
             report.put("seanime_webview", true)
+            val probeApk = File(context.filesDir, "engine-state/app-updates/self-update-probe.apk")
+            probeApk.parentFile?.mkdirs()
+            try {
+                File(context.applicationInfo.sourceDir).copyTo(probeApk, overwrite = true)
+                val inspectedSelf = ExtensionPackages.inspect(context, probeApk.path, allowSelfUpdate = true)
+                assertEquals(context.packageName, inspectedSelf.getString("pkg"))
+                assertTrue(inspectedSelf.getString("signer").isNotBlank())
+                val contentUri = androidx.core.content.FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    probeApk,
+                )
+                assertEquals("content", contentUri.scheme)
+                assertEquals(0, JSONObject(NativeHooks.appUpdateStatus("nonexistent-probe")).length())
+                val eventsModule = Python.getInstance().getModule("animelab.platform_events")
+                assertNotNull(eventsModule["app_update_install_handler"])
+                assertNotNull(eventsModule["app_update_status_handler"])
+                assertNotNull(eventsModule["app_update_confirm_handler"])
+                val pyStatus = eventsModule.callAttr("app_update_status", "nonexistent-probe")
+                assertEquals("{}", pyStatus.toString())
+                report.put("self_update_installer_ready", true)
+            } finally {
+                probeApk.delete()
+            }
             println("ANIMAN_ANDROID_PROBE=" + report.toString())
             val instrumentation = InstrumentationRegistry.getInstrumentation()
             val image = instrumentation.uiAutomation.takeScreenshot()

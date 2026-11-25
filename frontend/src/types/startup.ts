@@ -47,6 +47,7 @@ export interface UpdateInstallStatus {
     | 'waiting_user'
     | 'ready'
     | 'completed'
+    | 'cancelled'
     | 'failed'
   version: string | null
   assetName: string | null
@@ -56,6 +57,7 @@ export interface UpdateInstallStatus {
   filePath: string | null
   installDir: string | null
   executablePath: string | null
+  operationId?: string | null
   restartRequired: boolean
   message: string | null
   error: string | null

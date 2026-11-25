@@ -1,13 +1,17 @@
 package com.animan.app
 
+import android.app.Activity
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import androidx.core.content.FileProvider
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
+import java.lang.ref.WeakReference
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.security.SecureRandom
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 
 /** One engine per process; Activity recreation only reconnects to it. */
@@ -24,12 +28,29 @@ object EngineHost {
     @Volatile var progress = 0
     @Volatile var label = ""
     private var started = false
+    private val foregroundActivityRef = AtomicReference<WeakReference<Activity>?>(null)
     val main = Handler(Looper.getMainLooper())
+
+    fun attachActivity(activity: Activity) {
+        foregroundActivityRef.set(WeakReference(activity))
+    }
+
+    fun detachActivity(activity: Activity) {
+        val current = foregroundActivityRef.get()?.get()
+        if (current === activity) foregroundActivityRef.set(null)
+    }
+
+    fun foregroundActivity(): Activity? =
+        foregroundActivityRef.get()?.get()?.takeIf { !it.isFinishing && !it.isDestroyed }
 
     @Synchronized fun start(applicationContext: Context, testMode: Boolean = false) {
         if (started) return
         started = true
         context = applicationContext.applicationContext
+        ExtensionPackages.activityProvider = { foregroundActivity() }
+        ExtensionPackages.apkUriProvider = { ctx, file ->
+            FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
+        }
         CrashReporter.install(context)
         if (BuildConfig.EXTENSION_RUNTIME_ENABLED) ExtensionBridge.initialize(context)
         port = ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { it.localPort }

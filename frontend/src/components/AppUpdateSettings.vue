@@ -31,12 +31,12 @@
     <p v-if="status" role="status">{{ tx(status) }}</p>
     <div v-if="flow.update?.status === 'available'" class="update-actions" style="margin-top: 10px">
       <button
-        v-if="flow.installStatus?.state === 'ready' && flow.installStatus?.restartRequired"
+        v-if="applyActionLabel"
         class="btn btn-primary"
         :disabled="flow.installing"
         @click="flow.applyInstalledUpdate()"
       >
-        {{ tx('Lancer la nouvelle version') }}
+        {{ tx(applyActionLabel) }}
       </button>
       <button
         v-else
@@ -59,16 +59,29 @@
       {{ tx(flow.installStatus.message || 'Installation en cours…') }}
       <span v-if="flow.installStatus.percent > 0">({{ flow.installStatus.percent }}%)</span>
     </p>
+    <p v-if="flow.installStatus?.state === 'failed' && flow.installStatus.error" role="alert">
+      {{ flow.installStatus.error }}
+    </p>
     <p v-if="error || flow.error" role="alert">{{ tx(error || flow.error) }}</p>
   </section>
 </template>
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useStartupStore } from '@/stores/startup'
+import { computed, onMounted, ref } from 'vue'
+import { getUpdateApplyActionLabel, useStartupStore } from '@/stores/startup'
 import { tx } from '@/utils/locale'
 const flow = useStartupStore()
+const applyActionLabel = computed(() => getUpdateApplyActionLabel(flow.installStatus))
 const status = ref('')
 const error = ref('')
+onMounted(() => {
+  if (
+    ['downloading', 'verifying', 'installing', 'waiting_user', 'permission_required'].includes(
+      flow.installStatus?.state || '',
+    )
+  ) {
+    void flow.refreshInstallStatus()
+  }
+})
 async function check() {
   await flow.checkUpdates(true)
   status.value =

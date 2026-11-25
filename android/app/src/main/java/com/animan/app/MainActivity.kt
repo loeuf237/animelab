@@ -33,7 +33,13 @@ import java.net.URL
 class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
+        EngineHost.attachActivity(this)
         ExtensionBridge.resumePendingInstalls()
+    }
+
+    override fun onPause() {
+        EngineHost.detachActivity(this)
+        super.onPause()
     }
     private lateinit var binding: ActivityMainBinding
     private var customView: View? = null
@@ -133,6 +139,7 @@ class MainActivity : AppCompatActivity() {
         }
         onBackPressedDispatcher.addCallback(this, backCallback)
         setupWebView()
+        EngineHost.attachActivity(this)
         EngineHost.start(applicationContext, BuildConfig.DEBUG && intent.getBooleanExtra("test_mode", false))
         StorageAccess.actionHandler = permissionAction
         DownloadService.update(applicationContext)
@@ -308,6 +315,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
     override fun onDestroy() {
+        EngineHost.detachActivity(this)
         customView?.let { binding.customViewContainer.removeView(it) }
         customCallback?.onCustomViewHidden()
         customView = null; customCallback = null

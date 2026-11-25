@@ -262,6 +262,25 @@ def run_engine(args, workdir):
             engine.dispose()
 
 
+def _stop_running_instance_for_update(directory, remote_call_fn, running_record_fn):
+    # Give the outgoing engine a moment to flush the HTTP response before shutting it down.
+    time.sleep(.4)
+    record = running_record_fn(directory)
+    if not record:
+        return
+    try:
+        remote_call_fn(record, '/api/action', {'action': 'stop'}, timeout=5)
+    except (OSError, ValueError):
+        return
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline:
+        try:
+            remote_call_fn(record, timeout=2)
+        except (OSError, ValueError):
+            return
+        time.sleep(.2)
+
+
 def main():
     parser = argparse.ArgumentParser(description="AnimeLab desktop")
     parser.add_argument("--version", action="version", version=__version__)
@@ -283,6 +302,7 @@ def main():
     parser.add_argument('--worker', help=argparse.SUPPRESS)
     parser.add_argument('--account-worker', action='store_true', help=argparse.SUPPRESS)
     parser.add_argument('--control-url', help=argparse.SUPPRESS)
+    parser.add_argument('--replace-instance', action='store_true', help=argparse.SUPPRESS)
     from animelab.browser_settings import add_browser_arguments, apply_browser_arguments
     add_browser_arguments(parser)
     args = parser.parse_args()
@@ -375,8 +395,16 @@ def main():
         except Exception:
             logger.exception('Native launcher unavailable; opening browser administration')
             args.web_admin = True
+    if args.replace_instance:
+        _stop_running_instance_for_update(directory, remote_call, running_record)
     lock = InstanceLock(directory)
-    if not lock.acquire():
+    acquired = lock.acquire()
+    if not acquired and args.replace_instance:
+        lock_deadline = time.monotonic() + 20
+        while time.monotonic() < lock_deadline and not acquired:
+            time.sleep(.15)
+            acquired = lock.acquire()
+    if not acquired:
         # Wait briefly if another launcher is still creating its control plane.
         for _ in range(50):
             try:

@@ -4,6 +4,8 @@ completed_handler = None
 storage_status_handler = None
 storage_action_handler = None
 app_update_install_handler = None
+app_update_status_handler = None
+app_update_confirm_handler = None
 exported_copy_exists_handler = None
 exported_copy_size_handler = None
 read_exported_copy_handler = None
@@ -26,6 +28,18 @@ def storage_status():
 
 def install_app_update(path):
     return app_update_install_handler(path) if app_update_install_handler else None
+
+
+def app_update_status(operation_id: str):
+    return app_update_status_handler(operation_id) if app_update_status_handler and operation_id else None
+
+
+def confirm_app_update(operation_id: str | None, path: str | None):
+    if app_update_confirm_handler:
+        return app_update_confirm_handler(operation_id or "", path or "")
+    if app_update_install_handler and path:
+        return app_update_install_handler(path)
+    return None
 
 
 def exported_copy_exists(uri: str) -> bool | None:

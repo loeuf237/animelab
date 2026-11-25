@@ -115,6 +115,13 @@
                 }"
               ></div>
             </div>
+            <p
+              v-if="flow.installStatus.state === 'failed' && flow.installStatus.error"
+              class="setup-error"
+              role="alert"
+            >
+              {{ flow.installStatus.error }}
+            </p>
           </div>
           <p v-if="flow.screen === 'update'" class="setup-fine-print">
             {{
@@ -318,13 +325,13 @@
         </template>
         <template v-else-if="flow.screen === 'update'">
           <button
-            v-if="flow.installStatus?.state === 'ready' && flow.installStatus?.restartRequired"
+            v-if="applyActionLabel"
             type="button"
             class="setup-primary"
             :disabled="flow.installing"
             @click="flow.applyInstalledUpdate()"
           >
-            <Rocket />{{ tx('Lancer la nouvelle version') }}
+            <Rocket />{{ tx(applyActionLabel) }}
           </button>
           <button
             v-else-if="selectedAsset"
@@ -391,11 +398,12 @@ import {
 } from 'lucide-vue-next'
 import brandIcon from '@/assets/brand-icon.png'
 import ThemePicker from './ThemePicker.vue'
-import { useStartupStore } from '@/stores/startup'
+import { getUpdateApplyActionLabel, useStartupStore } from '@/stores/startup'
 import { useI18nStore } from '@/stores/i18n'
 import { api, type AndroidStorageState } from '@/api/client'
 import { tx } from '@/utils/locale'
 const flow = useStartupStore()
+const applyActionLabel = computed(() => getUpdateApplyActionLabel(flow.installStatus))
 const i18n = useI18nStore()
 const router = useRouter()
 const native = ref<AndroidStorageState | null>(null)
