@@ -105,7 +105,7 @@ internal object ExtensionPackages {
         val info = requireNotNull(
             context.packageManager.getPackageArchiveInfo(
                 value.path,
-                PackageManager.GET_META_DATA or PackageManager.GET_CONFIGURATIONS or PackageManager.GET_SIGNING_CERTIFICATES,
+                PackageManager.GET_META_DATA or PackageManager.GET_CONFIGURATIONS or PackageManager.GET_SIGNING_CERTIFICATES or PackageManager.GET_SIGNATURES,
             )
         ) { "Invalid APK" }
         requireNotNull(info.signingInfo) { "APK has no signatures" }
@@ -133,12 +133,13 @@ internal object ExtensionPackages {
             .put("sha256", digest.digest().joinToString("") { "%02x".format(it) })
     }
 
+    @Suppress("DEPRECATION")
     private fun installedInfo(context: Context, pkg: String): PackageInfo? {
         if (pkg.isBlank()) return null
         return try {
             context.packageManager.getPackageInfo(
                 pkg,
-                PackageManager.GET_SIGNING_CERTIFICATES,
+                PackageManager.GET_SIGNING_CERTIFICATES or PackageManager.GET_SIGNATURES,
             )
         } catch (_: PackageManager.NameNotFoundException) {
             null
@@ -650,7 +651,7 @@ internal object ExtensionPackages {
                 pendingConfirmations.remove(id)
                 try {
                     if (operation.getString("action")=="install") {
-                        val info=context.packageManager.getPackageInfo(operation.getString("pkg"),PackageManager.GET_SIGNING_CERTIFICATES)
+                        val info=context.packageManager.getPackageInfo(operation.getString("pkg"),PackageManager.GET_SIGNING_CERTIFICATES or PackageManager.GET_SIGNATURES)
                         check(info.longVersionCode.toString()==operation.getString("versionCode") && signer(info)==operation.getString("signer"))
                         operation.put("state","installed")
                     } else {
