@@ -12,11 +12,16 @@ def _read_startup_row():
         return conn.execute("SELECT value FROM app_preferences WHERE key='startup'").fetchone()
 
 
+def _needs_schema_init(exc: sqlite3.OperationalError) -> bool:
+    detail = str(exc).lower()
+    return 'app_preferences' in detail or 'locked' in detail or 'busy' in detail
+
+
 def load():
     try:
         row = _read_startup_row()
     except sqlite3.OperationalError as exc:
-        if 'app_preferences' not in str(exc):
+        if not _needs_schema_init(exc):
             raise
         from animelab.database import init_db
         init_db()
@@ -40,7 +45,7 @@ def save(changes):
     try:
         return _write_startup_values(changes)
     except sqlite3.OperationalError as exc:
-        if 'app_preferences' not in str(exc):
+        if not _needs_schema_init(exc):
             raise
         from animelab.database import init_db
         init_db()

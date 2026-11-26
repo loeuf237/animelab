@@ -237,3 +237,23 @@ def test_pyinstaller_spec_collects_lazily_imported_animelab_submodules():
         assert f"collect_submodules('{pkg}')" in spec_text
     for mod in ("animelab.database", "animelab.migrations", "animelab.progressive", "animelab.sqlite_conn"):
         assert f"'{mod}'" in spec_text
+
+
+def test_concurrent_init_db_and_app_preferences_load_on_fresh_sqlite(tmp_path, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from animelab.config import settings
+    import animelab.database as db_mod
+    from animelab.services import app_preferences
+
+    db_path = tmp_path / "concurrent" / "animan.sqlite3"
+    fresh_engine = db_mod.create_database_engine("sqlite:///" + str(db_path))
+    monkeypatch.setattr(settings, "DATABASE_PATH", str(db_path))
+    monkeypatch.setattr(db_mod, "engine", fresh_engine)
+    try:
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            futs = [pool.submit(db_mod.init_db) for _ in range(3)]
+            futs += [pool.submit(app_preferences.load) for _ in range(3)]
+            results = [f.result(timeout=30) for f in futs]
+        assert all(isinstance(r, dict) and r["onboardingCompleted"] is False for r in results[3:])
+    finally:
+        fresh_engine.dispose()

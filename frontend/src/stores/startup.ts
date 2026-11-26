@@ -101,7 +101,15 @@ export const useStartupStore = defineStore('startup', () => {
           failure && typeof failure === 'object' && 'status' in failure
             ? Number((failure as { status?: unknown }).status)
             : 0
-        const retryable = isAndroid && attempt < maxAttempts && (status === 0 || status === 503)
+        const detail =
+          failure instanceof Error
+            ? `${status}:${failure.name}:${failure.message}`
+            : String(failure)
+        if (typeof window !== 'undefined') {
+          ;(window as Window & { __animelabStartupError?: string }).__animelabStartupError = detail
+        }
+        console.warn('[StartupStore] initialize failed:', detail)
+        const retryable = isAndroid && attempt < maxAttempts && (status === 0 || status >= 500)
         if (!retryable) {
           if (snapshot.value === null) {
             setAppearance(themeMode.value, palette.value)
