@@ -13,7 +13,7 @@ _INIT_DB_LOCK = threading.Lock()
 
 
 def create_database_engine(url):
-    result = create_engine(url, connect_args={'check_same_thread': False, 'timeout': 30}, echo=False)
+    result = create_engine(url, connect_args={'check_same_thread': False, 'timeout': 5}, echo=False)
     event.listen(result, 'connect', lambda connection, record: configure_connection(connection))
     return result
 
