@@ -216,9 +216,9 @@ export function openNativeExternalPlayer(
 ): { launched: boolean; error?: string } | null {
   if (typeof window === 'undefined') return null
   try {
-    const fn = (window as NativeWindow).AnimeLabAndroid?.openExternalPlayer
-    if (typeof fn !== 'function') return null
-    const raw = fn(JSON.stringify(payload))
+    const bridge = (window as NativeWindow).AnimeLabAndroid
+    if (typeof bridge?.openExternalPlayer !== 'function') return null
+    const raw = bridge.openExternalPlayer(JSON.stringify(payload))
     if (!raw) return null
     const parsed = JSON.parse(raw) as { launched?: unknown; error?: unknown }
     return {
@@ -233,9 +233,9 @@ export function openNativeExternalPlayer(
 export async function chooseDesktopExternalPlayer(): Promise<string | null> {
   if (typeof window === 'undefined') return null
   try {
-    const fn = (window as NativeWindow).pywebview?.api?.choose_external_player
-    if (typeof fn !== 'function') return null
-    const selected = await fn()
+    const api = (window as NativeWindow).pywebview?.api
+    if (typeof api?.choose_external_player !== 'function') return null
+    const selected = await api.choose_external_player()
     return typeof selected === 'string' && selected.trim() ? selected.trim() : null
   } catch {
     return null
@@ -244,10 +244,10 @@ export async function chooseDesktopExternalPlayer(): Promise<string | null> {
 
 export function readAndroidEngineState(): AndroidEngineState | null {
   if (typeof window === 'undefined') return null
-  const fn = (window as NativeWindow).AnimeLabAndroid?.getEngineState
-  if (typeof fn !== 'function') return null
+  const bridge = (window as NativeWindow).AnimeLabAndroid
+  if (typeof bridge?.getEngineState !== 'function') return null
   try {
-    const raw = fn()
+    const raw = bridge.getEngineState()
     if (!raw) return null
     const parsed = JSON.parse(raw) as {
       ready?: unknown
