@@ -56,7 +56,8 @@ class EmbeddedEngineTest {
                         if (folder || englishFolder) { (folder || englishFolder).click(); return 'FOLDER'; }
                         const state = window.AnimeLabAndroid?.getEngineState?.() || 'no-bridge';
                         const err = setup.querySelector('.setup-error')?.textContent?.trim() || '';
-                        return 'WAIT|' + state + '|err=' + err + '|' + (setup.textContent || '').replace(/\s+/g, ' ').slice(0, 140);
+                        const rawErr = window.__animelabStartupError || '';
+                        return 'WAIT|' + state + '|err=' + err + '|raw=' + rawErr + '|' + (setup.textContent || '').replace(/\s+/g, ' ').slice(0, 140);
                     })()
                 """.trimIndent()) {
                     lastState = "url=$url loadingVis=$loadingVis timing=${EngineHost.timingJson()} dom=$it"

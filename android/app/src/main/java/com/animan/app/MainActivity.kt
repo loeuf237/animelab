@@ -161,13 +161,19 @@ class MainActivity : AppCompatActivity() {
             val cookies = CookieManager.getInstance()
             cookies.setAcceptCookie(true)
             cookies.setCookie(EngineHost.baseUrl, "animan_android_session=${EngineHost.token}; Path=/; HttpOnly; SameSite=Strict") {
+                cookies.flush()
                 if (!isDestroyed && !isFinishing) binding.webView.loadUrl(EngineHost.baseUrl + "/spa/")
             }
             connectJob = lifecycleScope.launch {
                 val ready = EngineHost.awaitHttpReady(TimeUnit.MINUTES.toMillis(3))
                 if (isDestroyed || isFinishing) return@launch
                 if (ready) {
-                    binding.webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('animelab:engine-ready'))", null)
+                    cookies.setCookie(EngineHost.baseUrl, "animan_android_session=${EngineHost.token}; Path=/; HttpOnly; SameSite=Strict") {
+                        cookies.flush()
+                        if (!isDestroyed && !isFinishing) {
+                            binding.webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('animelab:engine-ready'))", null)
+                        }
+                    }
                 } else {
                     val detail = EngineHost.error ?: getString(R.string.engine_timeout)
                     binding.webView.evaluateJavascript(
