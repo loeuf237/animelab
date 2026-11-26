@@ -49,7 +49,14 @@ def validate(app, tests, output, skip_native_media=False, package="com.animan.ap
                               capture_output=True, text=True, timeout=30)
         (output / "logcat.txt").write_text(logs.stdout)
     else:
-        (output / "logcat.txt").write_text("Target process exited; see instrumentation.txt.\n")
+        logs = subprocess.run(
+            ["adb", "logcat", "-d", "-s", "AnimanEngine:V", "chromium:V", "AndroidRuntime:E", "TestRunner:E"],
+            capture_output=True, text=True, timeout=30,
+        )
+        tail = "\n".join(logs.stdout.splitlines()[-400:])
+        (output / "logcat.txt").write_text(
+            "Target process exited; filtered logcat:\n" + tail + "\n"
+        )
     if is_engine:
         subprocess.run(["adb", "pull", f"/sdcard/Android/data/{package}/files/screen.png", str(output / "screen.png")], timeout=15)
         subprocess.run(["adb", "pull", f"/sdcard/Android/data/{package}/files/footprint.json",

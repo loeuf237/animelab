@@ -6,6 +6,7 @@ import { useNotifications } from './notifications'
 import { readPreference, writePreference } from '@/utils/locale'
 import {
   applyStartupPlatform,
+  platformRuntime,
   readAndroidEngineState,
   waitForAndroidEngine,
 } from '@/utils/platform'
@@ -85,52 +86,69 @@ export const useStartupStore = defineStore('startup', () => {
         return
       }
     }
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 5000)
-    try {
-      const state = await api.getStartup(controller.signal)
-      if (current !== generation) return
-      snapshot.value = state
-      applyStartupPlatform(state.runtime, state.os)
-      // Shared browsers keep their own appearance; a changing Android origin
-      // can restore installation preferences from the engine instead.
-      setAppearance(
-        (readPreference('theme') ? themeMode.value : state.preferences.theme) || themeMode.value,
-        (readPreference('palette') ? palette.value : state.preferences.palette) || palette.value,
-      )
-      if (state.preferences.checkUpdates) {
-        if (!state.preferences.onboardingCompleted) {
-          await checkUpdates()
-          if (current !== generation) return
-          if (update.value?.status === 'available') {
-            screen.value = 'update'
-            return
+    const isAndroid = platformRuntime.value === 'android'
+    const timeoutMs = isAndroid ? 20000 : 5000
+    const maxAttempts = isAndroid ? 3 : 1
+    let state: StartupSnapshot | null = null
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), timeoutMs)
+      try {
+        state = await api.getStartup(controller.signal)
+        break
+      } catch (failure) {
+        const status =
+          failure && typeof failure === 'object' && 'status' in failure
+            ? Number((failure as { status?: unknown }).status)
+            : 0
+        const retryable = isAndroid && attempt < maxAttempts && (status === 0 || status === 503)
+        if (!retryable) {
+          if (snapshot.value === null) {
+            setAppearance(themeMode.value, palette.value)
           }
-        } else {
-          continueStartup()
-          void checkUpdates().then(() => {
-            if (current === generation && update.value?.status === 'available') {
-              useNotifications().notify('Une nouvelle version est disponible.', 'info', {
-                label: 'Mettre à jour',
-                run: () => {
-                  screen.value = 'update'
-                },
-              })
-            }
-          })
+          if (current === generation)
+            error.value = 'Impossible de joindre le serveur. Vous pouvez réessayer ou continuer.'
           return
         }
+        await new Promise((resolve) => setTimeout(resolve, 350 * attempt))
+        if (current !== generation) return
+      } finally {
+        clearTimeout(timer)
       }
-      continueStartup()
-    } catch {
-      if (snapshot.value === null) {
-        setAppearance(themeMode.value, palette.value)
-      }
-      if (current === generation)
-        error.value = 'Impossible de joindre le serveur. Vous pouvez réessayer ou continuer.'
-    } finally {
-      clearTimeout(timer)
     }
+    if (!state || current !== generation) return
+    snapshot.value = state
+    applyStartupPlatform(state.runtime, state.os)
+    // Shared browsers keep their own appearance; a changing Android origin
+    // can restore installation preferences from the engine instead.
+    setAppearance(
+      (readPreference('theme') ? themeMode.value : state.preferences.theme) || themeMode.value,
+      (readPreference('palette') ? palette.value : state.preferences.palette) || palette.value,
+    )
+    if (state.preferences.checkUpdates) {
+      if (!state.preferences.onboardingCompleted) {
+        await checkUpdates()
+        if (current !== generation) return
+        if (update.value?.status === 'available') {
+          screen.value = 'update'
+          return
+        }
+      } else {
+        continueStartup()
+        void checkUpdates().then(() => {
+          if (current === generation && update.value?.status === 'available') {
+            useNotifications().notify('Une nouvelle version est disponible.', 'info', {
+              label: 'Mettre à jour',
+              run: () => {
+                screen.value = 'update'
+              },
+            })
+          }
+        })
+        return
+      }
+    }
+    continueStartup()
   }
   async function checkUpdates(refresh = false) {
     checking.value = true

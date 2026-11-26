@@ -144,8 +144,8 @@ object EngineHost {
                 val reachable = try {
                     val conn = URL("$baseUrl/api/engine/readiness").openConnection(Proxy.NO_PROXY) as HttpURLConnection
                     try {
-                        conn.connectTimeout = 300
-                        conn.readTimeout = 300
+                        conn.connectTimeout = 1500
+                        conn.readTimeout = 2000
                         conn.setRequestProperty("X-Animan-Session", token)
                         conn.responseCode == 200
                     } finally {
