@@ -228,3 +228,12 @@ def test_android_spa_packaging_and_interceptor_rules():
     ).read_text(encoding="utf-8")
     for marker in ('"/spa"', '"/assets/"', '"/api/"', '"application/javascript"', '"text/css"', '"text/html"'):
         assert marker in interceptor_text
+
+
+def test_pyinstaller_spec_collects_lazily_imported_animelab_submodules():
+    root = Path(__file__).resolve().parents[1]
+    spec_text = (root / "animelab.spec").read_text(encoding="utf-8")
+    for pkg in ("animelab.models", "animelab.routers", "animelab.services"):
+        assert f"collect_submodules('{pkg}')" in spec_text
+    for mod in ("animelab.database", "animelab.migrations", "animelab.progressive", "animelab.sqlite_conn"):
+        assert f"'{mod}'" in spec_text
