@@ -214,3 +214,17 @@ def test_android_runtime_extension_http_works_before_full_warmup(monkeypatch):
 
     payload = json.loads(android_runtime.extension_http('{"action": "user_agent"}'))
     assert "AnimeLabTest" in payload["userAgent"]
+
+
+def test_android_spa_packaging_and_interceptor_rules():
+    root = Path(__file__).resolve().parents[1]
+    gradle_text = (root / "android" / "app" / "build.gradle.kts").read_text(encoding="utf-8")
+    assert "syncSpaAssets" in gradle_text
+    assert 'generated/spa-assets/spa' in gradle_text
+    assert 'eachFile { path =' not in gradle_text
+
+    interceptor_text = (
+        root / "android" / "app" / "src" / "main" / "java" / "com" / "animan" / "app" / "SpaAssetInterceptor.kt"
+    ).read_text(encoding="utf-8")
+    for marker in ('"/spa"', '"/assets/"', '"/api/"', '"application/javascript"', '"text/css"', '"text/html"'):
+        assert marker in interceptor_text

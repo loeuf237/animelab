@@ -81,6 +81,7 @@ android {
     // The temporary validation key is never used by the publication job.
     testBuildType = if (System.getenv("ANIMAN_ANDROID_KEYSTORE").isNullOrBlank()) "validation" else "release"
     sourceSets["androidTest"].assets.srcDir(layout.buildDirectory.dir("generated/native-test-fixture"))
+    sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/spa-assets"))
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -179,6 +180,26 @@ tasks.matching { it.name.matches(Regex("generate(Release|Validation)PythonRequir
             }
         }
     }
+
+val syncSpaAssets by tasks.registering(Sync::class) {
+    val distDir = rootProject.file("../frontend/dist")
+    if (distDir.isDirectory) {
+        from(distDir) {
+            exclude(
+                "img/icon-512.png",
+                "img/icon-maskable.png",
+                "favicon.ico",
+            )
+        }
+    }
+    into(layout.buildDirectory.dir("generated/spa-assets/spa"))
+}
+
+tasks.configureEach {
+    if (name.startsWith("merge") && name.endsWith("Assets") && !name.endsWith("AndroidTestAssets")) {
+        dependsOn(syncSpaAssets)
+    }
+}
 
 tasks.matching { it.name.contains("Python") && it.name != "syncPythonSource" }.configureEach {
     dependsOn(syncPythonSource)

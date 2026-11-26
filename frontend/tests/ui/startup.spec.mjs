@@ -339,3 +339,101 @@ test('English Settings About section shows translated labels and Telegram link',
   await expect(tgLink).toBeVisible()
   await expect(tgLink).toHaveAttribute('href', 'https://t.me/AnimeLabGroup')
 })
+
+test('android progressive shell renders immediately while engine starts in background', async ({
+  page,
+}) => {
+  const { requests } = await installation(page, { android: true, completed: true })
+  await page.addInitScript(() => {
+    window.__mockEngineState = { ready: false, fullyReady: false, error: null }
+    window.AnimeLabAndroid = {
+      getEngineState: () => JSON.stringify(window.__mockEngineState),
+      getPlatformInfo: () =>
+        JSON.stringify({ os: 'android', runtime: 'android', sdk: 34, edgeToEdge: true }),
+      syncSystemBars: () => {},
+      haptic: () => {},
+      setKeepScreenOn: () => {},
+    }
+  })
+
+  await page.goto('/app/library')
+  await expect(page.getByText('Démarrage du moteur…', { exact: true })).toBeVisible()
+  await expect(
+    page.getByText('Le moteur local démarre en arrière-plan…', { exact: true }),
+  ).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Continuer sans vérifier' })).toHaveCount(0)
+  expect(
+    requests.filter((r) => r.path === '/api/app/startup' || r.path.startsWith('/api/i18n/')),
+  ).toHaveLength(0)
+
+  await page.evaluate(() => {
+    window.__mockEngineState = { ready: true, fullyReady: false, error: null }
+    window.dispatchEvent(new CustomEvent('animelab:engine-ready'))
+  })
+
+  await expect(page.getByRole('heading', { name: 'Ma Bibliothèque' })).toBeVisible()
+})
+
+test('android engine boot error displays alert and retry button inside SPA shell', async ({
+  page,
+}) => {
+  await installation(page, { android: true, completed: true })
+  await page.addInitScript(() => {
+    window.__mockEngineState = { ready: false, fullyReady: false, error: null }
+    window.AnimeLabAndroid = {
+      getEngineState: () => JSON.stringify(window.__mockEngineState),
+      getPlatformInfo: () =>
+        JSON.stringify({ os: 'android', runtime: 'android', sdk: 34, edgeToEdge: true }),
+      syncSystemBars: () => {},
+      haptic: () => {},
+      setKeepScreenOn: () => {},
+    }
+  })
+
+  await page.goto('/app/library')
+  await expect(page.getByText('Démarrage du moteur…', { exact: true })).toBeVisible()
+
+  await page.evaluate(() => {
+    window.__mockEngineState = { ready: false, fullyReady: false, error: 'Python init failure' }
+    window.dispatchEvent(
+      new CustomEvent('animelab:engine-error', { detail: 'Python init failure' }),
+    )
+  })
+
+  await expect(page.getByRole('alert')).toContainText('Python init failure')
+  await expect(page.getByRole('button', { name: 'Réessayer', exact: true })).toBeVisible()
+})
+
+test('android progressive shell supports full first-run onboarding once engine becomes ready', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 850 })
+  await installation(page, { android: true, completed: false })
+  await page.addInitScript(() => {
+    window.__mockEngineState = { ready: false, fullyReady: false, error: null }
+    window.AnimeLabAndroid = {
+      getEngineState: () => JSON.stringify(window.__mockEngineState),
+      getPlatformInfo: () =>
+        JSON.stringify({ os: 'android', runtime: 'android', sdk: 34, edgeToEdge: true }),
+      syncSystemBars: () => {},
+      haptic: () => {},
+      setKeepScreenOn: () => {},
+    }
+  })
+
+  await page.goto('/app/')
+  await expect(page.getByText('Démarrage du moteur…', { exact: true })).toBeVisible()
+
+  await page.evaluate(() => {
+    window.__mockEngineState = { ready: true, fullyReady: false, error: null }
+    window.dispatchEvent(new CustomEvent('animelab:engine-ready'))
+  })
+
+  await expect(page.getByRole('heading', { name: 'Bienvenue !' })).toBeVisible()
+  await page.getByRole('button', { name: 'Suivant', exact: true }).click()
+  await page.getByRole('button', { name: 'Utiliser Downloads/AnimeLab', exact: true }).click()
+  await page.getByRole('button', { name: 'Suivant', exact: true }).click()
+  await page.getByRole('button', { name: 'Commencer', exact: true }).click()
+  await expect(page).toHaveURL(/\/library$/)
+  await expect(page.getByRole('heading', { name: 'Ma Bibliothèque' })).toBeVisible()
+})

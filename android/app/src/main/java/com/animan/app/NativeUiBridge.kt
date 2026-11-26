@@ -187,6 +187,9 @@ class NativeUiBridge(
             .toString()
     }
 
+    @JavascriptInterface
+    fun getEngineState(): String = EngineHost.engineStateJson()
+
     private fun checkLocalOriginSync(): Boolean {
         if (activity.isDestroyed || activity.isFinishing) return false
         if (Looper.myLooper() == Looper.getMainLooper()) {

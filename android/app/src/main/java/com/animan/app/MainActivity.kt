@@ -26,9 +26,11 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.animan.app.databinding.ActivityMainBinding
 import kotlinx.coroutines.*
+import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.Proxy
 import java.net.URL
+import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity() {
     override fun onResume() {
@@ -48,6 +50,7 @@ class MainActivity : AppCompatActivity() {
     private var fileCallback: ValueCallback<Array<Uri>>? = null
     private var connectJob: Job? = null
     private var firstPageLogged = false
+    private var shellLoaded = false
     private lateinit var nativeUiBridge: NativeUiBridge
 
     internal fun isInFullscreenVideo(): Boolean = customView != null
@@ -150,17 +153,44 @@ class MainActivity : AppCompatActivity() {
 
     private fun connect() {
         connectJob?.cancel()
+        shellLoaded = false
         binding.loadingLayout.visibility = View.VISIBLE
         binding.loadingStatus.text = getString(R.string.starting_engine)
         binding.retryButton.visibility = View.GONE
+        if (SpaAssetInterceptor.hasPackagedShell(applicationContext)) {
+            val cookies = CookieManager.getInstance()
+            cookies.setAcceptCookie(true)
+            cookies.setCookie(EngineHost.baseUrl, "animan_android_session=${EngineHost.token}; Path=/; HttpOnly; SameSite=Strict") {
+                if (!isDestroyed && !isFinishing) binding.webView.loadUrl(EngineHost.baseUrl + "/spa/")
+            }
+            connectJob = lifecycleScope.launch {
+                val ready = EngineHost.awaitHttpReady(TimeUnit.MINUTES.toMillis(3))
+                if (isDestroyed || isFinishing) return@launch
+                if (ready) {
+                    binding.webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('animelab:engine-ready'))", null)
+                } else {
+                    val detail = EngineHost.error ?: getString(R.string.engine_timeout)
+                    binding.webView.evaluateJavascript(
+                        "window.dispatchEvent(new CustomEvent('animelab:engine-error', { detail: ${JSONObject.quote(detail)} }))",
+                        null,
+                    )
+                    if (!shellLoaded) {
+                        binding.loadingLayout.visibility = View.VISIBLE
+                        binding.loadingStatus.text = getString(R.string.engine_error, detail)
+                        binding.retryButton.visibility = View.VISIBLE
+                    }
+                }
+            }
+            return
+        }
         connectJob = lifecycleScope.launch {
-            val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MINUTES.toNanos(3)
+            val deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(3)
             var probeDelayMs = 50L
             while (System.nanoTime() < deadline && EngineHost.error == null) {
-                if (!EngineHost.ready) {
-                    val remainingMs = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime())
+                if (!EngineHost.httpReady) {
+                    val remainingMs = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime())
                     if (remainingMs <= 0L) break
-                    EngineHost.awaitReady(remainingMs)
+                    if (!EngineHost.awaitHttpReady(remainingMs)) break
                     continue
                 }
                 val reachable = withContext(Dispatchers.IO) {
@@ -206,6 +236,8 @@ class MainActivity : AppCompatActivity() {
             setSupportMultipleWindows(true)
         }
         binding.webView.webViewClient = object : WebViewClient() {
+            override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? =
+                request?.let { SpaAssetInterceptor.shouldIntercept(applicationContext, it) }
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 if (!request.isForMainFrame) return false
                 val uri = request.url
@@ -217,11 +249,23 @@ class MainActivity : AppCompatActivity() {
             }
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) { binding.progressBar.visibility = View.VISIBLE }
             override fun onPageFinished(view: WebView?, url: String?) {
+                shellLoaded = true
+                EngineHost.markShellReady()
                 binding.progressBar.visibility = View.GONE; binding.loadingLayout.visibility = View.GONE
                 if (!firstPageLogged && EngineHost.startElapsedMs > 0L) {
                     firstPageLogged = true
                     val elapsed = android.os.SystemClock.elapsedRealtime() - EngineHost.startElapsedMs
                     android.util.Log.i("AnimanEngine", "ANIMAN_WEBVIEW_READY=${elapsed}ms timing=${EngineHost.timingJson()}")
+                }
+                if (EngineHost.httpReady) {
+                    view?.evaluateJavascript("window.dispatchEvent(new CustomEvent('animelab:engine-ready'))", null)
+                } else {
+                    EngineHost.error?.let { detail ->
+                        view?.evaluateJavascript(
+                            "window.dispatchEvent(new CustomEvent('animelab:engine-error', { detail: ${JSONObject.quote(detail)} }))",
+                            null,
+                        )
+                    }
                 }
             }
             override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {

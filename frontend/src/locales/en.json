@@ -1401,5 +1401,7 @@
   "Vérifier dans la WebView": "Verify in WebView",
   "Ouvrir en WebView": "Open in WebView",
   "Fenêtre de vérification ouverte — fermez ou cliquez sur « J’ai terminé la vérification » une fois l’accès débloqué.": "Verification window open — close it or click \"I have completed verification\" once access is restored.",
-  "Impossible d’ouvrir cette URL dans la WebView.": "Unable to open this URL in WebView."
+  "Impossible d’ouvrir cette URL dans la WebView.": "Unable to open this URL in WebView.",
+  "Démarrage du moteur…": "Starting the engine…",
+  "Le moteur local démarre en arrière-plan…": "The local engine is starting in the background…"
 }

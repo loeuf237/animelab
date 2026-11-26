@@ -12,9 +12,15 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 import java.lang.ref.WeakReference
+import java.net.HttpURLConnection
 import java.net.InetAddress
+import java.net.Proxy
 import java.net.ServerSocket
+import java.net.URL
 import java.security.SecureRandom
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 
@@ -27,13 +33,22 @@ object EngineHost {
         private set
     val baseUrl: String get() = "http://127.0.0.1:$port"
     private val readyDeferred = CompletableDeferred<Boolean>()
+    private val httpReadyDeferred = CompletableDeferred<Boolean>()
+    private val httpReadyLatch = CountDownLatch(1)
+    private val loopbackProbeStarted = AtomicBoolean(false)
     @Volatile var startElapsedMs = 0L
         private set
     @Volatile var pythonStartedMs = 0L
         private set
     @Volatile var stage0ReadyMs = 0L
         private set
+    @Volatile var httpReadyMs = 0L
+        private set
+    @Volatile var shellReadyMs = 0L
+        private set
     @Volatile var fullReadyMs = 0L
+        private set
+    @Volatile var httpReady = false
         private set
     @Volatile var fullyReady = false
         private set
@@ -43,6 +58,7 @@ object EngineHost {
             if (value) {
                 if (stage0ReadyMs == 0L) stage0ReadyMs = SystemClock.elapsedRealtime()
                 readyDeferred.complete(true)
+                startLoopbackProbe()
             }
         }
     @Volatile var error: String? = null
@@ -71,14 +87,28 @@ object EngineHost {
         android.util.Log.i("AnimanEngine", "ANIMAN_STARTUP_TIMING=${timingJson()}")
     }
 
+    @JvmStatic fun markShellReady() {
+        if (shellReadyMs == 0L) shellReadyMs = SystemClock.elapsedRealtime()
+    }
+
+    @JvmStatic fun engineStateJson(): String =
+        JSONObject()
+            .put("ready", httpReady)
+            .put("fullyReady", fullyReady)
+            .put("error", error ?: JSONObject.NULL)
+            .toString()
+
     @JvmStatic fun timingJson(): String {
         val origin = startElapsedMs
         fun delta(stamp: Long): Long = if (origin > 0L && stamp >= origin) stamp - origin else -1L
         return JSONObject()
             .put("ready", ready)
+            .put("httpReady", httpReady)
             .put("fullyReady", fullyReady)
             .put("pythonStartMs", delta(pythonStartedMs))
             .put("stage0ReadyMs", delta(stage0ReadyMs))
+            .put("httpReadyMs", delta(httpReadyMs))
+            .put("shellReadyMs", delta(shellReadyMs))
             .put("fullReadyMs", delta(fullReadyMs))
             .toString()
     }
@@ -87,6 +117,60 @@ object EngineHost {
         if (ready) return true
         if (error != null) return false
         return withTimeoutOrNull(timeoutMs.coerceAtLeast(1L)) { readyDeferred.await() } == true
+    }
+
+    suspend fun awaitHttpReady(timeoutMs: Long): Boolean {
+        if (httpReady) return true
+        if (error != null) return false
+        return withTimeoutOrNull(timeoutMs.coerceAtLeast(1L)) { httpReadyDeferred.await() } == true
+    }
+
+    fun awaitHttpReadyBlocking(timeoutMs: Long): Boolean {
+        if (httpReady) return true
+        if (error != null) return false
+        return try {
+            httpReadyLatch.await(timeoutMs.coerceAtLeast(1L), TimeUnit.MILLISECONDS) && httpReady
+        } catch (_: InterruptedException) {
+            false
+        }
+    }
+
+    private fun startLoopbackProbe() {
+        if (!loopbackProbeStarted.compareAndSet(false, true)) return
+        thread(name = "AnimanLoopbackProbe", isDaemon = true) {
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60)
+            var delayMs = 15L
+            while (System.nanoTime() < deadline && error == null) {
+                val reachable = try {
+                    val conn = URL("$baseUrl/api/engine/readiness").openConnection(Proxy.NO_PROXY) as HttpURLConnection
+                    try {
+                        conn.connectTimeout = 300
+                        conn.readTimeout = 300
+                        conn.setRequestProperty("X-Animan-Session", token)
+                        conn.responseCode == 200
+                    } finally {
+                        conn.disconnect()
+                    }
+                } catch (_: Exception) {
+                    false
+                }
+                if (reachable) {
+                    if (httpReadyMs == 0L) httpReadyMs = SystemClock.elapsedRealtime()
+                    httpReady = true
+                    httpReadyDeferred.complete(true)
+                    httpReadyLatch.countDown()
+                    return@thread
+                }
+                try {
+                    Thread.sleep(delayMs)
+                } catch (_: InterruptedException) {
+                    break
+                }
+                delayMs = (delayMs * 2).coerceAtMost(200L)
+            }
+            httpReadyDeferred.complete(false)
+            httpReadyLatch.countDown()
+        }
     }
 
     @Synchronized fun start(applicationContext: Context, testMode: Boolean = false) {
@@ -118,6 +202,8 @@ object EngineHost {
             } catch (failure: Exception) {
                 error = failure.message ?: failure.javaClass.simpleName
                 readyDeferred.complete(false)
+                httpReadyDeferred.complete(false)
+                httpReadyLatch.countDown()
                 CrashReporter.recordWebViewError(context, "engine_start_failed", error ?: "unknown")
                 android.util.Log.e("AnimanEngine", "Embedded engine failed", failure)
                 main.post { DownloadService.finishIdle(context) }
