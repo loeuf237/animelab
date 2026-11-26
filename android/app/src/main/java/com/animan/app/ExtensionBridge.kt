@@ -34,15 +34,30 @@ object ExtensionBridge {
         client = ExtensionHostClient(context,gateway)
         try { ExtensionPackages.reconcile(context) } catch (_: Exception) { }
     }
-    @JvmStatic fun discover(): String = client.discover()
-    @JvmStatic fun invoke(payload: String): String = client.invoke(payload)
-    @JvmStatic fun cancel(id: String) { client.cancel(id) }
-    @JvmStatic fun inspect(path: String): String = ExtensionPackages.inspect(context, path).toString()
-    @JvmStatic fun install(path: String, expectedPackage: String): String = ExtensionPackages.install(context, path, expectedPackage).toString()
-    @JvmStatic fun uninstall(pkg: String): String = ExtensionPackages.uninstall(context, pkg).toString()
-    @JvmStatic fun operations(): String = ExtensionPackages.operations(context).toString()
-    @JvmStatic fun cancelInstallation(id: String): String = ExtensionPackages.cancel(context,id).toString()
-    @JvmStatic fun confirmOperation(id: String): String = ExtensionPackages.openConfirmation(context, id).toString()
+    @Synchronized private fun ensureInitialized() {
+        if (!::context.isInitialized) {
+            initialize(EngineHost.context)
+        }
+    }
+
+    @JvmStatic fun discover(): String {
+        ensureInitialized()
+        return client.discover()
+    }
+    @JvmStatic fun invoke(payload: String): String {
+        ensureInitialized()
+        return client.invoke(payload)
+    }
+    @JvmStatic fun cancel(id: String) {
+        ensureInitialized()
+        client.cancel(id)
+    }
+    @JvmStatic fun inspect(path: String): String = ExtensionPackages.inspect(appContext(), path).toString()
+    @JvmStatic fun install(path: String, expectedPackage: String): String = ExtensionPackages.install(appContext(), path, expectedPackage).toString()
+    @JvmStatic fun uninstall(pkg: String): String = ExtensionPackages.uninstall(appContext(), pkg).toString()
+    @JvmStatic fun operations(): String = ExtensionPackages.operations(appContext()).toString()
+    @JvmStatic fun cancelInstallation(id: String): String = ExtensionPackages.cancel(appContext(), id).toString()
+    @JvmStatic fun confirmOperation(id: String): String = ExtensionPackages.openConfirmation(appContext(), id).toString()
     private fun appContext(): Context = if (::context.isInitialized) context else EngineHost.context
 
     @JvmStatic fun installAppUpdate(path: String): String =

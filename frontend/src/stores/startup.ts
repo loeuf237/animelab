@@ -2,8 +2,13 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { api } from '@/api/client'
 import { palette, setAppearance, themeMode } from './appearance'
+import { useNotifications } from './notifications'
 import { readPreference, writePreference } from '@/utils/locale'
-import { applyStartupPlatform } from '@/utils/platform'
+import {
+  applyStartupPlatform,
+  readAndroidEngineState,
+  waitForAndroidEngine,
+} from '@/utils/platform'
 import type {
   AppPreferences,
   StartupSnapshot,
@@ -44,6 +49,7 @@ export const useStartupStore = defineStore('startup', () => {
   const error = ref('')
   const saving = ref(false)
   const checking = ref(false)
+  const engineStarting = ref(false)
   let generation = 0
   let pollTimer: ReturnType<typeof setTimeout> | null = null
   function continueStartup() {
@@ -59,6 +65,26 @@ export const useStartupStore = defineStore('startup', () => {
     const current = ++generation
     screen.value = 'loading'
     error.value = ''
+    engineStarting.value = false
+    const engineState = readAndroidEngineState()
+    if (engineState && !engineState.ready) {
+      if (engineState.error) {
+        if (current === generation) error.value = engineState.error
+        return
+      }
+      engineStarting.value = true
+      const engine = await waitForAndroidEngine()
+      if (current !== generation) {
+        engineStarting.value = false
+        return
+      }
+      engineStarting.value = false
+      if (!engine.ready) {
+        error.value =
+          engine.error || 'Impossible de joindre le serveur. Vous pouvez réessayer ou continuer.'
+        return
+      }
+    }
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 5000)
     try {
@@ -73,10 +99,25 @@ export const useStartupStore = defineStore('startup', () => {
         (readPreference('palette') ? palette.value : state.preferences.palette) || palette.value,
       )
       if (state.preferences.checkUpdates) {
-        await checkUpdates()
-        if (current !== generation) return
-        if (update.value?.status === 'available') {
-          screen.value = 'update'
+        if (!state.preferences.onboardingCompleted) {
+          await checkUpdates()
+          if (current !== generation) return
+          if (update.value?.status === 'available') {
+            screen.value = 'update'
+            return
+          }
+        } else {
+          continueStartup()
+          void checkUpdates().then(() => {
+            if (current === generation && update.value?.status === 'available') {
+              useNotifications().notify('Une nouvelle version est disponible.', 'info', {
+                label: 'Mettre à jour',
+                run: () => {
+                  screen.value = 'update'
+                },
+              })
+            }
+          })
           return
         }
       }
@@ -222,6 +263,7 @@ export const useStartupStore = defineStore('startup', () => {
     error,
     saving,
     checking,
+    engineStarting,
     initialize,
     checkUpdates,
     continueStartup,

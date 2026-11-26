@@ -1141,6 +1141,7 @@
   "Installation annulée. Vous pouvez rouvrir l’installeur Android.": "Installation cancelled. You can reopen the Android installer.",
   "Téléchargement de la mise à jour…": "Downloading update…",
   "Vérification de l’intégrité du paquet…": "Verifying package integrity…",
+  "Mettre à jour": "Update",
   "Installation de la mise à jour…": "Installing update…",
   "Autorisez l’installation d’applications dans les paramètres Android puis réessayez.": "Allow app installations in Android Settings and try again.",
   "Confirmez l’installation de la mise à jour dans la boîte de dialogue Android.": "Confirm the update installation in the Android dialog.",
@@ -1400,5 +1401,7 @@
   "Vérifier dans la WebView": "Verify in WebView",
   "Ouvrir en WebView": "Open in WebView",
   "Fenêtre de vérification ouverte — fermez ou cliquez sur « J’ai terminé la vérification » une fois l’accès débloqué.": "Verification window open — close it or click \"I have completed verification\" once access is restored.",
-  "Impossible d’ouvrir cette URL dans la WebView.": "Unable to open this URL in WebView."
+  "Impossible d’ouvrir cette URL dans la WebView.": "Unable to open this URL in WebView.",
+  "Démarrage du moteur…": "Starting the engine…",
+  "Le moteur local démarre en arrière-plan…": "The local engine is starting in the background…"
 }

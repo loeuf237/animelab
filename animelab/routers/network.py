@@ -3,6 +3,7 @@ from animelab.api_contracts import ContractRoute
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from animelab.request_origin import is_local, local_only
 from animelab.services.browser_verification import browser_verification
 from animelab.services.download_manager import download_manager
 
@@ -107,18 +108,6 @@ async def rotate_proxy(body: StartVerification, request: Request):
         return {"success": True, "domain": domain, "resumed": resumed}
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from exc
-
-
-def is_local(request):
-    import os
-    if os.getenv("ANIMELAB_SHARED_WORKER") == "1":
-        return False
-    return bool(request.client and request.client.host in ("127.0.0.1", "::1", "testclient"))
-
-
-def local_only(request):
-    if not is_local(request):
-        raise HTTPException(403, "La vérification dans le navigateur doit être ouverte depuis cette machine")
 
 
 def verification_only(request):

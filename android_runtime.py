@@ -11,10 +11,104 @@ import time
 from urllib.parse import urlparse
 
 _loop = None
+_configured_bridges = set()
+
+
+def _ensure_source_http_configured():
+    if "source_http" in _configured_bridges:
+        return
+    try:
+        from java import jclass
+    except ImportError:
+        return
+    from animelab.services.source_http import source_http
+    verification = jclass("com.animan.app.VerificationBridge")
+    source_http.default_user_agent = source_http.valid_user_agent(str(verification.userAgent()))
+    _configured_bridges.add("source_http")
+
+
+def _ensure_android_extensions_configured():
+    if "android_extensions" in _configured_bridges:
+        return
+    try:
+        from java import jclass
+    except ImportError:
+        return
+    from animelab.services import android_extensions
+    if jclass("com.animan.app.BuildConfig").EXTENSION_RUNTIME_ENABLED:
+        android_extensions.configure(jclass("com.animan.app.ExtensionBridge"))
+    _configured_bridges.add("android_extensions")
+
+
+def _ensure_seanime_configured():
+    if "seanime" in _configured_bridges:
+        return
+    try:
+        from java import jclass
+    except ImportError:
+        return
+    from animelab.services.seanime_runtime import seanime_runtime
+    seanime_runtime.configure_android(jclass("com.animan.app.SeanimeJsBridge"))
+    _configured_bridges.add("seanime")
+
+
+def _ensure_browser_verification_configured():
+    if "browser_verification" in _configured_bridges:
+        return
+    try:
+        from java import jclass
+    except ImportError:
+        return
+    from animelab.services.browser_verification import browser_verification
+    verification = jclass("com.animan.app.VerificationBridge")
+    browser_verification.platform = "android"
+    opener = lambda url, auto_close=True: VerificationWindow(url, verification, auto_close=auto_close)
+    opener.seed_cookies = lambda url, cookies: VerificationWindow.seed_cookies(url, cookies, verification)
+    opener.user_agent = lambda: str(verification.userAgent())
+    browser_verification.webview_opener = opener
+    _configured_bridges.add("browser_verification")
+
+
+def _ensure_download_hooks_configured():
+    if "download_hooks" in _configured_bridges:
+        return
+    from java import jclass
+    from animelab import platform_events
+    from animelab.models.download_task import DownloadStatus, ExportStatus
+    from animelab.services.download_manager import download_manager
+
+    hooks = jclass("com.animan.app.NativeHooks")
+    storage = jclass("com.animan.app.StorageAccess")
+
+    def notify(task):
+        active = [t for t in download_manager.get_all_tasks() if t.status in (
+            DownloadStatus.PENDING, DownloadStatus.DOWNLOADING, DownloadStatus.RETRYING, DownloadStatus.MUXING)
+            or (t.exportStatus == ExportStatus.EXPORTING and not t.paused and not t.cancelled)]
+        native_status = "CANCELLED" if task.cancelled else "PAUSED" if task.paused else "EXPORTING" if task.exportStatus == ExportStatus.EXPORTING else task.status.value
+        if not hooks.progress(len(active), int(task.progress), task.fileName, task.id, native_status) and active and _loop:
+            _loop.call_soon_threadsafe(download_manager.pause_all_downloads)
+
+    def export_completed(task):
+        if not task.savePath or not Path(task.savePath).is_file():
+            raise FileNotFoundError("The private download is missing")
+        paths = [path for path in dict.fromkeys(platform_events.completed_paths(task)) if path and Path(path).is_file()]
+        if not paths:
+            raise FileNotFoundError("The private download is missing")
+        uris = [str(hooks.exportFile(path, task.id)) for path in paths]
+        destination = json.loads(str(storage.status()))["destination"]
+        # Release private staging copies once every file is verified & published in shared storage.
+        download_manager._release_private_paths(paths)
+        return {"uris": uris, "destination": destination}
+
+    platform_events.progress_handler = notify
+    platform_events.completed_handler = export_completed
+    _configured_bridges.add("download_hooks")
 
 
 def seanime_fetch(payload, extension_id=""):
     """Execute one Seanime fetch() call through Python's SSRF-protected transport."""
+    _ensure_source_http_configured()
+    _ensure_seanime_configured()
     from animelab.services.seanime_runtime import (
         AndroidSeanimeRuntime,
         host_fetch_json_sync,
@@ -30,6 +124,7 @@ def seanime_fetch(payload, extension_id=""):
 def extension_http(payload):
     """Native default OkHttp gateway: keep the shared URL/cookie/proxy policy."""
     import base64
+    _ensure_source_http_configured()
     from animelab.services.source_http import source_http, VerificationRequired, RateLimited, SourceNetworkError
     if json.loads(payload).get('action') == 'user_agent':
         return json.dumps({'userAgent':source_http.default_user_agent})
@@ -174,6 +269,7 @@ def start(data_dir, cache_dir, port, token, test_mode=False):
         "ANIMAN_DB_PATH": str(Path(data_dir) / "db/animan.sqlite3"),
         "ANIMAN_DOWNLOAD_DIR": str(Path(data_dir) / "downloads"),
         "ANIMAN_HOST": "127.0.0.1", "ANIMAN_PORT": str(port),
+        "ANIMELAB_PROGRESSIVE_BOOT": os.environ.get("ANIMELAB_PROGRESSIVE_BOOT", "1"),
     })
     if test_mode:
         update_environment(ANIMAN_STARTUP_REFRESH="false", ANIMELAB_UPDATE_CHECK_DISABLED="true")
@@ -182,17 +278,10 @@ def start(data_dir, cache_dir, port, token, test_mode=False):
     from java import jclass
     from animelab import media_tools, platform_events
     media_tools.configure_android(jclass("com.animan.app.MediaBridge"), jclass("com.animan.app.CryptoBridge"))
-    from animelab.services import android_extensions
-    if jclass('com.animan.app.BuildConfig').EXTENSION_RUNTIME_ENABLED:
-        android_extensions.configure(jclass("com.animan.app.ExtensionBridge"))
     hooks = jclass("com.animan.app.NativeHooks")
-    verification = jclass("com.animan.app.VerificationBridge")
-    from animelab.services.source_http import source_http
-    source_http.default_user_agent = source_http.valid_user_agent(str(verification.userAgent()))
     storage = jclass("com.animan.app.StorageAccess")
+    engine_host = jclass("com.animan.app.EngineHost")
     update_environment(ANIMELAB_RELEASE_VERSION=str(jclass('com.animan.app.BuildConfig').RELEASE_VERSION))
-    from animelab.services.seanime_runtime import seanime_runtime
-    seanime_runtime.configure_android(jclass("com.animan.app.SeanimeJsBridge"))
     platform_events.storage_status_handler = lambda: json.loads(str(storage.status()))
     platform_events.storage_action_handler = lambda action: json.loads(str(storage.request(action)))
     platform_events.exported_copy_exists_handler = lambda uri: bool(hooks.exportedCopyExists(uri))
@@ -206,43 +295,27 @@ def start(data_dir, cache_dir, port, token, test_mode=False):
     platform_events.app_update_install_handler = lambda path: json.loads(str(extension_bridge.installAppUpdate(path)))
     platform_events.app_update_status_handler = lambda op_id: json.loads(str(extension_bridge.appUpdateStatus(op_id or "")))
     platform_events.app_update_confirm_handler = lambda op_id, path: json.loads(str(extension_bridge.confirmAppUpdate(op_id or "", path or "")))
+
     import run
     from animelab.android_security import AndroidSessionMiddleware
-    from animelab.models.download_task import DownloadStatus, ExportStatus
-    from animelab.services.download_manager import download_manager
     run.app.add_middleware(AndroidSessionMiddleware, token=token)
-    run.browser_verification.platform = "android"
-    opener = lambda url, auto_close=True: VerificationWindow(url, verification, auto_close=auto_close)
-    opener.seed_cookies = lambda url, cookies: VerificationWindow.seed_cookies(url, cookies, verification)
-    opener.user_agent = lambda: str(verification.userAgent())
-    run.browser_verification.webview_opener = opener
 
-    def notify(task):
-        active = [t for t in download_manager.get_all_tasks() if t.status in (
-            DownloadStatus.PENDING, DownloadStatus.DOWNLOADING, DownloadStatus.RETRYING, DownloadStatus.MUXING)
-            or (t.exportStatus == ExportStatus.EXPORTING and not t.paused and not t.cancelled)]
-        native_status = "CANCELLED" if task.cancelled else "PAUSED" if task.paused else "EXPORTING" if task.exportStatus == ExportStatus.EXPORTING else task.status.value
-        if not hooks.progress(len(active), int(task.progress), task.fileName, task.id, native_status) and active and _loop:
-            _loop.call_soon_threadsafe(download_manager.pause_all_downloads)
+    def _configure_core_bridges():
+        _ensure_source_http_configured()
+        _ensure_browser_verification_configured()
+        _ensure_download_hooks_configured()
+        _ensure_android_extensions_configured()
+        _ensure_seanime_configured()
 
-    platform_events.progress_handler = notify
-    def export_completed(task):
-        if not task.savePath or not Path(task.savePath).is_file():
-            raise FileNotFoundError("The private download is missing")
-        paths = [path for path in dict.fromkeys(platform_events.completed_paths(task)) if path and Path(path).is_file()]
-        if not paths:
-            raise FileNotFoundError("The private download is missing")
-        uris = [str(hooks.exportFile(path, task.id)) for path in paths]
-        destination = json.loads(str(storage.status()))["destination"]
-        # Release private staging copies once every file is verified & published in shared storage.
-        download_manager._release_private_paths(paths)
-        return {"uris": uris, "destination": destination}
+    run.progressive_loader.register_hook("core_services", _configure_core_bridges)
+    run.progressive_loader.register_hook("extensions", _ensure_android_extensions_configured)
+    run.progressive_loader.register_hook("sources", _ensure_seanime_configured)
 
-    platform_events.completed_handler = export_completed
     original_lifespan = run.app.router.lifespan_context
 
     async def startup_cleanup():
         try:
+            from animelab.services.download_manager import download_manager
             await asyncio.to_thread(
                 download_manager.startup_android_storage_cleanup,
                 lambda uri: bool(hooks.exportedCopyExists(uri)),
@@ -257,26 +330,37 @@ def start(data_dir, cache_dir, port, token, test_mode=False):
     async def lifespan(app):
         global _loop
         _loop = asyncio.get_running_loop()
-        async with original_lifespan(app):
-            hooks.ready()
+        post_warmup_tasks = []
+
+        def _on_full_ready():
+            engine_host.markFullReady()
             from animelab.services.extension_service import extension_service
+
             async def discover_apks():
                 try:
                     await asyncio.to_thread(extension_service.sync_android_extensions)
                 except Exception as failure:
                     import logging
-                    logging.getLogger('animelab.extensions').warning('Découverte APK indisponible (%s)',type(failure).__name__)
-            discovery = asyncio.create_task(discover_apks())
-            cleanup_task = asyncio.create_task(startup_cleanup())
+                    logging.getLogger('animelab.extensions').warning('Découverte APK indisponible (%s)', type(failure).__name__)
+
+            if _loop is not None:
+                post_warmup_tasks.append(_loop.create_task(discover_apks()))
+                post_warmup_tasks.append(_loop.create_task(startup_cleanup()))
+
+        run.progressive_loader.register_hook("full_ready", _on_full_ready)
+
+        async with original_lifespan(app):
+            hooks.ready()
+            if not run.PROGRESSIVE_BOOT:
+                _on_full_ready()
             try:
                 yield
             finally:
-                discovery.cancel()
-                cleanup_task.cancel()
-                with suppress(asyncio.CancelledError):
-                    await discovery
-                with suppress(asyncio.CancelledError):
-                    await cleanup_task
+                for task in post_warmup_tasks:
+                    task.cancel()
+                for task in post_warmup_tasks:
+                    with suppress(asyncio.CancelledError):
+                        await task
         _loop = None
 
     run.app.router.lifespan_context = lifespan

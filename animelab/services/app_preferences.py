@@ -1,20 +1,30 @@
 """Installation/account preferences, independent of WebView origins and ports."""
 import json
-from animelab.database import sqlite_connection
+import sqlite3
+from animelab.sqlite_conn import sqlite_connection
 
 DEFAULTS = {'onboardingCompleted': False, 'theme': None, 'palette': None,
             'checkUpdates': True, 'updateChannel': 'beta', 'downloadDirectory': None, 'lastSeenVersion': None}
 
 
-def load():
+def _read_startup_row():
     with sqlite_connection() as conn:
-        row = conn.execute("SELECT value FROM app_preferences WHERE key='startup'").fetchone()
+        return conn.execute("SELECT value FROM app_preferences WHERE key='startup'").fetchone()
+
+
+def load():
+    try:
+        row = _read_startup_row()
+    except sqlite3.OperationalError as exc:
+        if 'app_preferences' not in str(exc):
+            raise
+        from animelab.database import init_db
+        init_db()
+        row = _read_startup_row()
     return {**DEFAULTS, **(json.loads(row['value']) if row else {})}
 
 
-def save(changes):
-    # Read/merge/write under the same write lock: completing setup must not
-    # overwrite a concurrent update-channel or appearance change.
+def _write_startup_values(changes):
     with sqlite_connection() as conn:
         conn.execute('BEGIN IMMEDIATE')
         row = conn.execute("SELECT value FROM app_preferences WHERE key='startup'").fetchone()
@@ -22,6 +32,19 @@ def save(changes):
         conn.execute("INSERT INTO app_preferences(key,value) VALUES('startup',?) "
                      'ON CONFLICT(key) DO UPDATE SET value=excluded.value', (json.dumps(values),))
     return values
+
+
+def save(changes):
+    # Read/merge/write under the same write lock: completing setup must not
+    # overwrite a concurrent update-channel or appearance change.
+    try:
+        return _write_startup_values(changes)
+    except sqlite3.OperationalError as exc:
+        if 'app_preferences' not in str(exc):
+            raise
+        from animelab.database import init_db
+        init_db()
+        return _write_startup_values(changes)
 
 
 def restore_download_directory():

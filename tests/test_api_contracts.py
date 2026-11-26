@@ -84,6 +84,21 @@ async def test_invalid_download_is_rejected_before_queueing_and_does_not_echo_se
     assert definition['properties']['episodeNumber']['type'] == 'integer'
 
 
+def test_contract_route_defers_openapi_schema_until_requested(monkeypatch):
+    from animelab.routers.download import router
+    app = FastAPI()
+    app.router.route_class = ContractRoute
+    install_contract_schema(app)
+    app.include_router(router)
+    download_route = next(r for r in router.routes if getattr(r, 'path', None) == '/api/download' and 'POST' in getattr(r, 'methods', set()))
+    download_route._contract_schema_attached = False
+    download_route.openapi_extra = None
+    assert 'requestBody' not in (download_route.openapi_extra or {})
+    schema = app.openapi()
+    assert download_route._contract_schema_attached is True
+    assert 'requestBody' in schema['paths']['/api/download']['post']
+
+
 def test_schema_download_response_detects_contract_drift():
     from animelab.models.download_task import DownloadTask
     wire = DownloadTask().to_dict()

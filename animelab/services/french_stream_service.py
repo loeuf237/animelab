@@ -175,7 +175,7 @@ def normalize_french_stream_url(url: str, base_url: Optional[str] = None) -> str
 class FrenchStreamService:
     """Scraper and stream resolver for French-Stream (`fstream.net` -> `fs*.lol`)."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, lazy: bool = False) -> None:
         self.base_url: str = settings.FRENCH_STREAM_URL.rstrip("/")
         self.portal_url: str = settings.FRENCH_STREAM_PORTAL_URL.rstrip("/")
         self.lang: str = "fr"
@@ -185,6 +185,13 @@ class FrenchStreamService:
         self.last_mirror_check: float = 0.0
         self.is_refreshing: bool = False
         self._refresh_task: Optional[asyncio.Task[Any]] = None
+        self._cache_loaded: bool = False
+        if not lazy:
+            self._load_persistent_cache()
+
+    def _ensure_persistent_cache_loaded(self) -> None:
+        if getattr(self, "_cache_loaded", True):
+            return
         self._load_persistent_cache()
 
     def get_allowed_domains(self) -> set[str]:
@@ -204,6 +211,7 @@ class FrenchStreamService:
         return normalize_french_stream_url(url, self.base_url)
 
     def _load_persistent_cache(self) -> None:
+        self._cache_loaded = True
         try:
             cache_file = settings.CACHE_DIR / "latest_french_stream.json"
             if cache_file.exists():
@@ -310,6 +318,7 @@ class FrenchStreamService:
     # -------------------------------------------------------------------------
 
     async def get_latest_releases(self) -> List[AnimeResult]:
+        self._ensure_persistent_cache_loaded()
         state = source_http.state(self.base_url)
         if state.blocked_url:
             self.last_cache_time = 0
@@ -871,4 +880,4 @@ class FrenchStreamService:
         return {}
 
 
-french_stream_service = FrenchStreamService()
+french_stream_service = FrenchStreamService(lazy=True)

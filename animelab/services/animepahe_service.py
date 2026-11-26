@@ -23,7 +23,7 @@ logger = logging.getLogger("animelab.animepahe")
 
 
 class AnimepaheService:
-    def __init__(self):
+    def __init__(self, *, lazy: bool = False):
         self.base_url = settings.ANIMEPAHE_URL.rstrip("/")
         self.backup_urls = [u.rstrip("/") for u in settings.ANIMEPAHE_BACKUP_URLS]
         self.cookie = settings.ANIMEPAHE_COOKIE
@@ -32,9 +32,17 @@ class AnimepaheService:
         self.is_refreshing: bool = False
         self._cookies_cache: Optional[Dict[str, str]] = None
         self._cookies_cache_time: float = 0.0
+        self._cache_loaded: bool = False
+        if not lazy:
+            self._load_persistent_cache()
+
+    def _ensure_persistent_cache_loaded(self):
+        if getattr(self, "_cache_loaded", True):
+            return
         self._load_persistent_cache()
 
     def _load_persistent_cache(self):
+        self._cache_loaded = True
         try:
             cache_file = settings.CACHE_DIR / "latest_animepahe.json"
             if cache_file.exists():
@@ -208,6 +216,7 @@ class AnimepaheService:
     # -------------------------------------------------------------------------
 
     async def get_latest_releases(self) -> List[AnimeResult]:
+        self._ensure_persistent_cache_loaded()
         state = source_http.state(self.base_url)
         if state.blocked_url:
             blocked = state.blocked_url
@@ -598,4 +607,4 @@ class AnimepaheService:
         return None
 
 
-animepahe_service = AnimepaheService()
+animepahe_service = AnimepaheService(lazy=True)

@@ -1,5 +1,6 @@
 /** The personal SPA owns PWA registration; shared accounts disable offline caching. */
 export function initializePwa(): void {
+  if (typeof window !== 'undefined' && 'AnimeLabAndroid' in window) return
   if (!('serviceWorker' in navigator)) return
   const register = () => {
     navigator.serviceWorker

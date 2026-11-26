@@ -29,8 +29,8 @@ android {
         applicationId = "com.animan.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 229
-        versionName = "0.3.1"
+        versionCode = 230
+        versionName = "0.3.2"
         buildConfigField("String", "RELEASE_VERSION", "\"${System.getenv("RELEASE_TAG")?.removePrefix("android-v")?.removePrefix("v") ?: versionName}\"")
         manifestPlaceholders["appLabel"] = "@string/app_name"
 
@@ -81,6 +81,7 @@ android {
     // The temporary validation key is never used by the publication job.
     testBuildType = if (System.getenv("ANIMAN_ANDROID_KEYSTORE").isNullOrBlank()) "validation" else "release"
     sourceSets["androidTest"].assets.srcDir(layout.buildDirectory.dir("generated/native-test-fixture"))
+    sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/spa-assets"))
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -144,6 +145,7 @@ val syncPythonSource by tasks.registering(Sync::class) {
         exclude("**/*.pyc")
         exclude("animelab/Artefacts/**")
         exclude("animelab/ressources/**")
+        exclude("animelab/desktop/**")
     }
     into("${projectDir}/src/main/python")
     if (optimizeApk) {
@@ -178,6 +180,26 @@ tasks.matching { it.name.matches(Regex("generate(Release|Validation)PythonRequir
             }
         }
     }
+
+val syncSpaAssets by tasks.registering(Sync::class) {
+    val distDir = rootProject.file("../frontend/dist")
+    if (distDir.isDirectory) {
+        from(distDir) {
+            exclude(
+                "img/icon-512.png",
+                "img/icon-maskable.png",
+                "favicon.ico",
+            )
+        }
+    }
+    into(layout.buildDirectory.dir("generated/spa-assets/spa"))
+}
+
+tasks.configureEach {
+    if (name.startsWith("merge") && name.endsWith("Assets") && !name.endsWith("AndroidTestAssets")) {
+        dependsOn(syncSpaAssets)
+    }
+}
 
 tasks.matching { it.name.contains("Python") && it.name != "syncPythonSource" }.configureEach {
     dependsOn(syncPythonSource)

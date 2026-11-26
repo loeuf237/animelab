@@ -1,24 +1,13 @@
 """Shared SQLite connection policy, migrations and explicit units of work."""
 from contextlib import contextmanager
 from pathlib import Path
-import sqlite3
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import declarative_base, sessionmaker
 from animelab.config import settings
+from animelab.sqlite_conn import configure_connection, sqlite_connection
 
 Base = declarative_base()
-
-
-def configure_connection(connection):
-    cursor = connection.cursor()
-    try:
-        cursor.execute('PRAGMA journal_mode=WAL')
-        cursor.execute('PRAGMA synchronous=NORMAL')
-        cursor.execute('PRAGMA busy_timeout=5000')
-        cursor.execute('PRAGMA foreign_keys=ON')
-    finally:
-        cursor.close()
 
 
 def create_database_engine(url):
@@ -29,22 +18,6 @@ def create_database_engine(url):
 
 engine = create_database_engine(settings.DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, expire_on_commit=False, bind=engine)
-
-
-@contextmanager
-def sqlite_connection(path=None):
-    """Commit/rollback and CLOSE every settings connection, including failures."""
-    path = str(path or settings.DATABASE_PATH)
-    if path != ':memory:':
-        Path(path).parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(path, timeout=5)
-    connection.row_factory = sqlite3.Row
-    try:
-        configure_connection(connection)
-        with connection:
-            yield connection
-    finally:
-        connection.close()
 
 
 @contextmanager
@@ -63,6 +36,7 @@ def transaction(factory=None):
 
 def init_db(path=None):
     import animelab.models  # Register models before applying the first migration.
+    animelab.models.register_all()
     from animelab.migrations import migrate
     owned = path is not None and str(path) != str(settings.DATABASE_PATH)
     if owned and str(path) != ':memory:':

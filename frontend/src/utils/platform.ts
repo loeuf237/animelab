@@ -9,8 +9,15 @@ interface AndroidUiBridge {
   haptic?: (kind: HapticKind) => void
   setKeepScreenOn?: (enabled: boolean) => void
   getPlatformInfo?: () => string
+  getEngineState?: () => string
   exportDiagnostics?: (jsonPayload: string) => string
   openExternalPlayer?: (payloadJson: string) => string
+}
+
+export interface AndroidEngineState {
+  ready: boolean
+  fullyReady: boolean
+  error: string | null
 }
 
 interface PyWebViewBridge {
@@ -233,4 +240,79 @@ export async function chooseDesktopExternalPlayer(): Promise<string | null> {
   } catch {
     return null
   }
+}
+
+export function readAndroidEngineState(): AndroidEngineState | null {
+  if (typeof window === 'undefined') return null
+  const fn = (window as NativeWindow).AnimeLabAndroid?.getEngineState
+  if (typeof fn !== 'function') return null
+  try {
+    const raw = fn()
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as {
+      ready?: unknown
+      fullyReady?: unknown
+      error?: unknown
+    }
+    return {
+      ready: Boolean(parsed?.ready),
+      fullyReady: Boolean(parsed?.fullyReady),
+      error: typeof parsed?.error === 'string' && parsed.error ? parsed.error : null,
+    }
+  } catch {
+    return null
+  }
+}
+
+export function isAndroidEngineBooting(): boolean {
+  const state = readAndroidEngineState()
+  return state !== null && !state.ready && !state.error
+}
+
+export function waitForAndroidEngine(
+  signal?: AbortSignal,
+): Promise<{ ready: boolean; error?: string }> {
+  if (typeof window === 'undefined') return Promise.resolve({ ready: true })
+  const initial = readAndroidEngineState()
+  if (!initial || initial.ready) return Promise.resolve({ ready: true })
+  if (initial.error) return Promise.resolve({ ready: false, error: initial.error })
+  if (signal?.aborted) return Promise.resolve({ ready: false, error: 'Aborted' })
+
+  return new Promise((resolve) => {
+    let settled = false
+    let pollTimer: ReturnType<typeof setInterval> | null = null
+
+    const finish = (result: { ready: boolean; error?: string }) => {
+      if (settled) return
+      settled = true
+      window.removeEventListener('animelab:engine-ready', onReady)
+      window.removeEventListener('animelab:engine-error', onError)
+      signal?.removeEventListener('abort', onAbort)
+      if (pollTimer !== null) {
+        clearInterval(pollTimer)
+        pollTimer = null
+      }
+      resolve(result)
+    }
+
+    const onReady = () => finish({ ready: true })
+    const onError = (event: Event) => {
+      const detail = (event as CustomEvent<unknown>)?.detail
+      const latest = readAndroidEngineState()
+      const message =
+        typeof detail === 'string' && detail.trim() ? detail : latest?.error || undefined
+      finish({ ready: false, error: message })
+    }
+    const onAbort = () => finish({ ready: false, error: 'Aborted' })
+
+    window.addEventListener('animelab:engine-ready', onReady)
+    window.addEventListener('animelab:engine-error', onError)
+    signal?.addEventListener('abort', onAbort, { once: true })
+
+    pollTimer = setInterval(() => {
+      const state = readAndroidEngineState()
+      if (!state || state.ready) finish({ ready: true })
+      else if (state.error) finish({ ready: false, error: state.error })
+    }, 150)
+  })
 }

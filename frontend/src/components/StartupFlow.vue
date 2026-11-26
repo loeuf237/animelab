@@ -37,9 +37,11 @@
           <p class="setup-description" role="status">
             {{
               tx(
-                flow.checking
-                  ? 'Recherche d’une nouvelle version…'
-                  : 'Préparation de votre espace…',
+                flow.engineStarting
+                  ? 'Démarrage du moteur…'
+                  : flow.checking
+                    ? 'Recherche d’une nouvelle version…'
+                    : 'Préparation de votre espace…',
               )
             }}
           </p>
@@ -47,7 +49,9 @@
             <p>
               {{
                 tx(
-                  'La vérification ne télécharge que les informations de version. Aucun fichier d’installation n’est téléchargé sans votre accord.',
+                  flow.engineStarting
+                    ? 'Le moteur local démarre en arrière-plan…'
+                    : 'La vérification ne télécharge que les informations de version. Aucun fichier d’installation n’est téléchargé sans votre accord.',
                 )
               }}
             </p>
@@ -314,7 +318,7 @@
           <button v-if="flow.error" class="setup-primary" @click="flow.initialize()">
             {{ tx('Réessayer') }}
           </button>
-          <button class="setup-outlined" @click="flow.skipCheck()">
+          <button v-if="!flow.engineStarting" class="setup-outlined" @click="flow.skipCheck()">
             {{ tx('Continuer sans vérifier') }}
           </button>
         </template>

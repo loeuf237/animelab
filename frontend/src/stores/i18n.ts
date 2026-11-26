@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { api } from '@/api/client'
 import catalogs from '@/locales/catalogs.json'
 import { language, applyLanguage, type Language } from '@/utils/locale'
+import { isAndroidEngineBooting, waitForAndroidEngine } from '@/utils/platform'
 
 export const useI18nStore = defineStore('i18n', () => {
   const currentLang = language
@@ -12,6 +13,13 @@ export const useI18nStore = defineStore('i18n', () => {
   async function load(lang: Language) {
     const current = ++generation
     translations.value = catalogs[lang]
+    if (isAndroidEngineBooting()) {
+      const engine = await waitForAndroidEngine()
+      if (current !== generation || !engine.ready) {
+        if (current === generation) isLoaded.value = true
+        return
+      }
+    }
     try {
       const res = await api.getTranslations(lang)
       if (current === generation && res?.translations)

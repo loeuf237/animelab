@@ -1,11 +1,6 @@
 import uuid
 from datetime import datetime, timezone
 from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import select
-from animelab.database import transaction
-from animelab.models.playback import PlaybackProgress
-from animelab.models.download_task import DownloadTaskEntity
-from animelab.models.auto_download import episode_version
 from animelab.api_errors import APIProblem
 
 
@@ -49,6 +44,12 @@ class PlaybackState(BaseModel):
 
 class PlaybackService:
     def open(self, body: PlaybackOpen):
+        from sqlalchemy import select
+        from animelab.database import transaction
+        from animelab.models.playback import PlaybackProgress
+        from animelab.models.download_task import DownloadTaskEntity
+        from animelab.models.auto_download import episode_version
+
         source, url, number, version = body.source,body.animeUrl,body.episodeNumber,episode_version(body.version)
         with transaction() as db:
             # Serialize the read/update pair across browser windows/processes.
@@ -75,6 +76,10 @@ class PlaybackService:
                 positionSeconds=position,durationSeconds=row.durationSeconds,selection=PlaybackSelection.model_validate_json(row.selectionJson))
 
     def save(self, body: PlaybackSave):
+        from sqlalchemy import select
+        from animelab.database import transaction
+        from animelab.models.playback import PlaybackProgress
+
         with transaction() as db:
             db.connection().exec_driver_sql('BEGIN IMMEDIATE')
             row=db.scalar(select(PlaybackProgress).filter_by(sessionId=body.sessionId))

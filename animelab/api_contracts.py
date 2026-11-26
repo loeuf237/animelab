@@ -531,6 +531,9 @@ class ContractRoute(APIRoute):
         name = endpoint.__name__
         api = path.startswith('/api/') or endpoint.__module__.endswith(('.network', '.sources'))
         self.contract_request = REQUESTS.get(name) if api else None
+        self._request_adapter = None
+        self._response_adapter = None
+        self._contract_schema_attached = False
         if api and name not in BINARY:
             # JSONResponse handlers are validated explicitly below, too.
             kwargs['response_model'] = RESPONSES.get(name, JsonValue)
@@ -545,23 +548,35 @@ class ContractRoute(APIRoute):
                 500: {'model': ErrorResponse, 'description': 'Internal failure'},
                 502: {'model': ErrorResponse, 'description': 'Upstream network failure'}}
         super().__init__(path, endpoint, **kwargs)
-        if self.contract_request:
-            schema = TypeAdapter(self.contract_request).json_schema(ref_template='#/components/schemas/{model}')
-            self.contract_definitions = schema.pop('$defs', {})
-            self.openapi_extra = {**(self.openapi_extra or {}), 'requestBody': {'required': True,
-                'content': {'application/json': {'schema': schema}}}}
+
+    def attach_contract_openapi(self):
+        if self._contract_schema_attached or not self.contract_request:
+            return
+        if self._request_adapter is None:
+            self._request_adapter = TypeAdapter(self.contract_request)
+        schema = self._request_adapter.json_schema(ref_template='#/components/schemas/{model}')
+        self.contract_definitions = schema.pop('$defs', {})
+        self.openapi_extra = {
+            **(self.openapi_extra or {}),
+            'requestBody': {'required': True, 'content': {'application/json': {'schema': schema}}},
+        }
+        self._contract_schema_attached = True
 
     def get_route_handler(self):
         original = super().get_route_handler()
+        response_model = RESPONSES.get(self.endpoint.__name__)
         async def handler(request: Request):
             if self.contract_request:
+                if self._request_adapter is None:
+                    self._request_adapter = TypeAdapter(self.contract_request)
+                adapter = self._request_adapter
                 try:
                     raw = await request.json()
-                    data = TypeAdapter(self.contract_request).validate_python(raw)
+                    data = adapter.validate_python(raw)
                     # Legacy handlers still read request.json(); give them the
                     # validated wire values, preserving PATCH omission semantics.
                     request._json = (data.model_dump(exclude_unset=True, mode='json') if isinstance(data, BaseModel)
-                                     else TypeAdapter(self.contract_request).dump_python(data, mode='json', exclude_unset=True))
+                                     else adapter.dump_python(data, mode='json', exclude_unset=True))
                 except (ValidationError, ValueError) as exc:
                     errors = exc.errors() if isinstance(exc, ValidationError) else [{'type': 'json_invalid', 'loc': ('body',), 'msg': 'Invalid JSON'}]
                     if self.endpoint.__name__ in ('set_language', 'android_storage_action', 'toggle_extension_api'):
@@ -579,22 +594,41 @@ class ContractRoute(APIRoute):
                     payload.setdefault('problem', problem_for(500, payload, category=category).model_dump())
                     response.body = json.dumps(payload, ensure_ascii=False).encode()
                     response.headers['content-length'] = str(len(response.body))
-            if response.status_code < 400 and self.endpoint.__name__ in RESPONSES and hasattr(response, 'body'):
-                TypeAdapter(RESPONSES[self.endpoint.__name__]).validate_json(response.body)
+            if response.status_code < 400 and response_model is not None and hasattr(response, 'body'):
+                if self._response_adapter is None:
+                    self._response_adapter = TypeAdapter(response_model)
+                self._response_adapter.validate_json(response.body)
             return response
         return handler
 
 
 def install_contract_schema(app):
     from fastapi.openapi.utils import get_openapi
+    from fastapi.routing import iter_route_contexts
+
     def schema():
         if app.openapi_schema is None:
             import warnings
+            contract_bodies = []
+            for ctx in iter_route_contexts(app.routes):
+                orig = getattr(ctx, 'original_route', None)
+                if isinstance(orig, ContractRoute) and orig.contract_request and getattr(ctx, 'include_in_schema', True):
+                    orig.attach_contract_openapi()
+                    contract_bodies.append((ctx.path_format, ctx.methods or (), orig.openapi_extra['requestBody']))
             # FastAPI assigns one ID to multi-method media routes. Give each
             # operation its own stable ID after generation (including HEAD).
             with warnings.catch_warnings():
                 warnings.filterwarnings('ignore', message='Duplicate Operation ID .*', category=UserWarning)
                 result = get_openapi(title=app.title, version=app.version, routes=app.routes)
+            paths = result.setdefault('paths', {})
+            for path_format, methods, request_body in contract_bodies:
+                path_item = paths.get(path_format)
+                if not isinstance(path_item, dict):
+                    continue
+                for method in methods:
+                    operation = path_item.get(method.lower())
+                    if isinstance(operation, dict) and 'requestBody' not in operation:
+                        operation['requestBody'] = request_body
             for path, operations in result['paths'].items():
                 for method, operation in operations.items():
                     if isinstance(operation, dict) and 'operationId' in operation:
