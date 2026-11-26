@@ -119,6 +119,8 @@ object SpaAssetInterceptor {
         val headers = linkedMapOf(
             "Cache-Control" to cacheControl,
             "X-Content-Type-Options" to "nosniff",
+            "Access-Control-Allow-Origin" to EngineHost.baseUrl,
+            "Vary" to "Origin",
         )
         return WebResourceResponse(mime, encoding, 200, "OK", headers, stream)
     }

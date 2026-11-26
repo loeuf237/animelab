@@ -37,16 +37,17 @@ for name in ('ffmpeg', 'ffprobe'):
 hiddenimports = ['uvicorn.logging', 'uvicorn.loops.auto', 'uvicorn.loops.asyncio',
     'uvicorn.protocols.http.h11_impl', 'uvicorn.protocols.websockets.websockets_impl',
     'uvicorn.lifespan.on', 'sqlalchemy.dialects.sqlite', 'yt_dlp', '_cffi_backend', 'PySide6.QtWidgets']
-hiddenimports += collect_submodules('animelab.services.extractors')
+hiddenimports += collect_submodules('animelab.models')
+hiddenimports += collect_submodules('animelab.routers')
+hiddenimports += collect_submodules('animelab.services')
 hiddenimports += [
-    'animelab.services.recipe_runtime',
-    'animelab.services.recipe_plans',
+    'animelab.database',
+    'animelab.migrations',
+    'animelab.progressive',
+    'animelab.request_origin',
+    'animelab.sqlite_conn',
+    'animelab.version_info',
     'py_mini_racer',
-    'animelab.services.seanime_service',
-    'animelab.services.seanime_runtime',
-    'animelab.services.seanime_catalog',
-    'animelab.services.seanime_ts',
-    'animelab.services.seanime_source',
 ]
 if sys.platform == 'win32':
     hiddenimports += ['webview.platforms.edgechromium', 'webview.platforms.winforms']

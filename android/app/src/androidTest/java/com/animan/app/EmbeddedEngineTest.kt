@@ -28,37 +28,47 @@ import java.util.concurrent.atomic.AtomicBoolean
 class EmbeddedEngineTest {
     private fun completeFirstRun(scenario: ActivityScenario<MainActivity>) {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60)
+        var lastState = "init"
         while (System.nanoTime() < deadline) {
             val checked = CountDownLatch(1)
             val ready = AtomicBoolean(false)
             scenario.onActivity { activity ->
-                activity.findViewById<WebView>(R.id.webView).evaluateJavascript("""
+                val webView = activity.findViewById<WebView>(R.id.webView)
+                val url = webView.url
+                val loadingVis = activity.findViewById<android.view.View>(R.id.loadingLayout).visibility
+                webView.evaluateJavascript("""
                     (() => {
                         const setup = document.querySelector('.startup-page');
                         if (!setup) {
-                            if (!document.querySelector('#main-content')) return false;
+                            if (!document.querySelector('#main-content')) return 'NO_UI|' + (document.body?.innerText || '').slice(0, 120);
                             if (window.location.pathname !== '/spa/') {
                                 const home = document.querySelector('a[href="/spa/"]');
                                 if (home) home.click();
-                                return false;
+                                return 'NAV|' + window.location.pathname;
                             }
-                            return true;
+                            return 'DONE';
                         }
                         const buttons = [...setup.querySelectorAll('button')];
                         const next = buttons.find(b => !b.disabled && ['Suivant','Next','Commencer','Get started','Continuer','Continue','Pas maintenant','Not now'].includes(b.textContent.trim()));
-                        if (next) { next.click(); return false; }
+                        if (next) { next.click(); return 'CLICK|' + next.textContent.trim(); }
                         const folder = buttons.find(b => !b.disabled && b.textContent.trim() === 'Utiliser Downloads/AnimeLab');
                         const englishFolder = buttons.find(b => !b.disabled && b.textContent.trim() === 'Use Downloads/AnimeLab');
-                        (folder || englishFolder)?.click();
-                        return false;
+                        if (folder || englishFolder) { (folder || englishFolder).click(); return 'FOLDER'; }
+                        const state = window.AnimeLabAndroid?.getEngineState?.() || 'no-bridge';
+                        const err = setup.querySelector('.setup-error')?.textContent?.trim() || '';
+                        return 'WAIT|' + state + '|err=' + err + '|' + (setup.textContent || '').replace(/\s+/g, ' ').slice(0, 140);
                     })()
-                """.trimIndent()) { ready.set(it == "true"); checked.countDown() }
+                """.trimIndent()) {
+                    lastState = "url=$url loadingVis=$loadingVis timing=${EngineHost.timingJson()} dom=$it"
+                    ready.set(it == "\"DONE\"")
+                    checked.countDown()
+                }
             }
             checked.await(5, TimeUnit.SECONDS)
             if (ready.get()) return
             Thread.sleep(250)
         }
-        fail("First-run configuration did not reach the library")
+        fail("First-run configuration did not reach the library [$lastState]")
     }
 
     @org.junit.After fun removeIsolatedProbeExports() {

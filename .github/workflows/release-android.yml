@@ -248,7 +248,7 @@ jobs:
           # Emulator-only ADB access for collecting test evidence on API 30;
           # this does not grant extra storage privileges to the application.
           script: |
-            adb root
+            adb root || (sleep 3 && adb root)
             adb wait-for-device
             python scripts/android_run_probes.py android-validation android-test-results
       - uses: actions/upload-artifact@v4
