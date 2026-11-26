@@ -2,8 +2,12 @@
 from contextlib import contextmanager
 from pathlib import Path
 import sqlite3
+import threading
+import time
 
 from animelab.config import settings
+
+_WAL_LOCK = threading.Lock()
 
 
 def configure_connection(connection):
@@ -12,7 +16,20 @@ def configure_connection(connection):
         cursor.execute('PRAGMA busy_timeout=30000')
         mode = cursor.execute('PRAGMA journal_mode').fetchone()
         if not mode or str(mode[0]).lower() != 'wal':
-            cursor.execute('PRAGMA journal_mode=WAL')
+            with _WAL_LOCK:
+                mode = cursor.execute('PRAGMA journal_mode').fetchone()
+                if not mode or str(mode[0]).lower() != 'wal':
+                    for attempt in range(6):
+                        try:
+                            cursor.execute('PRAGMA journal_mode=WAL')
+                            break
+                        except sqlite3.OperationalError as exc:
+                            detail = str(exc).lower()
+                            if 'locked' not in detail and 'busy' not in detail:
+                                raise
+                            if attempt == 5:
+                                raise
+                            time.sleep(0.05 * (attempt + 1))
         cursor.execute('PRAGMA synchronous=NORMAL')
         cursor.execute('PRAGMA foreign_keys=ON')
     finally:
