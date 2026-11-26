@@ -214,6 +214,50 @@ test('an installed update is acknowledged once without resetting setup', async (
   await expect(page.getByRole('heading', { name: /installée$/ })).toHaveCount(0)
 })
 
+test('returning users enter immediately without waiting on update checks', async ({ page }) => {
+  await installation(page, { completed: true })
+  let releaseUpdateCheck
+  const updateRequested = new Promise((resolve) => {
+    releaseUpdateCheck = resolve
+  })
+  await page.route('**/api/app/updates', async (route) => {
+    releaseUpdateCheck()
+    await new Promise((resolve) => setTimeout(resolve, 600))
+    return route.fulfill({
+      json: {
+        status: 'available',
+        currentVersion: '0.1.6-beta.3',
+        channel: 'beta',
+        release: {
+          version: '0.1.7-beta.1',
+          notes: '# Changes\n- Faster startup',
+          url: 'https://github.com/loeuf237/animelab/releases/tag/v0.1.7-beta.1',
+          assets: [
+            {
+              name: 'AnimeLab-Linux-x64.tar.gz',
+              label: 'Linux',
+              url: 'https://github.com/loeuf237/animelab/releases/download/v0.1.7-beta.1/AnimeLab.tar.gz',
+              size: 120,
+            },
+          ],
+        },
+      },
+    })
+  })
+
+  await page.goto('/app/library')
+  await expect(page.getByRole('heading', { name: 'Ma Bibliothèque' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Nouvelle version disponible !' })).toHaveCount(0)
+
+  await updateRequested
+  const updateNotifBtn = page
+    .locator('.notification-region')
+    .getByRole('button', { name: 'Mettre à jour', exact: true })
+  await expect(updateNotifBtn).toBeVisible()
+  await updateNotifBtn.click()
+  await expect(page.getByRole('heading', { name: 'Nouvelle version disponible !' })).toBeVisible()
+})
+
 test('a failed preferences save keeps setup open and reports the error', async ({ page }) => {
   const { state } = await installation(page)
   await page.route('**/api/app/preferences', (route) =>

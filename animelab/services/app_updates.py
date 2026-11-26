@@ -23,36 +23,13 @@ from animelab.config import IS_ANDROID, settings
 from animelab.diagnostics import telemetry
 from animelab.environment import getenv
 from animelab.security import is_safe_url_async
+from animelab.version_info import VERSION, current_version, version_key
 
 logger = logging.getLogger(__name__)
 
 GITHUB_FEED = 'https://api.github.com/repos/loeuf237/animelab/releases?per_page=10'
 MAX_FEED_BYTES = 512 * 1024
 MAX_ASSET_BYTES = 512 * 1024 * 1024
-VERSION = re.compile(r'^(?:android-)?v?(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta|rc)[.-]?(\d+))?(?:\+[\w.-]+)?$')
-
-
-def current_version():
-    explicit = getenv('ANIMELAB_RELEASE_VERSION')
-    if explicit:
-        return explicit
-    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-        try:
-            data = json.loads((Path(sys._MEIPASS) / 'release-metadata' / 'build-info.json').read_text())
-            tag = data['release_tag']
-            version_key(tag)
-            return tag.removeprefix('v')
-        except (OSError, ValueError, KeyError, TypeError):
-            pass
-    return __version__
-
-
-def version_key(value):
-    match = VERSION.fullmatch(str(value))
-    if not match:
-        raise ValueError('Unsupported release version')
-    major, minor, patch, phase, serial = match.groups()
-    return (int(major), int(minor), int(patch), {'alpha': 0, 'beta': 1, 'rc': 2, None: 3}[phase], int(serial or 0))
 
 
 def public_https(value):

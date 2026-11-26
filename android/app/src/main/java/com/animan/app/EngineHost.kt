@@ -4,9 +4,13 @@ import android.app.Activity
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import androidx.core.content.FileProvider
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeoutOrNull
+import org.json.JSONObject
 import java.lang.ref.WeakReference
 import java.net.InetAddress
 import java.net.ServerSocket
@@ -22,7 +26,25 @@ object EngineHost {
     @Volatile var port = 0
         private set
     val baseUrl: String get() = "http://127.0.0.1:$port"
+    private val readyDeferred = CompletableDeferred<Boolean>()
+    @Volatile var startElapsedMs = 0L
+        private set
+    @Volatile var pythonStartedMs = 0L
+        private set
+    @Volatile var stage0ReadyMs = 0L
+        private set
+    @Volatile var fullReadyMs = 0L
+        private set
+    @Volatile var fullyReady = false
+        private set
     @Volatile var ready = false
+        set(value) {
+            field = value
+            if (value) {
+                if (stage0ReadyMs == 0L) stage0ReadyMs = SystemClock.elapsedRealtime()
+                readyDeferred.complete(true)
+            }
+        }
     @Volatile var error: String? = null
     @Volatile var activeCount = 0
     @Volatile var progress = 0
@@ -43,24 +65,59 @@ object EngineHost {
     fun foregroundActivity(): Activity? =
         foregroundActivityRef.get()?.get()?.takeIf { !it.isFinishing && !it.isDestroyed }
 
+    @JvmStatic fun markFullReady() {
+        if (fullReadyMs == 0L) fullReadyMs = SystemClock.elapsedRealtime()
+        fullyReady = true
+        android.util.Log.i("AnimanEngine", "ANIMAN_STARTUP_TIMING=${timingJson()}")
+    }
+
+    @JvmStatic fun timingJson(): String {
+        val origin = startElapsedMs
+        fun delta(stamp: Long): Long = if (origin > 0L && stamp >= origin) stamp - origin else -1L
+        return JSONObject()
+            .put("ready", ready)
+            .put("fullyReady", fullyReady)
+            .put("pythonStartMs", delta(pythonStartedMs))
+            .put("stage0ReadyMs", delta(stage0ReadyMs))
+            .put("fullReadyMs", delta(fullReadyMs))
+            .toString()
+    }
+
+    suspend fun awaitReady(timeoutMs: Long): Boolean {
+        if (ready) return true
+        if (error != null) return false
+        return withTimeoutOrNull(timeoutMs.coerceAtLeast(1L)) { readyDeferred.await() } == true
+    }
+
     @Synchronized fun start(applicationContext: Context, testMode: Boolean = false) {
         if (started) return
         started = true
+        startElapsedMs = SystemClock.elapsedRealtime()
         context = applicationContext.applicationContext
         ExtensionPackages.activityProvider = { foregroundActivity() }
         ExtensionPackages.apkUriProvider = { ctx, file ->
             FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
         }
         CrashReporter.install(context)
-        if (BuildConfig.EXTENSION_RUNTIME_ENABLED) ExtensionBridge.initialize(context)
+        if (BuildConfig.EXTENSION_RUNTIME_ENABLED) {
+            thread(name = "AnimanExtensionInit", isDaemon = true) {
+                try {
+                    ExtensionBridge.initialize(context)
+                } catch (failure: Exception) {
+                    android.util.Log.w("AnimanEngine", "Background extension init skipped", failure)
+                }
+            }
+        }
         port = ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { it.localPort }
         thread(name = "AnimanPythonEngine", isDaemon = true) {
             try {
                 if (!Python.isStarted()) Python.start(AndroidPlatform(context))
+                pythonStartedMs = SystemClock.elapsedRealtime()
                 Python.getInstance().getModule("android_runtime").callAttr("start",
                     context.filesDir.absolutePath, context.cacheDir.absolutePath, port, token, testMode)
             } catch (failure: Exception) {
                 error = failure.message ?: failure.javaClass.simpleName
+                readyDeferred.complete(false)
                 CrashReporter.recordWebViewError(context, "engine_start_failed", error ?: "unknown")
                 android.util.Log.e("AnimanEngine", "Embedded engine failed", failure)
                 main.post { DownloadService.finishIdle(context) }

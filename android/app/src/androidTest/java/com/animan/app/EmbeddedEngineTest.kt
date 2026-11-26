@@ -145,6 +145,10 @@ class EmbeddedEngineTest {
             assertTrue(page!!.second.contains("id=\"app\""))
             assertEquals(401, request("/api/download/status", false).first)
             assertEquals(200, request("/api/download/status").first)
+            assertEquals(401, request("/api/engine/readiness", false).first)
+            val readinessResp = request("/api/engine/readiness")
+            assertEquals(200, readinessResp.first)
+            assertTrue(JSONObject(readinessResp.second).getBoolean("ready"))
             completeFirstRun(scenario)
             waitForHome(scenario, "Vue did not render in the installed System WebView")
             val startup = JSONObject(request("/api/app/startup").second)
@@ -326,6 +330,7 @@ class EmbeddedEngineTest {
             } finally {
                 probeApk.delete()
             }
+            report.put("startup_timing", JSONObject(EngineHost.timingJson()))
             println("ANIMAN_ANDROID_PROBE=" + report.toString())
             val instrumentation = InstrumentationRegistry.getInstrumentation()
             val image = instrumentation.uiAutomation.takeScreenshot()

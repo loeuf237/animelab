@@ -1,4 +1,5 @@
 import asyncio
+import importlib
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -19,84 +20,44 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
-from animelab.services.source_http import source_http, VerificationRequired
-from animelab.services.browser_verification import browser_verification
-from animelab.routers.network import router as network_router
-from animelab.config import settings
+from animelab.config import IS_ANDROID, settings
 from animelab import __version__
-from animelab.database import init_db
-from animelab.services.download_manager import download_manager
-from animelab.services.scraping_service import scraping_service
-from animelab.services.voiranime_service import voiranime_service
-from animelab.services.animepahe_service import animepahe_service
-from animelab.services.watchdog_service import watchdog_service
+from animelab.progressive import ProgressiveAppLoader, ProgressiveRouteMiddleware
 from animelab.services.i18n_service import current_request_lang, detect_client_language
-from animelab.routers import (
-    anime_router,
-    download_router,
-    library_router,
-    media_router,
-    extensions_router,
-    sources_router,
-    i18n_router,
-)
 
 logger = logging.getLogger("animelab")
 
+PROGRESSIVE_BOOT = getenv(
+    "ANIMELAB_PROGRESSIVE_BOOT",
+    "1" if IS_ANDROID else "0",
+).lower() in ("1", "true", "yes")
+
+progressive_loader: ProgressiveAppLoader
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Starting AnimeLab Python v%s...", __version__)
-    source_http.start()
-    browser_verification.verified_callback = download_manager.resume_verified_domain
-    from animelab.desktop.window import install_linux_webview_opener
-    installed_linux_webview = install_linux_webview_opener(browser_verification)
-    # 1. Initialize SQLite database
-    init_db()
-    from animelab.services.app_preferences import restore_download_directory
-    restore_download_directory()
-    # 2. Restore unfinished download tasks
-    download_manager.init_from_db()
-    loop = asyncio.get_running_loop()
-    source_http.rotation_callback = lambda domain: loop.call_soon_threadsafe(download_manager.resume_verified_domain, domain)
-    # 3. Start Watchdog service
-    watchdog_service.start()
-    # 4. Pre-load release feeds (background with concurrency lock)
-    bg_tasks = [
-        asyncio.create_task(browser_verification.watch()),
-    ]
-    from animelab.services.proxy_pool import proxy_pool
-    bg_tasks.append(asyncio.create_task(proxy_pool.watch()))
-    if getenv("ANIMAN_STARTUP_REFRESH", "true").lower() not in ("false", "0", "no"):
-        bg_tasks.append(asyncio.create_task(proxy_pool.refresh()))
-        for service in (scraping_service, voiranime_service, animepahe_service):
-            service._refresh_task = asyncio.create_task(service._safe_refresh_cache())
-            bg_tasks.append(service._refresh_task)
+    logger.info("Starting AnimeLab Python v%s (progressive=%s)...", __version__, PROGRESSIVE_BOOT)
+    progressive_loader.mark_stage0_ready()
+    if PROGRESSIVE_BOOT:
+        progressive_loader.start_warmup()
+    else:
+        progressive_loader.initialize_core_services_eager()
 
-    import socket
-    lan_ip = "127.0.0.1"
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.connect(("8.8.8.8", 80))
-            lan_ip = s.getsockname()[0]
-    except Exception:
-        pass
-    logger.info("Application ready at http://localhost:%d and http://%s:%d (LAN / Mobile)", settings.PORT, lan_ip, settings.PORT)
+    if not PROGRESSIVE_BOOT:
+        import socket
+        lan_ip = "127.0.0.1"
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.connect(("8.8.8.8", 80))
+                lan_ip = s.getsockname()[0]
+        except Exception:
+            pass
+        logger.info("Application ready at http://localhost:%d and http://%s:%d (LAN / Mobile)", settings.PORT, lan_ip, settings.PORT)
     yield
 
     logger.info("Stopping AnimeLab...")
-    source_http.rotation_callback = None
-    browser_verification.verified_callback = None
-    if installed_linux_webview:
-        browser_verification.webview_opener = None
-    watchdog_service.stop()
-    await download_manager.shutdown()
-    for t in bg_tasks:
-        if not t.done():
-            t.cancel()
-    await asyncio.gather(*bg_tasks, return_exceptions=True)
-    await browser_verification.close()
-    await proxy_pool.close()
-    await asyncio.to_thread(source_http.close)
+    await progressive_loader.shutdown()
 
 app = FastAPI(
     title="AnimeLab",
@@ -104,6 +65,12 @@ app = FastAPI(
     version=__version__,
     lifespan=lifespan
 )
+progressive_loader = ProgressiveAppLoader(app, progressive=PROGRESSIVE_BOOT)
+
+# Register ProgressiveRouteMiddleware first so CORS, security/CSRF, error
+# contracts, TrustedHostMiddleware and AndroidSessionMiddleware stay outermost.
+if PROGRESSIVE_BOOT:
+    app.add_middleware(ProgressiveRouteMiddleware, loader=progressive_loader)
 
 # Configuration CORS pour autoriser les clients frontend découplés (SPA Vite, mobile, LAN)
 _cors_origins_env = getenv("ANIMAN_CORS_ORIGINS", "")
@@ -240,10 +207,17 @@ async def get_offline_page():
 # Enregistrement des routeurs
 from animelab.routers.web import router as web_router
 app.include_router(web_router)
-from animelab.routers.playback import router as playback_router
-app.include_router(playback_router)
 from animelab.routers.diagnostics import router as diagnostics_router
 app.include_router(diagnostics_router)
+from animelab.routers.startup import router as startup_router
+app.include_router(startup_router)
+from animelab.routers.i18n import router as i18n_router
+app.include_router(i18n_router)
+
+@app.get("/api/engine/readiness", include_in_schema=False)
+async def engine_readiness():
+    return progressive_loader.readiness_snapshot()
+
 from animelab.api_errors import ErrorContractMiddleware, install_error_handlers
 install_error_handlers(app)
 from animelab.api_contracts import install_contract_schema
@@ -252,18 +226,39 @@ app.add_middleware(ErrorContractMiddleware)
 # Validate Host before CSRF checks, CORS preflights and route handling.
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS, www_redirect=False)
 
-app.include_router(network_router)
-app.include_router(anime_router)
-app.include_router(download_router)
-from animelab.routers.subtitles import router as subtitles_router
-app.include_router(subtitles_router)
-app.include_router(library_router)
-from animelab.routers.startup import router as startup_router
-app.include_router(startup_router)
-app.include_router(media_router)
-app.include_router(extensions_router)
-app.include_router(sources_router)
-app.include_router(i18n_router)
+if not PROGRESSIVE_BOOT:
+    progressive_loader.mount_all_eager()
+
+_LAZY_RUN_ATTRS = {
+    "source_http": ("animelab.services.source_http", "source_http"),
+    "VerificationRequired": ("animelab.services.source_http", "VerificationRequired"),
+    "browser_verification": ("animelab.services.browser_verification", "browser_verification"),
+    "download_manager": ("animelab.services.download_manager", "download_manager"),
+    "scraping_service": ("animelab.services.scraping_service", "scraping_service"),
+    "voiranime_service": ("animelab.services.voiranime_service", "voiranime_service"),
+    "animepahe_service": ("animelab.services.animepahe_service", "animepahe_service"),
+    "watchdog_service": ("animelab.services.watchdog_service", "watchdog_service"),
+    "network_router": ("animelab.routers.network", "router"),
+    "anime_router": ("animelab.routers.anime", "router"),
+    "download_router": ("animelab.routers.download", "router"),
+    "library_router": ("animelab.routers.library", "router"),
+    "media_router": ("animelab.routers.media", "router"),
+    "extensions_router": ("animelab.routers.extensions", "router"),
+    "sources_router": ("animelab.routers.sources", "router"),
+    "subtitles_router": ("animelab.routers.subtitles", "router"),
+    "playback_router": ("animelab.routers.playback", "router"),
+    "i18n_router": ("animelab.routers.i18n", "router"),
+    "init_db": ("animelab.database", "init_db"),
+}
+
+
+def __getattr__(name: str):
+    if name not in _LAZY_RUN_ATTRS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module_name, attr_name = _LAZY_RUN_ATTRS[name]
+    value = getattr(importlib.import_module(module_name), attr_name)
+    globals()[name] = value
+    return value
 
 # Support SPA Vue 3 découplée (Mode hybride / production unifiée)
 frontend_dist = Path(__file__).parent / "frontend" / "dist"

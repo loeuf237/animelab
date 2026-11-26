@@ -1,17 +1,27 @@
-from animelab.routers.anime import router as anime_router
-from animelab.routers.download import router as download_router
-from animelab.routers.library import router as library_router
-from animelab.routers.media import router as media_router
-from animelab.routers.extensions import router as extensions_router
-from animelab.routers.sources import router as sources_router
-from animelab.routers.i18n import router as i18n_router
+"""Lazy router exports (PEP 562) so importing one router does not pull all others."""
+from importlib import import_module
 
-__all__ = [
-    "anime_router",
-    "download_router",
-    "library_router",
-    "media_router",
-    "extensions_router",
-    "sources_router",
-    "i18n_router",
-]
+_EXPORTS = {
+    "anime_router": ("animelab.routers.anime", "router"),
+    "download_router": ("animelab.routers.download", "router"),
+    "library_router": ("animelab.routers.library", "router"),
+    "media_router": ("animelab.routers.media", "router"),
+    "extensions_router": ("animelab.routers.extensions", "router"),
+    "sources_router": ("animelab.routers.sources", "router"),
+    "i18n_router": ("animelab.routers.i18n", "router"),
+}
+
+__all__ = list(_EXPORTS)
+
+
+def __getattr__(name: str):
+    if name not in _EXPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module_name, attr_name = _EXPORTS[name]
+    value = getattr(import_module(module_name), attr_name)
+    globals()[name] = value
+    return value
+
+
+def __dir__():
+    return sorted([*globals(), *__all__])

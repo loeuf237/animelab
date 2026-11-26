@@ -10,10 +10,10 @@ from animelab import __version__, platform_events
 from animelab.api_contracts import ContractRoute
 from animelab.config import settings, IS_ANDROID
 from animelab.environment import getenv
-from animelab.routers.network import is_local
+from animelab.request_origin import is_local
 from animelab.security import anonymize_path
 from animelab.services import app_preferences
-from animelab.services.app_updates import app_updates, current_version
+from animelab.version_info import current_version
 
 router = APIRouter(route_class=ContractRoute, prefix='/api/app')
 
@@ -72,6 +72,7 @@ async def save_startup_preferences(body: Preferences):
 
 @router.get('/updates')
 async def check_application_updates(refresh: bool = False):
+    from animelab.services.app_updates import app_updates
     prefs = await asyncio.to_thread(app_preferences.load)
     # A total deadline also bounds DNS and a peer which drips an endless body.
     try:
@@ -83,6 +84,7 @@ async def check_application_updates(refresh: bool = False):
 
 @router.get('/updates/install')
 async def get_update_install_status(request: Request):
+    from animelab.services.app_updates import app_updates
     status = await asyncio.to_thread(app_updates.install_status)
     return _public_install_status(status, is_local(request))
 
@@ -91,6 +93,7 @@ async def get_update_install_status(request: Request):
 async def start_update_install(request: Request, body: UpdateInstallRequest | None = None):
     if not is_local(request):
         raise HTTPException(403, 'Application updates cannot be installed from a remote client')
+    from animelab.services.app_updates import app_updates
     prefs = await asyncio.to_thread(app_preferences.load)
     try:
         status = await app_updates.start_install(
@@ -106,6 +109,7 @@ async def start_update_install(request: Request, body: UpdateInstallRequest | No
 async def apply_update_install(request: Request):
     if not is_local(request):
         raise HTTPException(403, 'Application updates cannot be launched from a remote client')
+    from animelab.services.app_updates import app_updates
     try:
         status = await app_updates.apply_installed_update()
     except ValueError as exc:

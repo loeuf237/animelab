@@ -30,8 +30,6 @@ logger = logging.getLogger("animelab.extensions")
 
 EXTENSIONS_DIR = Path.home() / ".animan" / "extensions"
 APKS_DIR = EXTENSIONS_DIR / "apks"
-EXTENSIONS_DIR.mkdir(parents=True, exist_ok=True)
-APKS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def serialized_extension(method):
@@ -50,16 +48,36 @@ def serialized_extension(method):
 class ExtensionService:
     """Service de gestion des dépôts et extensions Aniyomi compatibles."""
 
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: Optional[str] = None, *, lazy: bool = False):
         self.db_path = db_path or settings.DATABASE_PATH
         self._active_container_sources: Dict[str, AniyomiContainerSource] = {}
         self._native_packages = []
         self._native_lock = threading.RLock()
         self._operation_locks = {}
-        self._init_db()
-        self._load_enabled_sources()
+        self._init_lock = threading.RLock()
+        self._initialized = False
+        self._initializing = False
+        if not lazy:
+            self._ensure_initialized()
+
+    def _ensure_initialized(self):
+        if self._initialized:
+            return
+        with self._init_lock:
+            if self._initialized or self._initializing:
+                return
+            self._initializing = True
+            try:
+                EXTENSIONS_DIR.mkdir(parents=True, exist_ok=True)
+                APKS_DIR.mkdir(parents=True, exist_ok=True)
+                self._init_db()
+                self._load_enabled_sources()
+                self._initialized = True
+            finally:
+                self._initializing = False
 
     def _get_conn(self):
+        self._ensure_initialized()
         return sqlite_connection(self.db_path)
 
     def _init_db(self):
@@ -891,6 +909,7 @@ class ExtensionService:
         return await self.configure_extension(ext_id,json.loads(row['recipe_json']),revision_reason='restore',force_revision=True)
 
     def sync_android_extensions(self):
+        self._ensure_initialized()
         from animelab.services import android_extensions
         if not android_extensions.available():
             return []
@@ -1109,12 +1128,14 @@ class ExtensionService:
 
     def get_enabled_container_sources(self) -> List[AniyomiContainerSource]:
         """Retourne la liste des conteneurs de sources actuellement activés."""
+        self._ensure_initialized()
         return list(self._active_container_sources.values())
 
     def get_container_source_by_id(self, source_id: str) -> Optional[AniyomiContainerSource]:
         """Recherche une source active par identifiant ou nom de package."""
         if not source_id:
             return None
+        self._ensure_initialized()
         sid = source_id.lower().strip()
         if sid in self._active_container_sources:
             return self._active_container_sources[sid]
@@ -1128,6 +1149,7 @@ class ExtensionService:
 
     def get_allowed_domains(self) -> Set[str]:
         """Retourne les domaines des sources activées pour la whitelist SSRF."""
+        self._ensure_initialized()
         domains = set()
         for src in self._active_container_sources.values():
             if src.base_url:
@@ -1140,4 +1162,4 @@ class ExtensionService:
         return domains
 
 
-extension_service = ExtensionService()
+extension_service = ExtensionService(lazy=True)

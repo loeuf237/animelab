@@ -26,14 +26,22 @@ VIDZY_URL_PATTERN = re.compile(r"(https?://(?:vidzy\.[a-z0-9]+|luluvdo\.[a-z0-9]
 CLEAN_TITLE_PATTERN = re.compile(r"(?i)\s*\((VF|VOSTFR|VF\+VOSTFR|VF\s*/\s*VOSTFR|VOST|UNCUT)\)")
 
 class ScrapingService:
-    def __init__(self):
+    def __init__(self, *, lazy: bool = False):
         self.base_url = settings.BASE_URL
         self.latest_cache: List[AnimeResult] = []
         self.last_cache_time: float = 0.0
         self.is_refreshing: bool = False
+        self._cache_loaded: bool = False
+        if not lazy:
+            self._load_persistent_cache()
+
+    def _ensure_persistent_cache_loaded(self):
+        if getattr(self, "_cache_loaded", True):
+            return
         self._load_persistent_cache()
 
     def _load_persistent_cache(self):
+        self._cache_loaded = True
         try:
             cache_file = settings.CACHE_DIR / "latest_french_manga.json"
             if cache_file.exists():
@@ -79,6 +87,7 @@ class ScrapingService:
     # -------------------------------------------------------------------------
 
     async def get_latest_releases(self) -> List[AnimeResult]:
+        self._ensure_persistent_cache_loaded()
         state = source_http.state(self.base_url)
         if state.blocked_url:
             blocked = state.blocked_url
@@ -821,4 +830,4 @@ class ScrapingService:
         m = re.search(r"href=['\"]([^'\"]+\.(?:mp4|mkv|avi)[^'\"]*)['\"]", html, re.IGNORECASE)
         return m.group(1) if m else ""
 
-scraping_service = ScrapingService()
+scraping_service = ScrapingService(lazy=True)

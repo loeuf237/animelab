@@ -1,55 +1,71 @@
 from animelab.services.source_http import VerificationRequired
 import logging
+import threading
 from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
 from animelab.config import settings
 from animelab.services.extractors.base import BaseVideoExtractor, ExtractorResult
-from animelab.services.extractors.vidmoly import VidmolyExtractor
-from animelab.services.extractors.sibnet import SibnetExtractor
-from animelab.services.extractors.sendvid import SendvidExtractor
-from animelab.services.extractors.streamtape import StreamtapeExtractor
-from animelab.services.extractors.voe import VoeExtractor
-from animelab.services.extractors.uqload import UqloadExtractor
-from animelab.services.extractors.filemoon import FilemoonExtractor
-from animelab.services.extractors.doodstream import DoodstreamExtractor
-from animelab.services.extractors.mp4upload import Mp4uploadExtractor
-from animelab.services.extractors.mailru import MailRuExtractor
-from animelab.services.extractors.kwik import KwikExtractor
-from animelab.services.extractors.ytdlp_fallback import YtDlpFallbackExtractor
-from animelab.services.proxy_service import proxy_service
 from animelab.services.source_http import USER_AGENT
 
 logger = logging.getLogger(__name__)
 
+
 class ExtractorRegistry:
     def __init__(self):
         self._extractors: List[BaseVideoExtractor] = []
-        self._fallback_extractor = YtDlpFallbackExtractor()
-        self._register_defaults()
+        self._fallback_extractor: Optional[BaseVideoExtractor] = None
+        self._loaded = False
+        self._load_lock = threading.RLock()
 
-    def _register_defaults(self):
-        self.register(VidmolyExtractor())
-        self.register(SibnetExtractor())
-        self.register(SendvidExtractor())
-        self.register(StreamtapeExtractor())
-        self.register(VoeExtractor())
-        self.register(UqloadExtractor())
-        self.register(FilemoonExtractor())
-        self.register(DoodstreamExtractor())
-        self.register(Mp4uploadExtractor())
-        self.register(MailRuExtractor())
-        self.register(KwikExtractor())
+    def _ensure_loaded(self):
+        if self._loaded:
+            return
+        with self._load_lock:
+            if self._loaded:
+                return
+            from animelab.services.extractors.vidmoly import VidmolyExtractor
+            from animelab.services.extractors.sibnet import SibnetExtractor
+            from animelab.services.extractors.sendvid import SendvidExtractor
+            from animelab.services.extractors.streamtape import StreamtapeExtractor
+            from animelab.services.extractors.voe import VoeExtractor
+            from animelab.services.extractors.uqload import UqloadExtractor
+            from animelab.services.extractors.filemoon import FilemoonExtractor
+            from animelab.services.extractors.doodstream import DoodstreamExtractor
+            from animelab.services.extractors.mp4upload import Mp4uploadExtractor
+            from animelab.services.extractors.mailru import MailRuExtractor
+            from animelab.services.extractors.kwik import KwikExtractor
+            from animelab.services.extractors.ytdlp_fallback import YtDlpFallbackExtractor
+
+            self._fallback_extractor = YtDlpFallbackExtractor()
+            for cls in (
+                VidmolyExtractor,
+                SibnetExtractor,
+                SendvidExtractor,
+                StreamtapeExtractor,
+                VoeExtractor,
+                UqloadExtractor,
+                FilemoonExtractor,
+                DoodstreamExtractor,
+                Mp4uploadExtractor,
+                MailRuExtractor,
+                KwikExtractor,
+            ):
+                self._extractors.append(cls())
+            self._loaded = True
 
     def register(self, extractor: BaseVideoExtractor):
+        self._ensure_loaded()
         self._extractors.append(extractor)
 
     def domains(self):
+        self._ensure_loaded()
         return {domain for extractor in self._extractors for domain in extractor.domains}
 
     def find_extractor(self, url: str) -> Optional[BaseVideoExtractor]:
         if not url:
             return None
+        self._ensure_loaded()
         for ext in self._extractors:
             if ext.matches(url):
                 return ext
@@ -139,6 +155,7 @@ class ExtractorRegistry:
                 logger.debug("Échec de l'extracteur %s: %s", extractor.name, e)
 
         # Repli silencieux vers yt-dlp
+        self._ensure_loaded()
         logger.debug("Tentative repli yt-dlp pour URL: %s", url)
         try:
             res_ytdl = await self._fallback_extractor.extract(url, referer=referer, preferred_quality=preferred_quality)

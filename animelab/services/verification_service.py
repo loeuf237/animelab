@@ -46,11 +46,24 @@ class VerificationResult(BaseModel):
 
 class DownloadVerificationService:
     def __init__(self):
-        self._ffprobe_path = media_tools.which("ffprobe")
-        if self._ffprobe_path:
-            logger.info("Verification service initialized with ffprobe (%s)", self._ffprobe_path)
-        else:
-            logger.warning("ffprobe not detected on the system. Headers verification mode enabled.")
+        self._ffprobe_path_cached: Optional[str] = None
+        self._ffprobe_resolved: bool = False
+
+    @property
+    def _ffprobe_path(self) -> Optional[str]:
+        if not self._ffprobe_resolved:
+            self._ffprobe_resolved = True
+            self._ffprobe_path_cached = media_tools.which("ffprobe")
+            if self._ffprobe_path_cached:
+                logger.info("Verification service initialized with ffprobe (%s)", self._ffprobe_path_cached)
+            else:
+                logger.warning("ffprobe not detected on the system. Headers verification mode enabled.")
+        return self._ffprobe_path_cached
+
+    @_ffprobe_path.setter
+    def _ffprobe_path(self, value: Optional[str]) -> None:
+        self._ffprobe_resolved = True
+        self._ffprobe_path_cached = value
 
     @property
     def is_ffprobe_available(self) -> bool:

@@ -47,6 +47,7 @@ class MainActivity : AppCompatActivity() {
     private var savedCutoutMode: Int? = null
     private var fileCallback: ValueCallback<Array<Uri>>? = null
     private var connectJob: Job? = null
+    private var firstPageLogged = false
     private lateinit var nativeUiBridge: NativeUiBridge
 
     internal fun isInFullscreenVideo(): Boolean = customView != null
@@ -154,8 +155,14 @@ class MainActivity : AppCompatActivity() {
         binding.retryButton.visibility = View.GONE
         connectJob = lifecycleScope.launch {
             val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MINUTES.toNanos(3)
+            var probeDelayMs = 50L
             while (System.nanoTime() < deadline && EngineHost.error == null) {
-                if (!EngineHost.ready) { delay(500); continue }
+                if (!EngineHost.ready) {
+                    val remainingMs = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime())
+                    if (remainingMs <= 0L) break
+                    EngineHost.awaitReady(remainingMs)
+                    continue
+                }
                 val reachable = withContext(Dispatchers.IO) {
                     try {
                         val conn = URL(EngineHost.baseUrl + "/manifest.json").openConnection(Proxy.NO_PROXY) as HttpURLConnection
@@ -174,7 +181,8 @@ class MainActivity : AppCompatActivity() {
                     }
                     return@launch
                 }
-                delay(500)
+                delay(probeDelayMs)
+                probeDelayMs = (probeDelayMs * 2).coerceAtMost(250L)
             }
             binding.loadingStatus.text = getString(R.string.engine_error, EngineHost.error ?: getString(R.string.engine_timeout))
             binding.retryButton.visibility = View.VISIBLE
@@ -210,6 +218,11 @@ class MainActivity : AppCompatActivity() {
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) { binding.progressBar.visibility = View.VISIBLE }
             override fun onPageFinished(view: WebView?, url: String?) {
                 binding.progressBar.visibility = View.GONE; binding.loadingLayout.visibility = View.GONE
+                if (!firstPageLogged && EngineHost.startElapsedMs > 0L) {
+                    firstPageLogged = true
+                    val elapsed = android.os.SystemClock.elapsedRealtime() - EngineHost.startElapsedMs
+                    android.util.Log.i("AnimanEngine", "ANIMAN_WEBVIEW_READY=${elapsed}ms timing=${EngineHost.timingJson()}")
+                }
             }
             override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
                 if (request?.isForMainFrame == true) {

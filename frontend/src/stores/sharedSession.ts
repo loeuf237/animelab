@@ -12,6 +12,12 @@ export const sharedUser = ref<SharedUser | null>(null)
 const identityKey = 'animelab_shared_identity'
 
 export async function initializeSharedSession(): Promise<boolean> {
+  if (
+    typeof window !== 'undefined' &&
+    Boolean((window as Window & { AnimeLabAndroid?: unknown }).AnimeLabAndroid)
+  ) {
+    return true
+  }
   let response: Response
   try {
     response = await fetch('/api/auth/me', { cache: 'no-store', credentials: 'same-origin' })

@@ -144,6 +144,7 @@ val syncPythonSource by tasks.registering(Sync::class) {
         exclude("**/*.pyc")
         exclude("animelab/Artefacts/**")
         exclude("animelab/ressources/**")
+        exclude("animelab/desktop/**")
     }
     into("${projectDir}/src/main/python")
     if (optimizeApk) {
