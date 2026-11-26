@@ -11,9 +11,12 @@ const platformCode = ts
   })
   .outputText.replace("'vue'", JSON.stringify(import.meta.resolve('vue')))
 
-const { readAndroidEngineState, isAndroidEngineBooting, waitForAndroidEngine } = await import(
-  inline(platformCode)
-)
+const {
+  readAndroidEngineState,
+  isAndroidEngineBooting,
+  waitForAndroidEngine,
+  openNativeExternalPlayer,
+} = await import(inline(platformCode))
 
 function setupMockWindow(t, initialState) {
   const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')
@@ -21,16 +24,27 @@ function setupMockWindow(t, initialState) {
   const target = new EventTarget()
   let state = initialState
 
+  // Android WebView's Gin Java Bridge throws TypeError('Illegal invocation')
+  // whenever a @JavascriptInterface method is called without the bridge object as `this`.
+  const bridge =
+    initialState === undefined
+      ? {}
+      : {
+          getEngineState() {
+            if (this !== bridge) throw new TypeError('Illegal invocation')
+            return JSON.stringify(state)
+          },
+          openExternalPlayer(payloadJson) {
+            if (this !== bridge) throw new TypeError('Illegal invocation')
+            return JSON.stringify({ launched: Boolean(payloadJson) })
+          },
+        }
+
   const mockWindow = {
     addEventListener: target.addEventListener.bind(target),
     removeEventListener: target.removeEventListener.bind(target),
     dispatchEvent: target.dispatchEvent.bind(target),
-    AnimeLabAndroid:
-      initialState === undefined
-        ? {}
-        : {
-            getEngineState: () => JSON.stringify(state),
-          },
+    AnimeLabAndroid: bridge,
   }
 
   Object.defineProperty(globalThis, 'window', { configurable: true, value: mockWindow })
@@ -112,4 +126,16 @@ test('resolves via polling fallback when state changes without DOM event', async
   const pending = waitForAndroidEngine()
   setState({ ready: true, fullyReady: false, error: null })
   assert.deepEqual(await pending, { ready: true })
+})
+
+test('preserves Android WebView bridge receiver for JavascriptInterface methods', (t) => {
+  setupMockWindow(t, { ready: false, fullyReady: false, error: null })
+  assert.deepEqual(readAndroidEngineState(), { ready: false, fullyReady: false, error: null })
+  assert.deepEqual(
+    openNativeExternalPlayer({ kind: 'url', target: 'https://example.test/v.mp4' }),
+    {
+      launched: true,
+      error: undefined,
+    },
+  )
 })

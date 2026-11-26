@@ -118,8 +118,22 @@ export const useStartupStore = defineStore('startup', () => {
             error.value = 'Impossible de joindre le serveur. Vous pouvez réessayer ou continuer.'
           return
         }
-        await new Promise((resolve) => setTimeout(resolve, 350 * attempt))
-        if (current !== generation) return
+        const latestEngine = readAndroidEngineState()
+        if (latestEngine && !latestEngine.ready) {
+          engineStarting.value = true
+          const waited = await waitForAndroidEngine()
+          engineStarting.value = false
+          if (current !== generation) return
+          if (!waited.ready) {
+            error.value =
+              waited.error ||
+              'Impossible de joindre le serveur. Vous pouvez réessayer ou continuer.'
+            return
+          }
+        } else {
+          await new Promise((resolve) => setTimeout(resolve, 350 * attempt))
+          if (current !== generation) return
+        }
       } finally {
         clearTimeout(timer)
       }
